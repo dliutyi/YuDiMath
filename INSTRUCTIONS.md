@@ -6,15 +6,23 @@ A modern, interactive web application for visualizing linear algebra and calculu
 ## Key Concepts
 
 ### Frame/Viewport System
-- Each frame is a **viewport** - a rectangular region that is snapped to the background coordinate system
+- Each frame is a **viewport** - a rectangular region that is snapped to the background coordinate system (or parent frame's coordinate system for nested frames)
 - Each frame has its own **width and height** (defined by the rectangle bounds drawn by the user)
 - Each frame has its own **independent coordinate grid** based on its base vectors (i and j)
   - The frame's grid lines follow the directions of the base vectors
   - The frame's grid spacing is based on the base vector magnitudes
-  - The frame's origin is positioned at a specific point in the background coordinate system
-- The frame's coordinate system is transformed relative to the background coordinate system
-  - Objects drawn in frame coordinates are transformed to background coordinates for display
-- Multiple frames can exist simultaneously, each with completely independent coordinate systems
+  - The frame's origin is positioned at a specific point in the parent coordinate system (background or parent frame)
+- The frame's coordinate system is transformed relative to its parent coordinate system
+  - Objects drawn in frame coordinates are transformed to parent coordinates for display
+  - For nested frames, transformations are composed (child frame coordinates → parent frame coordinates → background coordinates)
+- **Nested Frame Support (Russian Doll Pattern)**:
+  - Frames can be nested recursively - a frame can contain child frames within it
+  - Each nested frame has its own base vectors, functions, vectors, and can contain further nested frames
+  - Nested frames are positioned and transformed relative to their parent frame's coordinate system
+  - The nesting depth is unlimited - frames can be nested as deeply as needed
+  - When a nested frame is selected, its corresponding Python code appears in the code panel
+  - Each frame maintains its own independent state (base vectors, functions, vectors, nested frames)
+- Multiple frames can exist simultaneously at the same nesting level, each with completely independent coordinate systems
 - When a frame is selected, its corresponding Python code appears in the code panel
 
 ### Coordinate Modes
@@ -273,15 +281,21 @@ For each step:
 
 ## Phase 3: Frame/Viewport System
 
+**Note on Nested Frames**: The frame system supports recursive nesting (Russian doll pattern). Frames can be drawn inside other frames, creating a hierarchy where each nested frame has its own coordinate system relative to its parent. This nesting can continue to any depth. When implementing frame features, ensure they work correctly for both top-level frames (relative to background) and nested frames (relative to parent frame).
+
 ### [ ] Step 3.1: Implement Frame Drawing (Rectangle Creation)
 **Task**: Allow users to draw rectangles that become coordinate frames.
 
 **Implementation**:
 - Add drawing mode state
 - Implement mouse down/move/up handlers for rectangle drawing
-- Snap rectangle corners to grid
+- Snap rectangle corners to grid (background grid for top-level frames, parent frame grid for nested frames)
 - Create frame data structure on rectangle completion
 - Store frame bounds (x, y, width, height)
+- Support drawing frames inside existing frames (nested frames)
+  - When drawing inside a frame, the new frame should be a child of that frame
+  - Child frame bounds are relative to parent frame's coordinate system
+  - Store parent frame reference in frame data structure
 
 **Tests**:
 - Test rectangle drawing starts on mouse down
