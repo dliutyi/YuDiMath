@@ -360,29 +360,77 @@ function drawFrameAxes(
   const framePanX = frameViewport.x
   const framePanY = frameViewport.y
 
-  // Calculate visible range in frame coordinates
-  // Frame center in frame coordinates is at (0, 0) accounting for pan
-  // We need to account for how frame coordinates map to parent coordinates
-  const parentZoomAxes = viewport.zoom
-  // Combined scale: frame coordinate -> parent coordinate -> screen
-  // gridStep is the base vector magnitude, so frame coordinate -> parent is gridStep
-  // parent -> screen is parentZoom * frameZoom
-  const frameToScreenScaleAxes = gridStep * frameZoom * parentZoomAxes
+  // Axes should always be fixed at the origin (0, 0) in frame coordinates
+  // They extend from the origin to the frame edges, regardless of panning
+  // The origin in frame coordinates is always at (0, 0), which maps to frame.origin in parent coordinates
   
-  const halfFrameWidth = (frameScreenWidth / frameToScreenScaleAxes) / 2
-  const halfFrameHeight = (frameScreenHeight / frameToScreenScaleAxes) / 2
-
-  const minFrameX = -halfFrameWidth - framePanX
-  const maxFrameX = halfFrameWidth - framePanX
-  const minFrameY = -halfFrameHeight - framePanY
-  const maxFrameY = halfFrameHeight - framePanY
-
-  // Draw X axis (horizontal line in frame coordinates, parallel to baseI)
-  // X axis is at y=0 in frame coordinates
-  const xAxisStart = frameToParent([minFrameX, 0], frame)
-  const xAxisEnd = frameToParent([maxFrameX, 0], frame)
-  const xAxisStartScreen = worldToScreen(xAxisStart[0], xAxisStart[1], viewport, canvasWidth, canvasHeight)
-  const xAxisEndScreen = worldToScreen(xAxisEnd[0], xAxisEnd[1], viewport, canvasWidth, canvasHeight)
+  // Calculate frame corners in screen coordinates
+  const topLeftScreen = topLeft
+  const topRightScreen = [bottomRight[0], topLeft[1]]
+  const bottomLeftScreen = [topLeft[0], bottomRight[1]]
+  const bottomRightScreen = bottomRight
+  
+  // Origin in screen coordinates (always fixed at frame.origin in parent coordinates)
+  const originScreenAxes = worldToScreen(origin[0], origin[1], viewport, canvasWidth, canvasHeight)
+  
+  // Calculate axis directions in screen coordinates
+  // X axis is parallel to baseI, Y axis is parallel to baseJ
+  // We need to find where these axes intersect the frame edges
+  
+  // For X axis (parallel to baseI): find intersection with left and right edges
+  // For Y axis (parallel to baseJ): find intersection with top and bottom edges
+  
+  // Get base vector directions in screen coordinates
+  const baseIEndScreen = frameToScreen([1, 0], frame, viewport, canvasWidth, canvasHeight)
+  const baseJEndScreen = frameToScreen([0, 1], frame, viewport, canvasWidth, canvasHeight)
+  
+  // Calculate direction vectors in screen space
+  const baseIDirX = baseIEndScreen[0] - originScreenAxes[0]
+  const baseIDirY = baseIEndScreen[1] - originScreenAxes[1]
+  const baseJDirX = baseJEndScreen[0] - originScreenAxes[0]
+  const baseJDirY = baseJEndScreen[1] - originScreenAxes[1]
+  
+  // Find X axis endpoints (intersection with left and right edges)
+  // X axis goes through origin, parallel to baseI
+  let xAxisStartScreen = originScreenAxes
+  let xAxisEndScreen = originScreenAxes
+  
+  if (Math.abs(baseIDirX) > 0.001) {
+    // Find intersection with left edge (x = topLeft[0])
+    const tLeft = (topLeftScreen[0] - originScreenAxes[0]) / baseIDirX
+    const yLeft = originScreenAxes[1] + tLeft * baseIDirY
+    if (yLeft >= topLeftScreen[1] && yLeft <= bottomLeftScreen[1]) {
+      xAxisStartScreen = [topLeftScreen[0], yLeft]
+    }
+    
+    // Find intersection with right edge (x = bottomRight[0])
+    const tRight = (bottomRightScreen[0] - originScreenAxes[0]) / baseIDirX
+    const yRight = originScreenAxes[1] + tRight * baseIDirY
+    if (yRight >= topRightScreen[1] && yRight <= bottomRightScreen[1]) {
+      xAxisEndScreen = [bottomRightScreen[0], yRight]
+    }
+  }
+  
+  // Find Y axis endpoints (intersection with top and bottom edges)
+  // Y axis goes through origin, parallel to baseJ
+  let yAxisStartScreen = originScreenAxes
+  let yAxisEndScreen = originScreenAxes
+  
+  if (Math.abs(baseJDirY) > 0.001) {
+    // Find intersection with top edge (y = topLeft[1])
+    const tTop = (topLeftScreen[1] - originScreenAxes[1]) / baseJDirY
+    const xTop = originScreenAxes[0] + tTop * baseJDirX
+    if (xTop >= topLeftScreen[0] && xTop <= topRightScreen[0]) {
+      yAxisStartScreen = [xTop, topLeftScreen[1]]
+    }
+    
+    // Find intersection with bottom edge (y = bottomRight[1])
+    const tBottom = (bottomRightScreen[1] - originScreenAxes[1]) / baseJDirY
+    const xBottom = originScreenAxes[0] + tBottom * baseJDirX
+    if (xBottom >= bottomLeftScreen[0] && xBottom <= bottomRightScreen[0]) {
+      yAxisEndScreen = [xBottom, bottomRightScreen[1]]
+    }
+  }
 
   ctx.strokeStyle = '#64748b' // axis color
   ctx.lineWidth = 2
@@ -392,11 +440,7 @@ function drawFrameAxes(
   ctx.lineTo(Math.round(xAxisEndScreen[0]) + 0.5, Math.round(xAxisEndScreen[1]) + 0.5)
   ctx.stroke()
 
-  // Draw Y axis (vertical line in frame coordinates, parallel to baseJ)
-  // Y axis is at x=0 in frame coordinates
-  // Use frameToScreen to account for frame viewport zoom and pan
-  const yAxisStartScreen = frameToScreen([0, minFrameY], frame, viewport, canvasWidth, canvasHeight)
-  const yAxisEndScreen = frameToScreen([0, maxFrameY], frame, viewport, canvasWidth, canvasHeight)
+  // Y axis endpoints are already calculated above
 
   ctx.beginPath()
   ctx.moveTo(Math.round(yAxisStartScreen[0]) + 0.5, Math.round(yAxisStartScreen[1]) + 0.5)
