@@ -7,7 +7,7 @@ function App() {
     x: 0,
     y: 0,
     zoom: 1.0,
-    gridStep: 1,
+    gridStep: 10, // Default to 10 units for better visibility
   })
 
   return (

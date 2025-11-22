@@ -151,8 +151,9 @@ function drawGrid(
   console.log('[drawGrid] screenGridSpacing:', screenGridSpacing, 'worldToScreenScale:', worldToScreenScale)
 
   // Only draw grid if spacing is reasonable (not too dense, not too sparse)
-  if (screenGridSpacing < 5) {
-    console.log('[drawGrid] Grid too dense (spacing < 5px), skipping. Consider increasing gridStep or zoom')
+  // Lower threshold to 2px to allow denser grids
+  if (screenGridSpacing < 2) {
+    console.log('[drawGrid] Grid too dense (spacing < 2px), skipping. Consider increasing gridStep or zoom')
     ctx.globalAlpha = 1.0
     return
   }
