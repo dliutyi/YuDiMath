@@ -375,6 +375,149 @@ describe('Canvas', () => {
     expect(createdFrame.bounds.height).toBeGreaterThan(0)
   })
 
+  it('inherits base vectors from parent frame', async () => {
+    const onFrameCreated = vi.fn()
+    
+    const parentFrame: CoordinateFrame = {
+      id: 'parent-frame',
+      origin: [0, 0],
+      baseI: [0.707, 0.707], // 45 degree rotation
+      baseJ: [-0.707, 0.707],
+      bounds: {
+        x: -10,
+        y: -10,
+        width: 20,
+        height: 20,
+      },
+      mode: '2d',
+      vectors: [],
+      functions: [],
+      code: '',
+      parentFrameId: null,
+      childFrameIds: [],
+    }
+    
+    const viewport = {
+      ...defaultViewport,
+      gridStep: 1,
+    }
+    
+    const { container } = render(
+      <Canvas
+        viewport={viewport}
+        isDrawing={true}
+        onFrameCreated={onFrameCreated}
+        frames={[parentFrame]}
+      />
+    )
+    
+    const canvas = container.querySelector('canvas')
+    if (!canvas) throw new Error('Canvas not found')
+
+    // Start drawing inside parent frame
+    const mouseDownEvent = new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 400, // Center of canvas, should be inside parent frame
+      clientY: 300,
+    })
+    canvas.dispatchEvent(mouseDownEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
+    // Move mouse to create a proper-sized frame
+    const mouseMoveEvent = new MouseEvent('mousemove', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 500,
+      clientY: 400,
+    })
+    canvas.dispatchEvent(mouseMoveEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
+    // Finish drawing
+    const mouseUpEvent = new MouseEvent('mouseup', {
+      bubbles: true,
+      cancelable: true,
+    })
+    canvas.dispatchEvent(mouseUpEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Child frame should inherit parent's base vectors
+    expect(onFrameCreated).toHaveBeenCalled()
+    if (onFrameCreated.mock.calls.length > 0) {
+      const createdFrame = onFrameCreated.mock.calls[0][0]
+      expect(createdFrame.parentFrameId).toBe('parent-frame')
+      expect(createdFrame.baseI).toEqual([0.707, 0.707])
+      expect(createdFrame.baseJ).toEqual([-0.707, 0.707])
+    }
+  })
+
+  it('uses default base vectors for top-level frames', async () => {
+    const onFrameCreated = vi.fn()
+    
+    const viewport = {
+      ...defaultViewport,
+      gridStep: 1,
+    }
+    
+    const { container } = render(
+      <Canvas
+        viewport={viewport}
+        isDrawing={true}
+        onFrameCreated={onFrameCreated}
+        frames={[]}
+      />
+    )
+    
+    const canvas = container.querySelector('canvas')
+    if (!canvas) throw new Error('Canvas not found')
+
+    // Start drawing
+    const mouseDownEvent = new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 400,
+      clientY: 300,
+    })
+    canvas.dispatchEvent(mouseDownEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
+    // Move mouse to create a proper-sized frame
+    const mouseMoveEvent = new MouseEvent('mousemove', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 500,
+      clientY: 400,
+    })
+    canvas.dispatchEvent(mouseMoveEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
+    // Finish drawing
+    const mouseUpEvent = new MouseEvent('mouseup', {
+      bubbles: true,
+      cancelable: true,
+    })
+    canvas.dispatchEvent(mouseUpEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Top-level frame should use default base vectors
+    expect(onFrameCreated).toHaveBeenCalled()
+    if (onFrameCreated.mock.calls.length > 0) {
+      const createdFrame = onFrameCreated.mock.calls[0][0]
+      expect(createdFrame.parentFrameId).toBeNull()
+      expect(createdFrame.baseI).toEqual([1, 0])
+      expect(createdFrame.baseJ).toEqual([0, 1])
+    }
+  })
+
   it('snaps rectangle corners to grid', async () => {
     const onFrameCreated = vi.fn()
     

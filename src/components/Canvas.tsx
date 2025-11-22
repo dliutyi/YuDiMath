@@ -417,11 +417,26 @@ export default function Canvas({
           const originX = minX + frameWidth / 2
           const originY = minY + frameHeight / 2
 
+          // Inherit base vectors from parent frame, or use defaults for top-level frames
+          // Default base vectors correspond to unit steps horizontally and vertically
+          let baseI: Point2D = [1, 0]
+          let baseJ: Point2D = [0, 1]
+          
+          if (parentFrameId) {
+            const parentFrame = frames.find(f => f.id === parentFrameId)
+            if (parentFrame) {
+              // Inherit base vectors from parent
+              baseI = [...parentFrame.baseI]
+              baseJ = [...parentFrame.baseJ]
+              console.log('[Canvas] Inheriting base vectors from parent:', { baseI, baseJ })
+            }
+          }
+
           const newFrame: CoordinateFrame = {
             id: frameId,
             origin: [originX, originY],
-            baseI: [1, 0],
-            baseJ: [0, 1],
+            baseI,
+            baseJ,
             bounds: newBounds,
             mode: '2d',
             vectors: [],
