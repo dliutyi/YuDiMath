@@ -382,7 +382,7 @@ function drawFrameAxes(
   
   // Transform direction vectors to screen coordinates
   // We need to transform a point at the origin and a point offset by the direction vector
-  const originScreen = worldToScreen(originX, originY, viewport, canvasWidth, canvasHeight)
+  // Use originScreenAxes which is already calculated above
   const baseIDirEndParentX = originX + baseIDirParentX
   const baseIDirEndParentY = originY + baseIDirParentY
   const baseJDirEndParentX = originX + baseJDirParentX
@@ -392,16 +392,11 @@ function drawFrameAxes(
   const baseJDirEndScreen = worldToScreen(baseJDirEndParentX, baseJDirEndParentY, viewport, canvasWidth, canvasHeight)
   
   // Calculate direction vectors in screen space (from origin)
-  const baseIDirX = baseIDirEndScreen[0] - originScreen[0]
-  const baseIDirY = baseIDirEndScreen[1] - originScreen[1]
-  const baseJDirX = baseJDirEndScreen[0] - originScreen[0]
-  const baseJDirY = baseJDirEndScreen[1] - originScreen[1]
-  
-  // Calculate direction vectors in screen space
-  const baseIDirX = baseIEndScreen[0] - originScreenAxes[0]
-  const baseIDirY = baseIEndScreen[1] - originScreenAxes[1]
-  const baseJDirX = baseJEndScreen[0] - originScreenAxes[0]
-  const baseJDirY = baseJEndScreen[1] - originScreenAxes[1]
+  // Calculate direction vectors in screen space (from origin)
+  const baseIDirX = baseIDirEndScreen[0] - originScreenAxes[0]
+  const baseIDirY = baseIDirEndScreen[1] - originScreenAxes[1]
+  const baseJDirX = baseJDirEndScreen[0] - originScreenAxes[0]
+  const baseJDirY = baseJDirEndScreen[1] - originScreenAxes[1]
   
   // Find X axis endpoints (intersection with left and right edges)
   // X axis goes through the fixed origin, parallel to baseI direction
