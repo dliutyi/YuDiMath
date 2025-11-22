@@ -1,0 +1,17 @@
+# Development Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Expose Vite dev server port
+EXPOSE 3000
+
+# Start dev server (will be overridden by docker-compose command)
+CMD ["npm", "run", "dev"]
+
