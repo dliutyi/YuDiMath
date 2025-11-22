@@ -2,12 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #0f172a; /* bg-primary */
+    color: #f1f5f9; /* text-primary */
+  }
+
+  /* Dark theme base styles */
+  * {
+    @apply border-border;
+  }
+}
+
+@layer components {
+  /* Panel component styles */
+  .panel {
+    @apply bg-panel-bg border border-border rounded-lg shadow-lg;
+  }
+
+  /* Button base styles */
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-blue-600;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-white hover:bg-purple-600;
+  }
+
+  /* Input base styles */
+  .input {
+    @apply bg-panel-bg border border-border text-text-primary rounded-lg px-3 py-2 
+           focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+  }
 }
 

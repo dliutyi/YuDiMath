@@ -20,13 +20,14 @@ describe('App', () => {
 
   it('applies dark theme classes', () => {
     const { container } = render(<App />)
-    const mainDiv = container.querySelector('.bg-slate-900')
-    expect(mainDiv).toBeInTheDocument()
+    const mainDiv = container.querySelector('.bg-bg-primary')
+    expect(mainDiv).not.toBeNull()
+    expect(mainDiv).toBeInstanceOf(HTMLElement)
   })
 
   it('renders with correct text colors', () => {
     const { container } = render(<App />)
-    const textElements = container.querySelectorAll('.text-slate-100, .text-slate-300, .text-slate-400')
+    const textElements = container.querySelectorAll('.text-text-primary, .text-text-secondary')
     expect(textElements.length).toBeGreaterThan(0)
   })
 })
