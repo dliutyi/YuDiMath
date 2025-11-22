@@ -725,10 +725,10 @@ function drawGrid(
   }
 
   // Set grid line style - semi-transparent background grid
-  // More opaque so it's visible inside frames
+  // Less visible inside frames to reduce confusion
   ctx.strokeStyle = '#475569' // slate-600
   ctx.lineWidth = 1
-  ctx.globalAlpha = 0.4 // More opaque for visibility inside frames
+  ctx.globalAlpha = 0.25 // Less visible to reduce confusion inside frames
 
   // Draw vertical grid lines (lines at x = n * gridStep in world coordinates)
   // Find the first grid line to the left of the visible area
