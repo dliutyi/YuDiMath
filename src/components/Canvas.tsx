@@ -95,11 +95,11 @@ export default function Canvas({
     <div
       ref={containerRef}
       className="w-full h-full bg-bg-primary relative overflow-hidden"
+      style={{ minHeight: '400px' }}
     >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0"
-        style={{ width: '100%', height: '100%' }}
+        className="absolute inset-0 w-full h-full"
       />
     </div>
   )
