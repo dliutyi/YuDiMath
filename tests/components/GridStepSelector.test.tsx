@@ -16,7 +16,7 @@ describe('GridStepSelector', () => {
     const onGridStepChange = vi.fn()
     render(<GridStepSelector gridStep={1} onGridStepChange={onGridStepChange} />)
     
-    expect(screen.getByText('1.0')).toBeInTheDocument()
+    expect(screen.getByText('1.00')).toBeInTheDocument()
   })
 
   it('displays formatted grid step value correctly', () => {
@@ -28,10 +28,10 @@ describe('GridStepSelector', () => {
     expect(screen.getByText('0.50')).toBeInTheDocument()
     
     rerender(<GridStepSelector gridStep={5} onGridStepChange={onGridStepChange} />)
-    expect(screen.getByText('5.0')).toBeInTheDocument()
+    expect(screen.getByText('5.00')).toBeInTheDocument()
     
     rerender(<GridStepSelector gridStep={15} onGridStepChange={onGridStepChange} />)
-    expect(screen.getByText('15')).toBeInTheDocument()
+    expect(screen.getByText('15.00')).toBeInTheDocument()
   })
 
   it('calls onGridStepChange when slider is moved', () => {
@@ -54,13 +54,13 @@ describe('GridStepSelector', () => {
       <GridStepSelector gridStep={1} onGridStepChange={onGridStepChange} />
     )
     
-    expect(screen.getByText('1.0')).toBeInTheDocument()
+    expect(screen.getByText('1.00')).toBeInTheDocument()
     
     rerender(<GridStepSelector gridStep={2.5} onGridStepChange={onGridStepChange} />)
-    expect(screen.getByText('2.5')).toBeInTheDocument()
+    expect(screen.getByText('2.50')).toBeInTheDocument()
     
     rerender(<GridStepSelector gridStep={10} onGridStepChange={onGridStepChange} />)
-    expect(screen.getByText('10')).toBeInTheDocument()
+    expect(screen.getByText('10.00')).toBeInTheDocument()
   })
 
   it('converts slider value to grid step correctly', () => {

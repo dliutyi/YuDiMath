@@ -47,12 +47,10 @@ export default function GridStepSelector({
     onGridStepChange(roundedGridStep)
   }
 
-  // Format grid step for display (always show 2 decimal places for 0.25 increments)
+  // Format grid step for display (always show 2 decimal places)
   const formatGridStep = (value: number): string => {
     // Round to 0.25 first to ensure clean display
     const rounded = roundToQuarter(value)
-    if (rounded >= 10) return rounded.toFixed(0)
-    if (rounded >= 1) return rounded.toFixed(1)
     return rounded.toFixed(2)
   }
 
