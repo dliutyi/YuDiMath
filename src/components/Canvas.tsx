@@ -264,12 +264,19 @@ export default function Canvas({
         
         const framePoint = parentToFrame(worldPoint, zoomingFrame)
         
-        // Calculate new zoom level
-        const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY
-        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomingFrame.viewport.zoom + zoomDelta))
+        // Frame zoom is relative (1.0 = default), so use different constraints
+        // Frame zoom should be independent of parent zoom
+        const FRAME_MIN_ZOOM = 0.1  // 10x zoomed out
+        const FRAME_MAX_ZOOM = 10.0 // 10x zoomed in
+        const FRAME_ZOOM_SENSITIVITY = 0.01 // More sensitive for relative zoom
+        
+        // Calculate new zoom level using multiplicative zoom (more natural)
+        // Use exponential scaling: zoomDelta = e^(sensitivity * deltaY)
+        const zoomFactor = Math.exp(-e.deltaY * FRAME_ZOOM_SENSITIVITY)
+        const newZoom = Math.max(FRAME_MIN_ZOOM, Math.min(FRAME_MAX_ZOOM, zoomingFrame.viewport.zoom * zoomFactor))
         
         // If zoom didn't change (hit constraint), don't update
-        if (newZoom === zoomingFrame.viewport.zoom) return
+        if (Math.abs(newZoom - zoomingFrame.viewport.zoom) < 0.001) return
         
         // To keep the point under the mouse fixed, we need to adjust the frame pan
         // The point in frame coordinates is framePoint
