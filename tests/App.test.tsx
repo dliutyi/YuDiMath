@@ -1,6 +1,25 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import App from '../src/App'
+
+// Mock canvas context
+beforeEach(() => {
+  HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
+    clearRect: vi.fn(),
+    scale: vi.fn(),
+    strokeStyle: '',
+    lineWidth: 0,
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(),
+    fillStyle: '',
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    fillText: vi.fn(),
+  })
+})
 
 describe('App', () => {
   it('renders the application', () => {
@@ -13,9 +32,10 @@ describe('App', () => {
     expect(screen.getByText('Linear Algebra & Calculus Visualizer')).toBeInTheDocument()
   })
 
-  it('renders success message', () => {
-    render(<App />)
-    expect(screen.getByText('Project initialized successfully!')).toBeInTheDocument()
+  it('renders canvas component', () => {
+    const { container } = render(<App />)
+    const canvas = container.querySelector('canvas')
+    expect(canvas).toBeInTheDocument()
   })
 
   it('applies dark theme classes', () => {

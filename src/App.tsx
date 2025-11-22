@@ -1,10 +1,23 @@
+import { useState } from 'react'
+import Canvas from './components/Canvas'
+import type { ViewportState } from './types'
+
 function App() {
+  const [viewport, setViewport] = useState<ViewportState>({
+    x: 0,
+    y: 0,
+    zoom: 1.0,
+    gridStep: 1,
+  })
+
   return (
-    <div className="min-h-screen bg-bg-primary text-text-primary">
-      <div className="container mx-auto p-8">
-        <h1 className="text-4xl font-bold mb-4 text-text-primary">YuDiMath</h1>
-        <p className="text-text-secondary">Linear Algebra & Calculus Visualizer</p>
-        <p className="text-text-secondary mt-4 opacity-75">Project initialized successfully!</p>
+    <div className="min-h-screen bg-bg-primary text-text-primary flex flex-col">
+      <div className="p-4 border-b border-border">
+        <h1 className="text-2xl font-bold text-text-primary">YuDiMath</h1>
+        <p className="text-sm text-text-secondary">Linear Algebra & Calculus Visualizer</p>
+      </div>
+      <div className="flex-1 relative">
+        <Canvas viewport={viewport} onViewportChange={setViewport} />
       </div>
     </div>
   )
