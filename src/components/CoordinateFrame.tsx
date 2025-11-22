@@ -414,8 +414,8 @@ function drawFrameAxes(
   for (let x = startXLabel; x <= endXLabel; x += labelSpacing) {
     if (Math.abs(x) < 0.001) continue // Skip label at origin (will be drawn separately)
     
-    const labelPoint = frameToParent([x, 0], frame)
-    const labelScreen = worldToScreen(labelPoint[0], labelPoint[1], viewport, canvasWidth, canvasHeight)
+    // Use frameToScreen to account for frame viewport zoom and pan
+    const labelScreen = frameToScreen([x, 0], frame, viewport, canvasWidth, canvasHeight)
     
     // Format label (remove unnecessary decimals)
     const labelText = x % 1 === 0 ? x.toString() : x.toFixed(2).replace(/\.?0+$/, '')
