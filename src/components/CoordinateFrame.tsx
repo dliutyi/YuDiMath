@@ -122,26 +122,25 @@ function drawFrameGrid(
   ctx.globalAlpha = 0.3
   ctx.setLineDash([])
 
-  // The bounds define the frame viewport in parent coordinates
-  // We need to convert bounds to frame coordinates to know how many grid lines to draw
-  // For now, we'll estimate based on the bounds dimensions and base vector magnitudes
-  // This is a simplification - a more accurate approach would require inverse transformation
+  // The origin is at the center of the frame viewport
+  // We need to calculate how many grid lines to draw on each side of the origin
+  // to cover the entire frame viewport
   
-  // Estimate frame dimensions in frame coordinates
+  // Estimate frame dimensions in frame coordinates from the center
   // bounds.width and bounds.height are in parent coordinates
   // We approximate by dividing by the average magnitude
   const avgMagnitude = (iMagnitude + jMagnitude) / 2
-  const frameWidth = bounds.width / avgMagnitude
-  const frameHeight = bounds.height / avgMagnitude
+  const halfFrameWidth = bounds.width / (2 * avgMagnitude)
+  const halfFrameHeight = bounds.height / (2 * avgMagnitude)
 
   // Draw grid lines along baseI direction (lines parallel to baseJ)
-  // These are lines at constant u values
-  const numLinesI = Math.ceil(frameWidth / gridStep)
-  for (let i = 0; i <= numLinesI; i++) {
-    const u = i * gridStep
-    // Start and end points in frame coordinates: (u, 0) to (u, frameHeight)
-    const startPoint = frameToParent([u, 0], frame)
-    const endPoint = frameToParent([u, frameHeight], frame)
+  // These are lines at constant u values, centered around origin (u=0)
+  const minU = -Math.ceil(halfFrameWidth / gridStep) * gridStep
+  const maxU = Math.ceil(halfFrameWidth / gridStep) * gridStep
+  for (let u = minU; u <= maxU; u += gridStep) {
+    // Start and end points in frame coordinates: (u, -halfFrameHeight) to (u, halfFrameHeight)
+    const startPoint = frameToParent([u, -halfFrameHeight], frame)
+    const endPoint = frameToParent([u, halfFrameHeight], frame)
     
     const startScreen = worldToScreen(startPoint[0], startPoint[1], viewport, canvasWidth, canvasHeight)
     const endScreen = worldToScreen(endPoint[0], endPoint[1], viewport, canvasWidth, canvasHeight)
@@ -153,13 +152,13 @@ function drawFrameGrid(
   }
 
   // Draw grid lines along baseJ direction (lines parallel to baseI)
-  // These are lines at constant v values
-  const numLinesJ = Math.ceil(frameHeight / gridStep)
-  for (let j = 0; j <= numLinesJ; j++) {
-    const v = j * gridStep
-    // Start and end points in frame coordinates: (0, v) to (frameWidth, v)
-    const startPoint = frameToParent([0, v], frame)
-    const endPoint = frameToParent([frameWidth, v], frame)
+  // These are lines at constant v values, centered around origin (v=0)
+  const minV = -Math.ceil(halfFrameHeight / gridStep) * gridStep
+  const maxV = Math.ceil(halfFrameHeight / gridStep) * gridStep
+  for (let v = minV; v <= maxV; v += gridStep) {
+    // Start and end points in frame coordinates: (-halfFrameWidth, v) to (halfFrameWidth, v)
+    const startPoint = frameToParent([-halfFrameWidth, v], frame)
+    const endPoint = frameToParent([halfFrameWidth, v], frame)
     
     const startScreen = worldToScreen(startPoint[0], startPoint[1], viewport, canvasWidth, canvasHeight)
     const endScreen = worldToScreen(endPoint[0], endPoint[1], viewport, canvasWidth, canvasHeight)

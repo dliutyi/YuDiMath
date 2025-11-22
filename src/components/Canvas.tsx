@@ -413,9 +413,13 @@ export default function Canvas({
 
           console.log('[Canvas] Found parent frame:', parentFrameId, 'from', frames.length, 'frames')
 
+          // Set origin to the center of the frame viewport
+          const originX = minX + frameWidth / 2
+          const originY = minY + frameHeight / 2
+
           const newFrame: CoordinateFrame = {
             id: frameId,
-            origin: [minX, minY],
+            origin: [originX, originY],
             baseI: [1, 0],
             baseJ: [0, 1],
             bounds: newBounds,

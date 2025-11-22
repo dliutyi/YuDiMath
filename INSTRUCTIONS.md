@@ -308,7 +308,7 @@ For each step:
 
 ---
 
-### [ ] Step 3.2: Create Frame Component with Base Vectors
+### [x] Step 3.2: Create Frame Component with Base Vectors
 **Task**: Build the CoordinateFrame component that renders a frame viewport with base vectors.
 
 **Implementation**:
