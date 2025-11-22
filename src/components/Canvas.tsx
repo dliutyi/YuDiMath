@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import type { ViewportState } from '../types'
 import {
   worldToScreen,
-  screenToWorld,
   getVisibleBounds,
   calculateViewportMatrix,
 } from '../utils/coordinates'
