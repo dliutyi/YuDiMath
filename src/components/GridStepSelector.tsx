@@ -3,7 +3,6 @@ interface GridStepSelectorProps {
   onGridStepChange: (step: number) => void
 }
 
-const MIN_GRID_STEP = 0.1
 const MAX_GRID_STEP = 20
 const GRID_STEP_INCREMENT = 0.25
 
