@@ -224,15 +224,18 @@ For each step:
 
 ---
 
-### [ ] Step 2.3: Implement Pan and Zoom Functionality
+### [x] Step 2.3: Implement Pan and Zoom Functionality
 **Task**: Add mouse/touch controls for panning and zooming the canvas.
 
 **Implementation**:
 - Add mouse drag handler for panning
-- Add mouse wheel handler for zooming
+- Add mouse wheel handler for zooming (prevent browser zoom interference)
 - Add touch gesture support (optional)
 - Update viewport state on interactions
 - Implement zoom constraints (min/max zoom levels)
+- Add x and y value labels on both axes
+- Implement smart label spacing (skip labels when zoomed out to prevent overlap)
+- Fix zoom-in to prevent browser page zoom interference
 
 **Tests**:
 - Test panning updates viewport position
@@ -240,6 +243,8 @@ For each step:
 - Test zoom constraints are enforced
 - Test panning with different zoom levels
 - Test that viewport state updates correctly
+- Test axis labels are displayed correctly
+- Test label spacing adapts to zoom level
 
 **Commit**: `feat: implement pan and zoom functionality for canvas`
 

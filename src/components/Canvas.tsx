@@ -117,6 +117,26 @@ export default function Canvas({
     return () => resizeObserver.disconnect()
   }, [])
 
+  // Attach wheel event listener with passive: false to prevent browser zoom
+  // This must be in capture phase to prevent browser zoom before React handles it
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !onViewportChange) return
+
+    const wheelHandler = (e: WheelEvent) => {
+      // Prevent browser zoom but allow event to bubble to React handler
+      e.preventDefault()
+      // Don't stop propagation - let React handle it
+    }
+
+    // Use capture phase and non-passive to ensure we can preventDefault
+    canvas.addEventListener('wheel', wheelHandler, { passive: false, capture: true })
+    
+    return () => {
+      canvas.removeEventListener('wheel', wheelHandler, { capture: true } as EventListenerOptions)
+    }
+  }, [onViewportChange])
+
   // Pan handlers
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     // Only pan with left mouse button
@@ -188,11 +208,13 @@ export default function Canvas({
     lastPanPointRef.current = null
   }, [])
 
-  // Zoom handler
+  // Zoom handler - prevent browser zoom interference
   const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
     if (!onViewportChange) return
 
+    // Prevent browser zoom - must be called early
     e.preventDefault()
+    e.stopPropagation()
 
     const canvas = canvasRef.current
     const container = containerRef.current
@@ -370,6 +392,7 @@ export default function Canvas({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        style={{ touchAction: 'none' }} // Prevent browser zoom on touch
       />
     </div>
   )
@@ -541,12 +564,154 @@ function drawAxes(
   ctx.lineTo(yAxisX, canvasHeight)
   ctx.stroke()
 
-  // Draw axis labels at origin
-  const origin = worldToScreen(0, 0, viewport, canvasWidth, canvasHeight)
+  // Draw axis labels with x and y values
   ctx.fillStyle = '#cbd5e1' // text-secondary
   ctx.font = '12px sans-serif'
-  ctx.textAlign = 'right'
-  ctx.textBaseline = 'top'
-  ctx.fillText('0', origin[0] - 5, origin[1] + 5)
+  
+  // Calculate label spacing based on zoom level
+  // When zoomed out, skip labels to prevent overlap
+  const minLabelSpacing = 60 // Minimum pixels between labels
+  const screenToWorldScale = 1 / viewport.zoom
+  const worldLabelSpacing = minLabelSpacing * screenToWorldScale
+  
+  // Round to nice numbers (1, 2, 5, 10, 20, 50, 100, etc.)
+  const niceSpacing = getNiceSpacing(worldLabelSpacing)
+  
+  // Draw X-axis labels (horizontal axis)
+  drawAxisLabelsX(ctx, viewport, canvasWidth, canvasHeight, xAxisY, niceSpacing)
+  
+  // Draw Y-axis labels (vertical axis)
+  drawAxisLabelsY(ctx, viewport, canvasWidth, canvasHeight, yAxisX, niceSpacing)
+}
+
+/**
+ * Get a "nice" spacing value (1, 2, 5, 10, 20, 50, 100, etc.)
+ */
+function getNiceSpacing(spacing: number): number {
+  if (spacing <= 0) return 1
+  
+  const magnitude = Math.pow(10, Math.floor(Math.log10(spacing)))
+  const normalized = spacing / magnitude
+  
+  // Round to 1, 2, or 5
+  let nice: number
+  if (normalized <= 1) {
+    nice = 1
+  } else if (normalized <= 2) {
+    nice = 2
+  } else if (normalized <= 5) {
+    nice = 5
+  } else {
+    nice = 10
+  }
+  
+  return nice * magnitude
+}
+
+/**
+ * Draw labels along the X-axis
+ */
+function drawAxisLabelsX(
+  ctx: CanvasRenderingContext2D,
+  viewport: ViewportState,
+  canvasWidth: number,
+  canvasHeight: number,
+  axisY: number,
+  labelSpacing: number
+) {
+  // Find the range of x values visible on screen
+  const leftWorld = screenToWorld(0, 0, viewport, canvasWidth, canvasHeight)[0]
+  const rightWorld = screenToWorld(canvasWidth, 0, viewport, canvasWidth, canvasHeight)[0]
+  
+  const minX = Math.min(leftWorld, rightWorld)
+  const maxX = Math.max(leftWorld, rightWorld)
+  
+  // Start from the first label position (snapped to labelSpacing)
+  const startX = Math.floor(minX / labelSpacing) * labelSpacing
+  
+  // Draw labels
+  for (let x = startX; x <= maxX; x += labelSpacing) {
+    // Skip origin (will be drawn separately)
+    if (Math.abs(x) < 0.001) continue
+    
+    const screenPos = worldToScreen(x, 0, viewport, canvasWidth, canvasHeight)
+    const screenX = Math.round(screenPos[0])
+    
+    // Only draw if on screen
+    if (screenX >= 0 && screenX <= canvasWidth) {
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
+      
+      // Format number nicely
+      const label = formatNumber(x)
+      ctx.fillText(label, screenX, axisY + 5)
+    }
+  }
+  
+  // Draw origin label
+  const origin = worldToScreen(0, 0, viewport, canvasWidth, canvasHeight)
+  if (origin[0] >= 0 && origin[0] <= canvasWidth) {
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'top'
+    ctx.fillText('0', origin[0] - 5, origin[1] + 5)
+  }
+}
+
+/**
+ * Draw labels along the Y-axis
+ */
+function drawAxisLabelsY(
+  ctx: CanvasRenderingContext2D,
+  viewport: ViewportState,
+  canvasWidth: number,
+  canvasHeight: number,
+  axisX: number,
+  labelSpacing: number
+) {
+  // Find the range of y values visible on screen
+  const topWorld = screenToWorld(0, 0, viewport, canvasWidth, canvasHeight)[1]
+  const bottomWorld = screenToWorld(0, canvasHeight, viewport, canvasWidth, canvasHeight)[1]
+  
+  const minY = Math.min(topWorld, bottomWorld)
+  const maxY = Math.max(topWorld, bottomWorld)
+  
+  // Start from the first label position (snapped to labelSpacing)
+  const startY = Math.floor(minY / labelSpacing) * labelSpacing
+  
+  // Draw labels
+  for (let y = startY; y <= maxY; y += labelSpacing) {
+    // Skip origin (will be drawn separately)
+    if (Math.abs(y) < 0.001) continue
+    
+    const screenPos = worldToScreen(0, y, viewport, canvasWidth, canvasHeight)
+    const screenY = Math.round(screenPos[1])
+    
+    // Only draw if on screen
+    if (screenY >= 0 && screenY <= canvasHeight) {
+      ctx.textAlign = 'right'
+      ctx.textBaseline = 'middle'
+      
+      // Format number nicely
+      const label = formatNumber(y)
+      ctx.fillText(label, axisX - 5, screenY)
+    }
+  }
+  
+  // Origin label is already drawn in X-axis labels
+}
+
+/**
+ * Format a number for display (remove unnecessary decimals)
+ */
+function formatNumber(value: number): string {
+  // If very close to an integer, show as integer
+  if (Math.abs(value - Math.round(value)) < 0.0001) {
+    return Math.round(value).toString()
+  }
+  
+  // Otherwise, show with appropriate decimal places
+  // Limit to 3 decimal places
+  const rounded = Math.round(value * 1000) / 1000
+  return rounded.toString()
 }
 
