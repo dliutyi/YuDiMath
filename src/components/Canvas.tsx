@@ -540,7 +540,7 @@ export default function Canvas({
             viewport: {
               x: 0, // Frame's own pan offset in frame coordinates
               y: 0,
-              zoom: 50.0, // Frame's own zoom level (1 unit = 50px in frame coordinates)
+              zoom: 1.0, // Frame's own zoom level (1.0 = default, scales relative to base vectors)
               gridStep: 1, // Frame's grid step (based on base vectors, not used for grid but kept for consistency)
             },
             mode: '2d',
