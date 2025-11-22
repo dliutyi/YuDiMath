@@ -7,7 +7,7 @@ function App() {
     x: 0,
     y: 0,
     zoom: 1.0,
-    gridStep: 50, // Default to 50 units for better visibility
+    gridStep: 1, // Default to 1 unit - the fundamental coordinate system step
   })
 
   return (

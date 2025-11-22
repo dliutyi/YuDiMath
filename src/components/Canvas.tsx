@@ -404,120 +404,79 @@ function drawGrid(
   canvasWidth: number,
   canvasHeight: number
 ) {
-  console.log('[drawGrid] Called with:', { canvasWidth, canvasHeight, viewport })
-  
   // Set grid line style - make it more visible
   ctx.strokeStyle = '#475569' // slate-600 - more visible than rgba
   ctx.lineWidth = 1
   ctx.globalAlpha = 0.4
 
   const gridStep = viewport.gridStep
-  console.log('[drawGrid] gridStep:', gridStep)
   
   if (gridStep <= 0) {
-    console.log('[drawGrid] Grid step is <= 0, skipping')
     ctx.globalAlpha = 1.0
     return
   }
 
-  // Calculate how many grid lines we need based on visible area
-  // Use screen-space to determine appropriate spacing
-  const centerX = canvasWidth / 2
-  const centerY = canvasHeight / 2
+  // Get visible world bounds to determine which grid lines to draw
+  const topLeft = screenToWorld(0, 0, viewport, canvasWidth, canvasHeight)
+  const bottomRight = screenToWorld(canvasWidth, canvasHeight, viewport, canvasWidth, canvasHeight)
   
-  // Calculate world-to-screen scale
-  const worldToScreenScale = viewport.zoom
-  const screenGridSpacing = gridStep * worldToScreenScale
+  const minX = Math.min(topLeft[0], bottomRight[0])
+  const maxX = Math.max(topLeft[0], bottomRight[0])
+  const minY = Math.min(topLeft[1], bottomRight[1])
+  const maxY = Math.max(topLeft[1], bottomRight[1])
   
-  console.log('[drawGrid] screenGridSpacing:', screenGridSpacing, 'worldToScreenScale:', worldToScreenScale)
-
-  // Only draw grid if spacing is reasonable (not too dense, not too sparse)
-  // Lower threshold to 2px to allow denser grids
+  // Calculate screen spacing to check if grid is too dense
+  const screenGridSpacing = gridStep * viewport.zoom
+  
+  // Only draw grid if spacing is reasonable (not too dense)
   if (screenGridSpacing < 2) {
-    console.log('[drawGrid] Grid too dense (spacing < 2px), skipping. Consider increasing gridStep or zoom')
     ctx.globalAlpha = 1.0
     return
   }
 
-  // Draw vertical grid lines
-  // Start from center and go outward
-  let x = 0
-  let verticalLinesDrawn = 0
-  while (true) {
-    // Draw line at +x
-    if (x !== 0) {
-      let screenX = centerX + x * worldToScreenScale
-      // Align to pixel boundary to prevent blurring
-      screenX = Math.round(screenX) + 0.5
-      if (screenX > canvasWidth + 10) break
-      if (screenX >= -10) {
-        ctx.beginPath()
-        ctx.moveTo(screenX, 0)
-        ctx.lineTo(screenX, canvasHeight)
-        ctx.stroke()
-        verticalLinesDrawn++
-      }
-    }
+  // Draw vertical grid lines (lines at x = n * gridStep in world coordinates)
+  // Find the first grid line to the left of the visible area
+  const startX = Math.floor(minX / gridStep) * gridStep
+  const endX = Math.ceil(maxX / gridStep) * gridStep
+  
+  for (let worldX = startX; worldX <= endX; worldX += gridStep) {
+    // Skip the axis line (x=0) - it will be drawn by drawAxes
+    if (Math.abs(worldX) < 0.001) continue
     
-    // Draw line at -x
-    if (x !== 0) {
-      let screenX = centerX - x * worldToScreenScale
-      // Align to pixel boundary to prevent blurring
-      screenX = Math.round(screenX) + 0.5
-      if (screenX < -10) break
-      if (screenX <= canvasWidth + 10) {
-        ctx.beginPath()
-        ctx.moveTo(screenX, 0)
-        ctx.lineTo(screenX, canvasHeight)
-        ctx.stroke()
-        verticalLinesDrawn++
-      }
-    }
+    // Convert world coordinate to screen coordinate
+    const screenPos = worldToScreen(worldX, 0, viewport, canvasWidth, canvasHeight)
+    const screenX = Math.round(screenPos[0]) + 0.5 // Align to pixel boundary
     
-    x += gridStep
-    if (x * worldToScreenScale > canvasWidth + 100) break
+    // Only draw if on screen
+    if (screenX >= -10 && screenX <= canvasWidth + 10) {
+      ctx.beginPath()
+      ctx.moveTo(screenX, 0)
+      ctx.lineTo(screenX, canvasHeight)
+      ctx.stroke()
+    }
   }
-  console.log('[drawGrid] Vertical lines drawn:', verticalLinesDrawn)
 
-  // Draw horizontal grid lines
-  let y = 0
-  let horizontalLinesDrawn = 0
-  while (true) {
-    // Draw line at +y
-    if (y !== 0) {
-      let screenY = centerY - y * worldToScreenScale // Note: Y is inverted
-      // Align to pixel boundary to prevent blurring
-      screenY = Math.round(screenY) + 0.5
-      if (screenY < -10) break
-      if (screenY <= canvasHeight + 10) {
-        ctx.beginPath()
-        ctx.moveTo(0, screenY)
-        ctx.lineTo(canvasWidth, screenY)
-        ctx.stroke()
-        horizontalLinesDrawn++
-      }
-    }
+  // Draw horizontal grid lines (lines at y = n * gridStep in world coordinates)
+  // Find the first grid line below the visible area
+  const startY = Math.floor(minY / gridStep) * gridStep
+  const endY = Math.ceil(maxY / gridStep) * gridStep
+  
+  for (let worldY = startY; worldY <= endY; worldY += gridStep) {
+    // Skip the axis line (y=0) - it will be drawn by drawAxes
+    if (Math.abs(worldY) < 0.001) continue
     
-    // Draw line at -y
-    if (y !== 0) {
-      let screenY = centerY + y * worldToScreenScale // Note: Y is inverted
-      // Align to pixel boundary to prevent blurring
-      screenY = Math.round(screenY) + 0.5
-      if (screenY > canvasHeight + 10) break
-      if (screenY >= -10) {
-        ctx.beginPath()
-        ctx.moveTo(0, screenY)
-        ctx.lineTo(canvasWidth, screenY)
-        ctx.stroke()
-        horizontalLinesDrawn++
-      }
-    }
+    // Convert world coordinate to screen coordinate
+    const screenPos = worldToScreen(0, worldY, viewport, canvasWidth, canvasHeight)
+    const screenY = Math.round(screenPos[1]) + 0.5 // Align to pixel boundary
     
-    y += gridStep
-    if (y * worldToScreenScale > canvasHeight + 100) break
+    // Only draw if on screen
+    if (screenY >= -10 && screenY <= canvasHeight + 10) {
+      ctx.beginPath()
+      ctx.moveTo(0, screenY)
+      ctx.lineTo(canvasWidth, screenY)
+      ctx.stroke()
+    }
   }
-  console.log('[drawGrid] Horizontal lines drawn:', horizontalLinesDrawn)
-  console.log('[drawGrid] Total grid lines drawn:', verticalLinesDrawn + horizontalLinesDrawn)
 
   // Restore alpha
   ctx.globalAlpha = 1.0

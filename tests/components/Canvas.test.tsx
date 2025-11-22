@@ -15,7 +15,7 @@ describe('Canvas', () => {
     x: 0,
     y: 0,
     zoom: 1.0,
-    gridStep: 50,
+    gridStep: 1,
   }
 
   beforeEach(() => {
