@@ -21,17 +21,21 @@ export default function Canvas({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
+  const draw = () => {
     const canvas = canvasRef.current
-    if (!canvas) return
+    const container = containerRef.current
+    if (!canvas || !container) return
 
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Get actual canvas dimensions
-    const rect = canvas.getBoundingClientRect()
-    const canvasWidth = width || rect.width
-    const canvasHeight = height || rect.height
+    // Get actual container dimensions
+    const rect = container.getBoundingClientRect()
+    const canvasWidth = width || rect.width || 800
+    const canvasHeight = height || rect.height || 600
+
+    // Skip if dimensions are invalid
+    if (canvasWidth <= 0 || canvasHeight <= 0) return
 
     // Set canvas internal size (for high DPI displays)
     const dpr = window.devicePixelRatio || 1
@@ -50,6 +54,23 @@ export default function Canvas({
 
     // Draw axes
     drawAxes(ctx, viewport, canvasWidth, canvasHeight)
+  }
+
+  useEffect(() => {
+    // Use requestAnimationFrame to ensure DOM is ready
+    const frameId = requestAnimationFrame(() => {
+      draw()
+    })
+    return () => cancelAnimationFrame(frameId)
+  }, [viewport, width, height])
+
+  // Also redraw on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      draw()
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [viewport, width, height])
 
   // Handle canvas resize
@@ -58,15 +79,18 @@ export default function Canvas({
     if (!container) return
 
     const resizeObserver = new ResizeObserver(() => {
-      // Trigger re-render on resize
-      if (onViewportChange) {
-        onViewportChange(viewport)
+      // Force re-render by updating viewport (triggers drawing effect)
+      // This is a workaround to trigger the drawing effect when container resizes
+      const canvas = canvasRef.current
+      if (canvas) {
+        // Trigger a re-render by dispatching a resize event
+        window.dispatchEvent(new Event('resize'))
       }
     })
 
     resizeObserver.observe(container)
     return () => resizeObserver.disconnect()
-  }, [viewport, onViewportChange])
+  }, [])
 
   return (
     <div
@@ -89,10 +113,12 @@ function drawGrid(
   canvasWidth: number,
   canvasHeight: number
 ) {
-  ctx.strokeStyle = 'rgba(51, 65, 85, 0.3)' // grid-line with opacity
+  ctx.strokeStyle = 'rgba(51, 65, 85, 0.5)' // grid-line with better visibility
   ctx.lineWidth = 1
 
   const gridStep = viewport.gridStep
+  if (gridStep <= 0) return
+
   const startX = Math.floor(bounds.minX / gridStep) * gridStep
   const endX = Math.ceil(bounds.maxX / gridStep) * gridStep
   const startY = Math.floor(bounds.minY / gridStep) * gridStep
@@ -103,10 +129,13 @@ function drawGrid(
     const start = worldToScreen(x, bounds.minY, viewport, canvasWidth, canvasHeight)
     const end = worldToScreen(x, bounds.maxY, viewport, canvasWidth, canvasHeight)
     
-    ctx.beginPath()
-    ctx.moveTo(start[0], start[1])
-    ctx.lineTo(end[0], end[1])
-    ctx.stroke()
+    // Only draw if line is within canvas bounds
+    if (start[0] >= 0 && start[0] <= canvasWidth && end[0] >= 0 && end[0] <= canvasWidth) {
+      ctx.beginPath()
+      ctx.moveTo(start[0], start[1])
+      ctx.lineTo(end[0], end[1])
+      ctx.stroke()
+    }
   }
 
   // Draw horizontal grid lines
@@ -114,10 +143,13 @@ function drawGrid(
     const start = worldToScreen(bounds.minX, y, viewport, canvasWidth, canvasHeight)
     const end = worldToScreen(bounds.maxX, y, viewport, canvasWidth, canvasHeight)
     
-    ctx.beginPath()
-    ctx.moveTo(start[0], start[1])
-    ctx.lineTo(end[0], end[1])
-    ctx.stroke()
+    // Only draw if line is within canvas bounds
+    if (start[1] >= 0 && start[1] <= canvasHeight && end[1] >= 0 && end[1] <= canvasHeight) {
+      ctx.beginPath()
+      ctx.moveTo(start[0], start[1])
+      ctx.lineTo(end[0], end[1])
+      ctx.stroke()
+    }
   }
 }
 
