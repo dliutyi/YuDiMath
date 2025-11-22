@@ -267,8 +267,9 @@ function drawFrameGrid(
   const minV = -halfFrameHeight - framePanY
   const maxV = halfFrameHeight - framePanY
   
-  // Expand range slightly to ensure full coverage
-  const padding = gridStep * 2
+  // Expand range significantly to ensure infinite grid appearance during panning
+  // Use a large padding based on frame screen dimensions to ensure grid extends far beyond visible area
+  const padding = Math.max(frameScreenWidth, frameScreenHeight) / frameToScreenScale * 3
   const expandedMinU = minU - padding
   const expandedMaxU = maxU + padding
   const expandedMinV = minV - padding
@@ -346,10 +347,13 @@ function drawFrameAxes(
   const frameToScreenScaleAxes = gridStep * frameZoom * parentZoomAxes
   const halfFrameWidth = (frameScreenWidth / frameToScreenScaleAxes) / 2
   const halfFrameHeight = (frameScreenHeight / frameToScreenScaleAxes) / 2
-  const minFrameX = -halfFrameWidth - framePanX
-  const maxFrameX = halfFrameWidth - framePanX
-  const minFrameY = -halfFrameHeight - framePanY
-  const maxFrameY = halfFrameHeight - framePanY
+  // Calculate visible range in frame coordinates, accounting for panning
+  // Expand significantly to ensure labels appear when panning far
+  const paddingForLabels = Math.max(frameScreenWidth, frameScreenHeight) / frameToScreenScaleAxes * 3
+  const minFrameX = -halfFrameWidth - framePanX - paddingForLabels
+  const maxFrameX = halfFrameWidth - framePanX + paddingForLabels
+  const minFrameY = -halfFrameHeight - framePanY - paddingForLabels
+  const maxFrameY = halfFrameHeight - framePanY + paddingForLabels
 
   // Axes should always be fixed at the origin (0, 0) in frame coordinates
   // They extend from the origin to the frame edges, regardless of panning
