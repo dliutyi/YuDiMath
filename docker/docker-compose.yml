@@ -1,7 +1,7 @@
-version: '3.8'
+name: yudimath
 
 services:
-  app:
+  web:
     build:
       context: ..
       dockerfile: docker/Dockerfile
