@@ -112,12 +112,13 @@ function drawGrid(
   canvasWidth: number,
   canvasHeight: number
 ) {
-  ctx.strokeStyle = 'rgba(51, 65, 85, 0.6)' // grid-line color - more visible
+  ctx.strokeStyle = 'rgba(51, 65, 85, 0.7)' // grid-line color - more visible
   ctx.lineWidth = 1
 
   const gridStep = viewport.gridStep
   if (gridStep <= 0) return
 
+  // Calculate grid line positions in world coordinates
   const startX = Math.floor(bounds.minX / gridStep) * gridStep
   const endX = Math.ceil(bounds.maxX / gridStep) * gridStep
   const startY = Math.floor(bounds.minY / gridStep) * gridStep
@@ -128,22 +129,22 @@ function drawGrid(
     // Skip the axis line (x=0) as it's drawn separately
     if (Math.abs(x) < 0.001) continue
     
-    const start = worldToScreen(x, bounds.minY, viewport, canvasWidth, canvasHeight)
-    const end = worldToScreen(x, bounds.maxY, viewport, canvasWidth, canvasHeight)
+    // Convert world coordinates to screen coordinates
+    // Use a large Y range to ensure the line covers the full visible height
+    const topY = bounds.minY - 1000 // Extend beyond visible area
+    const bottomY = bounds.maxY + 1000
     
-    // Draw line if it intersects the canvas (less strict bounds check)
-    const lineIntersectsCanvas = 
-      (start[0] >= -10 && start[0] <= canvasWidth + 10) ||
-      (end[0] >= -10 && end[0] <= canvasWidth + 10) ||
-      (start[0] < 0 && end[0] > canvasWidth) ||
-      (start[0] > canvasWidth && end[0] < 0)
+    const top = worldToScreen(x, topY, viewport, canvasWidth, canvasHeight)
+    const bottom = worldToScreen(x, bottomY, viewport, canvasWidth, canvasHeight)
     
-    if (lineIntersectsCanvas) {
-      ctx.beginPath()
-      ctx.moveTo(start[0], start[1])
-      ctx.lineTo(end[0], end[1])
-      ctx.stroke()
-    }
+    // Always draw - clip to canvas bounds if needed
+    ctx.beginPath()
+    // Clip to canvas bounds
+    const clippedTop = Math.max(0, Math.min(canvasHeight, top[1]))
+    const clippedBottom = Math.max(0, Math.min(canvasHeight, bottom[1]))
+    ctx.moveTo(top[0], clippedTop)
+    ctx.lineTo(bottom[0], clippedBottom)
+    ctx.stroke()
   }
 
   // Draw horizontal grid lines
@@ -151,22 +152,22 @@ function drawGrid(
     // Skip the axis line (y=0) as it's drawn separately
     if (Math.abs(y) < 0.001) continue
     
-    const start = worldToScreen(bounds.minX, y, viewport, canvasWidth, canvasHeight)
-    const end = worldToScreen(bounds.maxX, y, viewport, canvasWidth, canvasHeight)
+    // Convert world coordinates to screen coordinates
+    // Use a large X range to ensure the line covers the full visible width
+    const leftX = bounds.minX - 1000 // Extend beyond visible area
+    const rightX = bounds.maxX + 1000
     
-    // Draw line if it intersects the canvas (less strict bounds check)
-    const lineIntersectsCanvas = 
-      (start[1] >= -10 && start[1] <= canvasHeight + 10) ||
-      (end[1] >= -10 && end[1] <= canvasHeight + 10) ||
-      (start[1] < 0 && end[1] > canvasHeight) ||
-      (start[1] > canvasHeight && end[1] < 0)
+    const left = worldToScreen(leftX, y, viewport, canvasWidth, canvasHeight)
+    const right = worldToScreen(rightX, y, viewport, canvasWidth, canvasHeight)
     
-    if (lineIntersectsCanvas) {
-      ctx.beginPath()
-      ctx.moveTo(start[0], start[1])
-      ctx.lineTo(end[0], end[1])
-      ctx.stroke()
-    }
+    // Always draw - clip to canvas bounds if needed
+    ctx.beginPath()
+    // Clip to canvas bounds
+    const clippedLeft = Math.max(0, Math.min(canvasWidth, left[0]))
+    const clippedRight = Math.max(0, Math.min(canvasWidth, right[0]))
+    ctx.moveTo(clippedLeft, left[1])
+    ctx.lineTo(clippedRight, right[1])
+    ctx.stroke()
   }
 }
 
