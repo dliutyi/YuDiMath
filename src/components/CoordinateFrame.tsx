@@ -22,6 +22,64 @@ function frameToParent(point: Point2D, frame: CoordinateFrame): Point2D {
 }
 
 /**
+ * Transform a point from frame coordinates to screen coordinates
+ * Accounts for frame's viewport pan and zoom
+ * @param point Point in frame coordinates [u, v]
+ * @param frame The coordinate frame
+ * @param parentViewport Parent viewport state
+ * @param canvasWidth Canvas width in pixels
+ * @param canvasHeight Canvas height in pixels
+ * @returns Point in screen coordinates [x, y]
+ */
+function frameToScreen(
+  point: Point2D,
+  frame: CoordinateFrame,
+  parentViewport: ViewportState,
+  canvasWidth: number,
+  canvasHeight: number
+): Point2D {
+  const [u, v] = point
+  const { viewport: frameViewport } = frame
+  
+  // Apply frame viewport pan and zoom
+  // Frame viewport pan (framePanX, framePanY) shifts what's visible in frame coordinates
+  // Frame viewport zoom scales the visible area (higher zoom = see less space, more detail)
+  // 
+  // To transform frame coordinate (u, v) to screen:
+  // 1. Account for frame pan: (u - framePanX, v - framePanY)
+  // 2. Apply frame zoom: scale base vectors by zoom
+  // 3. Transform to parent coordinates using scaled base vectors
+  // 4. Transform to screen coordinates using parent viewport
+  
+  const [originX, originY] = frame.origin
+  const [iX, iY] = frame.baseI
+  const [jX, jY] = frame.baseJ
+  
+  // Apply frame pan
+  const frameU = u - frameViewport.x
+  const frameV = v - frameViewport.y
+  
+  // Transform to parent coordinates using base vectors scaled by frame zoom
+  // The zoom affects how much of the frame coordinate space is visible
+  // Higher zoom means base vectors appear larger (more pixels per unit)
+  const scaledIX = iX / frameViewport.zoom
+  const scaledIY = iY / frameViewport.zoom
+  const scaledJX = jX / frameViewport.zoom
+  const scaledJY = jY / frameViewport.zoom
+  
+  const parentX = originX + frameU * scaledIX + frameV * scaledJX
+  const parentY = originY + frameU * scaledIY + frameV * scaledJY
+  
+  // Transform to screen coordinates using parent viewport
+  const centerX = canvasWidth / 2
+  const centerY = canvasHeight / 2
+  const screenX = centerX + (parentX - parentViewport.x) * parentViewport.zoom
+  const screenY = centerY - (parentY - parentViewport.y) * parentViewport.zoom
+  
+  return [screenX, screenY]
+}
+
+/**
  * Draw a coordinate frame on the canvas
  * This function is called from the Canvas component's draw function
  */
@@ -234,11 +292,9 @@ function drawFrameGrid(
   const endU = Math.ceil(expandedMaxU / gridStep) * gridStep
   for (let u = startU; u <= endU; u += gridStep) {
     // Line endpoints in frame coordinates: (u, expandedMinV) to (u, expandedMaxV)
-    const startPoint = frameToParent([u, expandedMinV], frame)
-    const endPoint = frameToParent([u, expandedMaxV], frame)
-    
-    const startScreen = worldToScreen(startPoint[0], startPoint[1], viewport, canvasWidth, canvasHeight)
-    const endScreen = worldToScreen(endPoint[0], endPoint[1], viewport, canvasWidth, canvasHeight)
+    // Use frameToScreen to account for frame viewport zoom and pan
+    const startScreen = frameToScreen([u, expandedMinV], frame, viewport, canvasWidth, canvasHeight)
+    const endScreen = frameToScreen([u, expandedMaxV], frame, viewport, canvasWidth, canvasHeight)
     
     ctx.beginPath()
     ctx.moveTo(Math.round(startScreen[0]) + 0.5, Math.round(startScreen[1]) + 0.5)
@@ -252,11 +308,9 @@ function drawFrameGrid(
   const endV = Math.ceil(expandedMaxV / gridStep) * gridStep
   for (let v = startV; v <= endV; v += gridStep) {
     // Line endpoints in frame coordinates: (expandedMinU, v) to (expandedMaxU, v)
-    const startPoint = frameToParent([expandedMinU, v], frame)
-    const endPoint = frameToParent([expandedMaxU, v], frame)
-    
-    const startScreen = worldToScreen(startPoint[0], startPoint[1], viewport, canvasWidth, canvasHeight)
-    const endScreen = worldToScreen(endPoint[0], endPoint[1], viewport, canvasWidth, canvasHeight)
+    // Use frameToScreen to account for frame viewport zoom and pan
+    const startScreen = frameToScreen([expandedMinU, v], frame, viewport, canvasWidth, canvasHeight)
+    const endScreen = frameToScreen([expandedMaxU, v], frame, viewport, canvasWidth, canvasHeight)
     
     ctx.beginPath()
     ctx.moveTo(Math.round(startScreen[0]) + 0.5, Math.round(startScreen[1]) + 0.5)
@@ -329,10 +383,9 @@ function drawFrameAxes(
 
   // Draw Y axis (vertical line in frame coordinates, parallel to baseJ)
   // Y axis is at x=0 in frame coordinates
-  const yAxisStart = frameToParent([0, minFrameY], frame)
-  const yAxisEnd = frameToParent([0, maxFrameY], frame)
-  const yAxisStartScreen = worldToScreen(yAxisStart[0], yAxisStart[1], viewport, canvasWidth, canvasHeight)
-  const yAxisEndScreen = worldToScreen(yAxisEnd[0], yAxisEnd[1], viewport, canvasWidth, canvasHeight)
+  // Use frameToScreen to account for frame viewport zoom and pan
+  const yAxisStartScreen = frameToScreen([0, minFrameY], frame, viewport, canvasWidth, canvasHeight)
+  const yAxisEndScreen = frameToScreen([0, maxFrameY], frame, viewport, canvasWidth, canvasHeight)
 
   ctx.beginPath()
   ctx.moveTo(Math.round(yAxisStartScreen[0]) + 0.5, Math.round(yAxisStartScreen[1]) + 0.5)
@@ -375,8 +428,8 @@ function drawFrameAxes(
   for (let y = startYLabel; y <= endYLabel; y += labelSpacing) {
     if (Math.abs(y) < 0.001) continue // Skip label at origin
     
-    const labelPoint = frameToParent([0, y], frame)
-    const labelScreen = worldToScreen(labelPoint[0], labelPoint[1], viewport, canvasWidth, canvasHeight)
+    // Use frameToScreen to account for frame viewport zoom and pan
+    const labelScreen = frameToScreen([0, y], frame, viewport, canvasWidth, canvasHeight)
     
     // Format label (remove unnecessary decimals)
     const labelText = y % 1 === 0 ? y.toString() : y.toFixed(2).replace(/\.?0+$/, '')
