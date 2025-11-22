@@ -52,6 +52,9 @@ export default function Canvas({
     canvas.height = canvasHeight * dpr
     ctx.scale(dpr, dpr)
     
+    // Enable crisp rendering by aligning to pixel boundaries
+    ctx.imageSmoothingEnabled = false
+    
     console.log('[Canvas.draw] Canvas set to:', { width: canvas.width, height: canvas.height, dpr })
 
     // Clear canvas
@@ -165,7 +168,9 @@ function drawGrid(
   while (true) {
     // Draw line at +x
     if (x !== 0) {
-      const screenX = centerX + x * worldToScreenScale
+      let screenX = centerX + x * worldToScreenScale
+      // Align to pixel boundary to prevent blurring
+      screenX = Math.round(screenX) + 0.5
       if (screenX > canvasWidth + 10) break
       if (screenX >= -10) {
         ctx.beginPath()
@@ -178,7 +183,9 @@ function drawGrid(
     
     // Draw line at -x
     if (x !== 0) {
-      const screenX = centerX - x * worldToScreenScale
+      let screenX = centerX - x * worldToScreenScale
+      // Align to pixel boundary to prevent blurring
+      screenX = Math.round(screenX) + 0.5
       if (screenX < -10) break
       if (screenX <= canvasWidth + 10) {
         ctx.beginPath()
@@ -200,7 +207,9 @@ function drawGrid(
   while (true) {
     // Draw line at +y
     if (y !== 0) {
-      const screenY = centerY - y * worldToScreenScale // Note: Y is inverted
+      let screenY = centerY - y * worldToScreenScale // Note: Y is inverted
+      // Align to pixel boundary to prevent blurring
+      screenY = Math.round(screenY) + 0.5
       if (screenY < -10) break
       if (screenY <= canvasHeight + 10) {
         ctx.beginPath()
@@ -213,7 +222,9 @@ function drawGrid(
     
     // Draw line at -y
     if (y !== 0) {
-      const screenY = centerY + y * worldToScreenScale // Note: Y is inverted
+      let screenY = centerY + y * worldToScreenScale // Note: Y is inverted
+      // Align to pixel boundary to prevent blurring
+      screenY = Math.round(screenY) + 0.5
       if (screenY > canvasHeight + 10) break
       if (screenY >= -10) {
         ctx.beginPath()
@@ -242,6 +253,10 @@ function drawAxes(
 ) {
   ctx.strokeStyle = '#64748b' // axis color
   ctx.lineWidth = 2
+  
+  // Align axes to pixel boundaries for crisp rendering
+  const centerX = Math.round(canvasWidth / 2) + 0.5
+  const centerY = Math.round(canvasHeight / 2) + 0.5
 
   // Draw X axis (horizontal line at y=0)
   const xAxisStart = worldToScreen(
