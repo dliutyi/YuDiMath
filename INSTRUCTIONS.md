@@ -333,7 +333,7 @@ For each step:
 
 ---
 
-### [ ] Step 3.3: Implement Frame Selection
+### [x] Step 3.3: Implement Frame Selection
 **Task**: Allow users to select frames by clicking on them.
 
 **Implementation**:

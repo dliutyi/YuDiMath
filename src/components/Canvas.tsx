@@ -176,7 +176,7 @@ export default function Canvas({
       draw()
     })
     return () => cancelAnimationFrame(frameId)
-  }, [viewport, width, height, drawingRect, frames])
+  }, [viewport, width, height, drawingRect, frames, selectedFrameId])
 
   // Also redraw on window resize
   useEffect(() => {
