@@ -22,33 +22,49 @@ export default function Canvas({
   const draw = () => {
     const canvas = canvasRef.current
     const container = containerRef.current
-    if (!canvas || !container) return
+    if (!canvas || !container) {
+      console.log('[Canvas.draw] Missing canvas or container')
+      return
+    }
 
     const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    if (!ctx) {
+      console.log('[Canvas.draw] Failed to get 2d context')
+      return
+    }
 
     // Get actual container dimensions
     const rect = container.getBoundingClientRect()
     const canvasWidth = width || rect.width || 800
     const canvasHeight = height || rect.height || 600
 
+    console.log('[Canvas.draw] Canvas dimensions:', { canvasWidth, canvasHeight, rectWidth: rect.width, rectHeight: rect.height })
+
     // Skip if dimensions are invalid
-    if (canvasWidth <= 0 || canvasHeight <= 0) return
+    if (canvasWidth <= 0 || canvasHeight <= 0) {
+      console.log('[Canvas.draw] Invalid dimensions, skipping')
+      return
+    }
 
     // Set canvas internal size (for high DPI displays)
     const dpr = window.devicePixelRatio || 1
     canvas.width = canvasWidth * dpr
     canvas.height = canvasHeight * dpr
     ctx.scale(dpr, dpr)
+    
+    console.log('[Canvas.draw] Canvas set to:', { width: canvas.width, height: canvas.height, dpr })
 
     // Clear canvas
     ctx.clearRect(0, 0, canvasWidth, canvasHeight)
 
     // Draw grid first (so axes appear on top)
+    console.log('[Canvas.draw] Drawing grid...')
     drawGrid(ctx, viewport, canvasWidth, canvasHeight)
 
     // Draw axes on top
+    console.log('[Canvas.draw] Drawing axes...')
     drawAxes(ctx, viewport, canvasWidth, canvasHeight)
+    console.log('[Canvas.draw] Drawing complete')
   }
 
   useEffect(() => {
@@ -107,13 +123,18 @@ function drawGrid(
   canvasWidth: number,
   canvasHeight: number
 ) {
+  console.log('[drawGrid] Called with:', { canvasWidth, canvasHeight, viewport })
+  
   // Set grid line style - make it more visible
   ctx.strokeStyle = '#475569' // slate-600 - more visible than rgba
   ctx.lineWidth = 1
   ctx.globalAlpha = 0.4
 
   const gridStep = viewport.gridStep
+  console.log('[drawGrid] gridStep:', gridStep)
+  
   if (gridStep <= 0) {
+    console.log('[drawGrid] Grid step is <= 0, skipping')
     ctx.globalAlpha = 1.0
     return
   }
@@ -126,10 +147,12 @@ function drawGrid(
   // Calculate world-to-screen scale
   const worldToScreenScale = viewport.zoom
   const screenGridSpacing = gridStep * worldToScreenScale
+  
+  console.log('[drawGrid] screenGridSpacing:', screenGridSpacing, 'worldToScreenScale:', worldToScreenScale)
 
   // Only draw grid if spacing is reasonable (not too dense, not too sparse)
   if (screenGridSpacing < 5) {
-    // Grid too dense, skip
+    console.log('[drawGrid] Grid too dense (spacing < 5px), skipping. Consider increasing gridStep or zoom')
     ctx.globalAlpha = 1.0
     return
   }
@@ -137,6 +160,7 @@ function drawGrid(
   // Draw vertical grid lines
   // Start from center and go outward
   let x = 0
+  let verticalLinesDrawn = 0
   while (true) {
     // Draw line at +x
     if (x !== 0) {
@@ -147,6 +171,7 @@ function drawGrid(
         ctx.moveTo(screenX, 0)
         ctx.lineTo(screenX, canvasHeight)
         ctx.stroke()
+        verticalLinesDrawn++
       }
     }
     
@@ -159,15 +184,18 @@ function drawGrid(
         ctx.moveTo(screenX, 0)
         ctx.lineTo(screenX, canvasHeight)
         ctx.stroke()
+        verticalLinesDrawn++
       }
     }
     
     x += gridStep
     if (x * worldToScreenScale > canvasWidth + 100) break
   }
+  console.log('[drawGrid] Vertical lines drawn:', verticalLinesDrawn)
 
   // Draw horizontal grid lines
   let y = 0
+  let horizontalLinesDrawn = 0
   while (true) {
     // Draw line at +y
     if (y !== 0) {
@@ -178,6 +206,7 @@ function drawGrid(
         ctx.moveTo(0, screenY)
         ctx.lineTo(canvasWidth, screenY)
         ctx.stroke()
+        horizontalLinesDrawn++
       }
     }
     
@@ -190,12 +219,15 @@ function drawGrid(
         ctx.moveTo(0, screenY)
         ctx.lineTo(canvasWidth, screenY)
         ctx.stroke()
+        horizontalLinesDrawn++
       }
     }
     
     y += gridStep
     if (y * worldToScreenScale > canvasHeight + 100) break
   }
+  console.log('[drawGrid] Horizontal lines drawn:', horizontalLinesDrawn)
+  console.log('[drawGrid] Total grid lines drawn:', verticalLinesDrawn + horizontalLinesDrawn)
 
   // Restore alpha
   ctx.globalAlpha = 1.0
