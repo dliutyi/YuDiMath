@@ -23,6 +23,9 @@ describe('CoordinateFrame', () => {
       textAlign: '',
       textBaseline: '',
       fillText: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      clip: vi.fn(),
     } as unknown as CanvasRenderingContext2D
 
     defaultViewport = {

@@ -38,6 +38,9 @@ describe('Canvas', () => {
       fillText: vi.fn(),
       setLineDash: vi.fn(),
       rect: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      clip: vi.fn(),
     })
 
     // Mock getBoundingClientRect
@@ -587,6 +590,9 @@ describe('Canvas', () => {
       fillText: vi.fn(),
       setLineDash: vi.fn(),
       rect: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      clip: vi.fn(),
     }
 
     HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(mockContext)
@@ -646,6 +652,9 @@ describe('Canvas', () => {
       fillText: vi.fn(),
       setLineDash: vi.fn(),
       rect: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      clip: vi.fn(),
     }
 
     HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(mockContext)

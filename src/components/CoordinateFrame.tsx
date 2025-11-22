@@ -88,7 +88,24 @@ export function drawCoordinateFrame(
   ctx.fillText('O', originScreen[0], originScreen[1] + 5)
 
   // Draw frame grid (lines along baseI and baseJ directions)
+  // Save context state before clipping
+  ctx.save()
+  
+  // Clip drawing to frame bounds
+  ctx.beginPath()
+  ctx.rect(
+    Math.round(topLeft[0]) + 0.5,
+    Math.round(topLeft[1]) + 0.5,
+    bottomRight[0] - topLeft[0],
+    bottomRight[1] - topLeft[1]
+  )
+  ctx.clip()
+  
+  // Draw grid within clipped region
   drawFrameGrid(ctx, frame, viewport, canvasWidth, canvasHeight)
+  
+  // Restore context state (removes clip)
+  ctx.restore()
 
   // Recursively draw child frames
   frame.childFrameIds.forEach(childId => {
@@ -110,39 +127,82 @@ function drawFrameGrid(
   canvasWidth: number,
   canvasHeight: number
 ) {
-  const { bounds, baseI, baseJ } = frame
+  const { bounds, baseI, baseJ, origin } = frame
 
-  // Calculate base vector magnitudes
-  const iMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
-  const jMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
-  
-  // Use a reasonable grid step (e.g., 1 unit in frame coordinates)
-  const gridStep = 1.0
+  // Use viewport grid step (inherited from background grid)
+  // This ensures frame grid aligns with background grid when base vectors are standard
+  const gridStep = viewport.gridStep
 
-  ctx.strokeStyle = '#475569' // slate-600
+  // Make frame grid visually distinct from background grid
+  // Use a different color (purple/indigo) and slightly higher opacity
+  ctx.strokeStyle = '#6366f1' // indigo-500 - distinct from background grid
   ctx.lineWidth = 1
-  ctx.globalAlpha = 0.3
+  ctx.globalAlpha = 0.4 // Slightly more visible than background grid (0.3)
   ctx.setLineDash([])
 
-  // The origin is at the center of the frame viewport
-  // We need to calculate how many grid lines to draw on each side of the origin
-  // to cover the entire frame viewport
+  // Calculate frame dimensions in frame coordinates
+  // The frame bounds are in parent coordinates, and the origin is at the center
+  // We need to find the corners of the frame in frame coordinates
   
-  // Estimate frame dimensions in frame coordinates from the center
-  // bounds.width and bounds.height are in parent coordinates
-  // We approximate by dividing by the average magnitude
-  const avgMagnitude = (iMagnitude + jMagnitude) / 2
-  const halfFrameWidth = bounds.width / (2 * avgMagnitude)
-  const halfFrameHeight = bounds.height / (2 * avgMagnitude)
+  // Frame corners in parent coordinates
+  const corners = [
+    [bounds.x, bounds.y + bounds.height], // top-left
+    [bounds.x + bounds.width, bounds.y + bounds.height], // top-right
+    [bounds.x + bounds.width, bounds.y], // bottom-right
+    [bounds.x, bounds.y], // bottom-left
+  ]
+  
+  // Convert corners to frame coordinates
+  // To convert from parent to frame: solve origin + u*baseI + v*baseJ = corner
+  // This is a 2x2 linear system: [baseI baseJ] * [u; v] = corner - origin
+  const [originX, originY] = origin
+  
+  // Calculate inverse transformation matrix
+  // [u; v] = [baseI_x baseJ_x; baseI_y baseJ_y]^-1 * [x - originX; y - originY]
+  const det = baseI[0] * baseJ[1] - baseI[1] * baseJ[0]
+  if (Math.abs(det) < 1e-10) {
+    // Degenerate case: base vectors are parallel, skip grid
+    ctx.globalAlpha = 1.0
+    return
+  }
+  
+  const invDet = 1.0 / det
+  const invMatrix = [
+    [baseJ[1] * invDet, -baseJ[0] * invDet],
+    [-baseI[1] * invDet, baseI[0] * invDet]
+  ]
+  
+  // Find min/max u and v values in frame coordinates
+  let minU = Infinity, maxU = -Infinity
+  let minV = Infinity, maxV = -Infinity
+  
+  for (const [px, py] of corners) {
+    const dx = px - originX
+    const dy = py - originY
+    const u = invMatrix[0][0] * dx + invMatrix[0][1] * dy
+    const v = invMatrix[1][0] * dx + invMatrix[1][1] * dy
+    
+    minU = Math.min(minU, u)
+    maxU = Math.max(maxU, u)
+    minV = Math.min(minV, v)
+    maxV = Math.max(maxV, v)
+  }
+  
+  // Expand range slightly to ensure full coverage
+  const padding = gridStep * 2
+  minU -= padding
+  maxU += padding
+  minV -= padding
+  maxV += padding
 
   // Draw grid lines along baseI direction (lines parallel to baseJ)
-  // These are lines at constant u values, centered around origin (u=0)
-  const minU = -Math.ceil(halfFrameWidth / gridStep) * gridStep
-  const maxU = Math.ceil(halfFrameWidth / gridStep) * gridStep
-  for (let u = minU; u <= maxU; u += gridStep) {
-    // Start and end points in frame coordinates: (u, -halfFrameHeight) to (u, halfFrameHeight)
-    const startPoint = frameToParent([u, -halfFrameHeight], frame)
-    const endPoint = frameToParent([u, halfFrameHeight], frame)
+  // These are lines at constant u values
+  const startU = Math.floor(minU / gridStep) * gridStep
+  const endU = Math.ceil(maxU / gridStep) * gridStep
+  for (let u = startU; u <= endU; u += gridStep) {
+    // Line endpoints in frame coordinates: (u, minV) to (u, maxV)
+    const startPoint = frameToParent([u, minV], frame)
+    const endPoint = frameToParent([u, maxV], frame)
     
     const startScreen = worldToScreen(startPoint[0], startPoint[1], viewport, canvasWidth, canvasHeight)
     const endScreen = worldToScreen(endPoint[0], endPoint[1], viewport, canvasWidth, canvasHeight)
@@ -154,13 +214,13 @@ function drawFrameGrid(
   }
 
   // Draw grid lines along baseJ direction (lines parallel to baseI)
-  // These are lines at constant v values, centered around origin (v=0)
-  const minV = -Math.ceil(halfFrameHeight / gridStep) * gridStep
-  const maxV = Math.ceil(halfFrameHeight / gridStep) * gridStep
-  for (let v = minV; v <= maxV; v += gridStep) {
-    // Start and end points in frame coordinates: (-halfFrameWidth, v) to (halfFrameWidth, v)
-    const startPoint = frameToParent([-halfFrameWidth, v], frame)
-    const endPoint = frameToParent([halfFrameWidth, v], frame)
+  // These are lines at constant v values
+  const startV = Math.floor(minV / gridStep) * gridStep
+  const endV = Math.ceil(maxV / gridStep) * gridStep
+  for (let v = startV; v <= endV; v += gridStep) {
+    // Line endpoints in frame coordinates: (minU, v) to (maxU, v)
+    const startPoint = frameToParent([minU, v], frame)
+    const endPoint = frameToParent([maxU, v], frame)
     
     const startScreen = worldToScreen(startPoint[0], startPoint[1], viewport, canvasWidth, canvasHeight)
     const endScreen = worldToScreen(endPoint[0], endPoint[1], viewport, canvasWidth, canvasHeight)
@@ -171,6 +231,7 @@ function drawFrameGrid(
     ctx.stroke()
   }
 
+  // Restore global alpha
   ctx.globalAlpha = 1.0
 }
 
