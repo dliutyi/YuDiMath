@@ -210,15 +210,115 @@ export default function Canvas({
   }, [])
 
   // Attach wheel event listener with passive: false to prevent browser zoom
-  // This must be in capture phase to prevent browser zoom before React handles it
+  // Handle zoom logic here instead of React handler to avoid passive listener issues
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || !onViewportChange) return
+    const container = containerRef.current
+    if (!canvas || !container) return
 
     const wheelHandler = (e: WheelEvent) => {
-      // Prevent browser zoom but allow event to bubble to React handler
+      // Prevent browser zoom
       e.preventDefault()
-      // Don't stop propagation - let React handle it
+      e.stopPropagation()
+
+      const rect = container.getBoundingClientRect()
+      const canvasWidth = width || rect.width || 800
+      const canvasHeight = height || rect.height || 600
+
+      // Get mouse position relative to canvas
+      const mouseX = e.clientX - rect.left
+      const mouseY = e.clientY - rect.top
+
+      // Check if mouse is inside a frame
+      const worldPoint = screenToWorld(mouseX, mouseY, viewport, canvasWidth, canvasHeight)
+      let zoomingFrame: CoordinateFrame | null = null
+      let smallestArea = Infinity
+      
+      for (const frame of frames) {
+        if (isPointInFrame(worldPoint, frame.bounds)) {
+          const frameArea = frame.bounds.width * frame.bounds.height
+          if (frameArea < smallestArea) {
+            smallestArea = frameArea
+            zoomingFrame = frame
+          }
+        }
+      }
+
+      if (zoomingFrame && onFrameViewportChange) {
+        // Zooming inside a frame - update frame viewport
+        // Convert mouse position to frame coordinates
+        const parentToFrame = (point: Point2D, frame: CoordinateFrame): Point2D => {
+          const [px, py] = point
+          const [originX, originY] = frame.origin
+          const dx = px - originX
+          const dy = py - originY
+          const [iX, iY] = frame.baseI
+          const [jX, jY] = frame.baseJ
+          const det = iX * jY - iY * jX
+          if (Math.abs(det) < 1e-10) return [0, 0]
+          const invDet = 1.0 / det
+          const u = (jY * dx - jX * dy) * invDet
+          const v = (-iY * dx + iX * dy) * invDet
+          return [u, v]
+        }
+        
+        const framePoint = parentToFrame(worldPoint, zoomingFrame)
+        
+        // Calculate new zoom level
+        const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomingFrame.viewport.zoom + zoomDelta))
+        
+        // If zoom didn't change (hit constraint), don't update
+        if (newZoom === zoomingFrame.viewport.zoom) return
+        
+        // To keep the point under the mouse fixed, we need to adjust the frame pan
+        // The point in frame coordinates is framePoint
+        // Before zoom: framePoint maps to screen position (mouseX, mouseY)
+        // After zoom: we want framePoint to still map to (mouseX, mouseY)
+        // The pan adjustment is: (framePoint - oldPan) * (oldZoom / newZoom) - (framePoint - newPan) = 0
+        // Solving: newPan = framePoint - (framePoint - oldPan) * (oldZoom / newZoom)
+        const oldZoom = zoomingFrame.viewport.zoom
+        const oldPanX = zoomingFrame.viewport.x
+        const oldPanY = zoomingFrame.viewport.y
+        
+        const newPanX = framePoint[0] - (framePoint[0] - oldPanX) * (oldZoom / newZoom)
+        const newPanY = framePoint[1] - (framePoint[1] - oldPanY) * (oldZoom / newZoom)
+        
+        // Update frame viewport
+        onFrameViewportChange(zoomingFrame.id, {
+          ...zoomingFrame.viewport,
+          zoom: newZoom,
+          x: newPanX,
+          y: newPanY,
+        })
+      } else if (onViewportChange) {
+        // Zooming background
+        // Get world coordinates of mouse position before zoom
+        const worldBefore = screenToWorld(mouseX, mouseY, viewport, canvasWidth, canvasHeight)
+
+        // Calculate new zoom level
+        const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom + zoomDelta))
+
+        // If zoom didn't change (hit constraint), don't update
+        if (newZoom === viewport.zoom) return
+
+        // Update viewport with new zoom
+        const newViewport: ViewportState = {
+          ...viewport,
+          zoom: newZoom,
+        }
+
+        // Get world coordinates of mouse position after zoom
+        const worldAfter = screenToWorld(mouseX, mouseY, newViewport, canvasWidth, canvasHeight)
+
+        // Adjust viewport position to keep the point under the mouse fixed
+        onViewportChange({
+          ...newViewport,
+          x: viewport.x + (worldBefore[0] - worldAfter[0]),
+          y: viewport.y + (worldBefore[1] - worldAfter[1]),
+        })
+      }
     }
 
     // Use capture phase and non-passive to ensure we can preventDefault
@@ -227,7 +327,7 @@ export default function Canvas({
     return () => {
       canvas.removeEventListener('wheel', wheelHandler, { capture: true } as EventListenerOptions)
     }
-  }, [onViewportChange])
+  }, [viewport, onViewportChange, onFrameViewportChange, frames, width, height, MIN_ZOOM, MAX_ZOOM, ZOOM_SENSITIVITY])
 
   // Pan and drawing handlers
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -576,112 +676,6 @@ export default function Canvas({
     panningFrameRef.current = null
   }, [])
 
-  // Zoom handler - prevent browser zoom interference
-  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
-    // Prevent browser zoom - must be called early
-    e.preventDefault()
-    e.stopPropagation()
-
-    const canvas = canvasRef.current
-    const container = containerRef.current
-    if (!canvas || !container) return
-
-    const rect = container.getBoundingClientRect()
-    const canvasWidth = width || rect.width || 800
-    const canvasHeight = height || rect.height || 600
-
-    // Get mouse position relative to canvas
-    const mouseX = e.clientX - rect.left
-    const mouseY = e.clientY - rect.top
-
-    // Check if mouse is inside a frame
-    const worldPoint = screenToWorld(mouseX, mouseY, viewport, canvasWidth, canvasHeight)
-    let zoomingFrame: CoordinateFrame | null = null
-    let smallestArea = Infinity
-    
-    for (const frame of frames) {
-      if (isPointInFrame(worldPoint, frame.bounds)) {
-        const frameArea = frame.bounds.width * frame.bounds.height
-        if (frameArea < smallestArea) {
-          smallestArea = frameArea
-          zoomingFrame = frame
-        }
-      }
-    }
-
-    if (zoomingFrame && onFrameViewportChange) {
-      // Zooming inside a frame - update frame viewport
-      // Convert mouse position to frame coordinates
-      const parentToFrame = (point: Point2D, frame: CoordinateFrame): Point2D => {
-        const [px, py] = point
-        const [originX, originY] = frame.origin
-        const dx = px - originX
-        const dy = py - originY
-        const [iX, iY] = frame.baseI
-        const [jX, jY] = frame.baseJ
-        const det = iX * jY - iY * jX
-        if (Math.abs(det) < 1e-10) return [0, 0]
-        const invDet = 1.0 / det
-        const u = (jY * dx - jX * dy) * invDet
-        const v = (-iY * dx + iX * dy) * invDet
-        return [u, v]
-      }
-      
-      const frameBefore = parentToFrame(worldPoint, zoomingFrame)
-      
-      // Calculate new zoom level
-      const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY
-      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomingFrame.viewport.zoom + zoomDelta))
-      
-      // If zoom didn't change (hit constraint), don't update
-      if (newZoom === zoomingFrame.viewport.zoom) return
-      
-      // Update frame viewport with new zoom
-      const newFrameViewport: ViewportState = {
-        ...zoomingFrame.viewport,
-        zoom: newZoom,
-      }
-      
-      // Get frame coordinates of mouse position after zoom
-      // Need to account for frame's viewport pan
-      const frameAfterX = (frameBefore[0] - zoomingFrame.viewport.x) * (zoomingFrame.viewport.zoom / newZoom) + newFrameViewport.x
-      const frameAfterY = (frameBefore[1] - zoomingFrame.viewport.y) * (zoomingFrame.viewport.zoom / newZoom) + newFrameViewport.y
-      
-      // Adjust frame viewport position to keep the point under the mouse fixed
-      onFrameViewportChange(zoomingFrame.id, {
-        ...newFrameViewport,
-        x: newFrameViewport.x + (frameBefore[0] - frameAfterX),
-        y: newFrameViewport.y + (frameBefore[1] - frameAfterY),
-      })
-    } else if (onViewportChange) {
-      // Zooming background
-      // Get world coordinates of mouse position before zoom
-      const worldBefore = screenToWorld(mouseX, mouseY, viewport, canvasWidth, canvasHeight)
-
-      // Calculate new zoom level
-      const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY
-      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom + zoomDelta))
-
-      // If zoom didn't change (hit constraint), don't update
-      if (newZoom === viewport.zoom) return
-
-      // Update viewport with new zoom
-      const newViewport: ViewportState = {
-        ...viewport,
-        zoom: newZoom,
-      }
-
-      // Get world coordinates of mouse position after zoom
-      const worldAfter = screenToWorld(mouseX, mouseY, newViewport, canvasWidth, canvasHeight)
-
-      // Adjust viewport position to keep the point under the mouse fixed
-      onViewportChange({
-        ...newViewport,
-        x: viewport.x + (worldBefore[0] - worldAfter[0]),
-        y: viewport.y + (worldBefore[1] - worldAfter[1]),
-      })
-    }
-  }, [viewport, onViewportChange, onFrameViewportChange, frames, width, height, MIN_ZOOM, MAX_ZOOM, ZOOM_SENSITIVITY])
 
   // Touch handlers for mobile support
   const touchStartRef = useRef<{ x: number; y: number; distance: number } | null>(null)
@@ -816,7 +810,6 @@ export default function Canvas({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        onWheel={handleWheel}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
