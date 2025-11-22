@@ -8,7 +8,7 @@ import type {
   WorkspaceState,
   FrameBounds,
   Point2D,
-} from './index'
+} from '../../src/types/index'
 
 describe('Type Definitions', () => {
   describe('CoordinateMode', () => {

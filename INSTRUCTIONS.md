@@ -37,11 +37,14 @@ A modern, interactive web application for visualizing linear algebra and calculu
 
 For each step:
 1. ✅ **Implement** the feature/functionality completely
-2. ✅ **Write unit tests** - All tests must pass before proceeding
-3. ✅ **Run tests** - Execute `npm test` and ensure 100% pass rate
+2. ✅ **Write unit tests** - All tests must be in the `tests/` folder (dedicated folder next to `src/`). All tests must pass before proceeding
+3. ✅ **Run tests** - Execute `npm test -- --run` and ensure 100% pass rate
 4. ✅ **Create git commit** - Use descriptive commit message following conventional commits
-5. ✅ **Restart Docker** - Restart the Docker container to verify the application runs
-6. ✅ **Verify in browser** - Manually test the feature in the browser
+5. ✅ **Restart Docker** - Restart the Docker container and verify it works:
+   - Build/restart: `docker-compose -f docker/docker-compose.yml build` and `docker-compose -f docker/docker-compose.yml up -d`
+   - Verify with curl: `curl http://localhost:3000` should return HTML without errors
+   - Check logs: `docker-compose -f docker/docker-compose.yml logs` should show no errors
+6. ✅ **Verify in browser** - Manually test the feature in the browser at http://localhost:3000
 7. ✅ **Mark step complete** - Check off the step in this checklist before proceeding
 
 **Do not proceed to the next step until the current step is fully complete and verified.**
@@ -61,16 +64,17 @@ For each step:
   yudimath/
   ├── public/
   │   └── index.html
-  ├── src/
-  │   ├── components/
-  │   ├── hooks/
-  │   ├── utils/
-  │   ├── types/
-  │   ├── styles/
-  │   └── main.tsx
-  ├── tests/
-  │   ├── unit/
-  │   └── setup.ts
+├── src/
+│   ├── components/
+│   ├── hooks/
+│   ├── utils/
+│   ├── types/
+│   ├── styles/
+│   └── main.tsx
+├── tests/
+│   ├── unit/
+│   ├── utils/
+│   └── setup.ts
   ├── docker/
   │   ├── Dockerfile
   │   └── docker-compose.yml
@@ -148,7 +152,7 @@ For each step:
 
 ---
 
-### [ ] Step 1.5: Set Up Dark Theme Color Palette
+### [x] Step 1.5: Set Up Dark Theme Color Palette
 **Task**: Configure Tailwind with dark theme color palette and create base styles.
 
 **Implementation**:
