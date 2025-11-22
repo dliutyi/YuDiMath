@@ -5,14 +5,29 @@ interface GridStepSelectorProps {
 
 const MIN_GRID_STEP = 0.1
 const MAX_GRID_STEP = 20
+const GRID_STEP_INCREMENT = 0.25
+
+// Round to nearest 0.25 increment
+function roundToQuarter(value: number): number {
+  return Math.round(value / GRID_STEP_INCREMENT) * GRID_STEP_INCREMENT
+}
 
 // Convert linear slider value (0-100) to logarithmic grid step (0.1-20)
+// and round to nearest 0.25 increment
 function sliderToGridStep(sliderValue: number): number {
   const normalized = sliderValue / 100 // 0 to 1
   const logMin = Math.log10(MIN_GRID_STEP)
   const logMax = Math.log10(MAX_GRID_STEP)
   const logValue = logMin + normalized * (logMax - logMin)
-  return Math.pow(10, logValue)
+  const rawValue = Math.pow(10, logValue)
+  // Round to nearest 0.25 increment
+  let rounded = roundToQuarter(rawValue)
+  // If rounded value is less than minimum, use the smallest valid 0.25 increment (0.25)
+  if (rounded < MIN_GRID_STEP) {
+    rounded = GRID_STEP_INCREMENT
+  }
+  // Clamp to maximum
+  return Math.min(MAX_GRID_STEP, rounded)
 }
 
 // Convert grid step (0.1-20) to linear slider value (0-100)
@@ -34,14 +49,18 @@ export default function GridStepSelector({
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newSliderValue = parseFloat(e.target.value)
     const newGridStep = sliderToGridStep(newSliderValue)
-    onGridStepChange(newGridStep)
+    // Ensure the value is rounded to 0.25 increment
+    const roundedGridStep = roundToQuarter(newGridStep)
+    onGridStepChange(roundedGridStep)
   }
 
-  // Format grid step for display (remove unnecessary decimals)
+  // Format grid step for display (always show 2 decimal places for 0.25 increments)
   const formatGridStep = (value: number): string => {
-    if (value >= 10) return value.toFixed(0)
-    if (value >= 1) return value.toFixed(1)
-    return value.toFixed(2)
+    // Round to 0.25 first to ensure clean display
+    const rounded = roundToQuarter(value)
+    if (rounded >= 10) return rounded.toFixed(0)
+    if (rounded >= 1) return rounded.toFixed(1)
+    return rounded.toFixed(2)
   }
 
   return (

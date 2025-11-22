@@ -69,11 +69,11 @@ describe('GridStepSelector', () => {
     
     const slider = screen.getByRole('slider') as HTMLInputElement
     
-    // Test minimum value (0 should map to 0.1)
+    // Test minimum value (0 should map to 0.25, the smallest valid 0.25 increment)
     fireEvent.change(slider, { target: { value: '0' } })
     expect(onGridStepChange).toHaveBeenCalled()
     const minCall = onGridStepChange.mock.calls[onGridStepChange.mock.calls.length - 1]
-    expect(minCall[0]).toBeCloseTo(0.1, 1)
+    expect(minCall[0]).toBe(0.25) // Rounded to nearest 0.25 increment
     
     // Test maximum value (100 should map to 20)
     vi.clearAllMocks()
@@ -83,18 +83,39 @@ describe('GridStepSelector', () => {
     expect(maxCall[0]).toBeCloseTo(20, 0)
   })
 
-  it('handles logarithmic scale conversion', () => {
+  it('handles logarithmic scale conversion and rounds to 0.25 increments', () => {
     const onGridStepChange = vi.fn()
     render(<GridStepSelector gridStep={1} onGridStepChange={onGridStepChange} />)
     
     const slider = screen.getByRole('slider') as HTMLInputElement
     
-    // Test middle value (50 should map to approximately 1)
+    // Test middle value (50 should map to approximately 1, rounded to 0.25)
     fireEvent.change(slider, { target: { value: '50' } })
     expect(onGridStepChange).toHaveBeenCalled()
     const middleCall = onGridStepChange.mock.calls[onGridStepChange.mock.calls.length - 1]
-    // Middle of log scale should be around 1-2
+    // Middle of log scale should be around 1-2, rounded to 0.25
     expect(middleCall[0]).toBeGreaterThan(0.5)
     expect(middleCall[0]).toBeLessThan(3)
+    // Value should be a multiple of 0.25
+    expect(middleCall[0] % 0.25).toBeCloseTo(0, 5)
+  })
+
+  it('always rounds grid step values to 0.25 increments', () => {
+    const onGridStepChange = vi.fn()
+    render(<GridStepSelector gridStep={1} onGridStepChange={onGridStepChange} />)
+    
+    const slider = screen.getByRole('slider') as HTMLInputElement
+    
+    // Test various slider positions to ensure all values are rounded to 0.25
+    const testPositions = [0, 25, 50, 75, 100]
+    testPositions.forEach((position) => {
+      vi.clearAllMocks()
+      fireEvent.change(slider, { target: { value: position.toString() } })
+      if (onGridStepChange.mock.calls.length > 0) {
+        const value = onGridStepChange.mock.calls[onGridStepChange.mock.calls.length - 1][0]
+        // Value should be a multiple of 0.25 (within floating point precision)
+        expect(value % 0.25).toBeCloseTo(0, 5)
+      }
+    })
   })
 })
