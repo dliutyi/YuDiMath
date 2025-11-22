@@ -14,7 +14,6 @@ interface CanvasProps {
 
 export default function Canvas({
   viewport,
-  onViewportChange,
   width,
   height,
 }: CanvasProps) {

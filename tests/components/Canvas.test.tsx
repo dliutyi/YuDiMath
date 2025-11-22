@@ -60,13 +60,16 @@ describe('Canvas', () => {
     expect(wrapper.className).toContain('bg-bg-primary')
   })
 
-  it('calls getContext on canvas', () => {
+  it('calls getContext on canvas', async () => {
     render(<Canvas viewport={defaultViewport} />)
+    // Wait for requestAnimationFrame
+    await new Promise(resolve => setTimeout(resolve, 100))
     expect(HTMLCanvasElement.prototype.getContext).toHaveBeenCalledWith('2d')
   })
 
-  it('handles viewport changes', () => {
+  it('handles viewport changes', async () => {
     const { rerender } = render(<Canvas viewport={defaultViewport} />)
+    await new Promise(resolve => setTimeout(resolve, 100))
     
     const newViewport: ViewportState = {
       x: 10,
@@ -76,12 +79,14 @@ describe('Canvas', () => {
     }
     
     rerender(<Canvas viewport={newViewport} />)
+    await new Promise(resolve => setTimeout(resolve, 100))
     // Component should re-render with new viewport
     expect(HTMLCanvasElement.prototype.getContext).toHaveBeenCalled()
   })
 
-  it('handles custom width and height', () => {
+  it('handles custom width and height', async () => {
     render(<Canvas viewport={defaultViewport} width={1920} height={1080} />)
+    await new Promise(resolve => setTimeout(resolve, 100))
     // Component should accept custom dimensions
     expect(HTMLCanvasElement.prototype.getContext).toHaveBeenCalled()
   })
