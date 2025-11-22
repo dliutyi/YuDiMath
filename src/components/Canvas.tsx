@@ -254,50 +254,36 @@ function drawAxes(
   ctx.strokeStyle = '#64748b' // axis color
   ctx.lineWidth = 2
   
-  // Align axes to pixel boundaries for crisp rendering
+  // Calculate center - align to pixel boundaries for crisp rendering
   const centerX = Math.round(canvasWidth / 2) + 0.5
   const centerY = Math.round(canvasHeight / 2) + 0.5
 
   // Draw X axis (horizontal line at y=0)
-  const xAxisStart = worldToScreen(
-    -10000,
-    0,
-    viewport,
-    canvasWidth,
-    canvasHeight
-  )
-  const xAxisEnd = worldToScreen(
-    10000,
-    0,
-    viewport,
-    canvasWidth,
-    canvasHeight
-  )
-
+  // Use centerY when viewport is at origin, otherwise calculate from world coordinates
+  let xAxisY: number
+  if (Math.abs(viewport.y) < 0.001) {
+    xAxisY = centerY
+  } else {
+    const originScreen = worldToScreen(0, 0, viewport, canvasWidth, canvasHeight)
+    xAxisY = Math.round(originScreen[1]) + 0.5
+  }
   ctx.beginPath()
-  ctx.moveTo(xAxisStart[0], xAxisStart[1])
-  ctx.lineTo(xAxisEnd[0], xAxisEnd[1])
+  ctx.moveTo(0, xAxisY)
+  ctx.lineTo(canvasWidth, xAxisY)
   ctx.stroke()
 
   // Draw Y axis (vertical line at x=0)
-  const yAxisStart = worldToScreen(
-    0,
-    -10000,
-    viewport,
-    canvasWidth,
-    canvasHeight
-  )
-  const yAxisEnd = worldToScreen(
-    0,
-    10000,
-    viewport,
-    canvasWidth,
-    canvasHeight
-  )
-
+  // Use centerX when viewport is at origin, otherwise calculate from world coordinates
+  let yAxisX: number
+  if (Math.abs(viewport.x) < 0.001) {
+    yAxisX = centerX
+  } else {
+    const originScreen = worldToScreen(0, 0, viewport, canvasWidth, canvasHeight)
+    yAxisX = Math.round(originScreen[0]) + 0.5
+  }
   ctx.beginPath()
-  ctx.moveTo(yAxisStart[0], yAxisStart[1])
-  ctx.lineTo(yAxisEnd[0], yAxisEnd[1])
+  ctx.moveTo(yAxisX, 0)
+  ctx.lineTo(yAxisX, canvasHeight)
   ctx.stroke()
 
   // Draw axis labels at origin
