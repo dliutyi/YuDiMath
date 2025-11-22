@@ -23,6 +23,7 @@ describe('CoordinateFrame', () => {
       textAlign: '',
       textBaseline: '',
       fillText: vi.fn(),
+      fill: vi.fn(),
       save: vi.fn(),
       restore: vi.fn(),
       clip: vi.fn(),
