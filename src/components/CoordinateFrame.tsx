@@ -318,7 +318,7 @@ function drawFrameAxes(
   canvasWidth: number,
   canvasHeight: number
 ) {
-  const { bounds, baseI, baseJ, origin, viewport: frameViewport } = frame
+  const { bounds, baseI, baseJ, viewport: frameViewport } = frame
 
   // Calculate grid step based on base vector magnitudes
   const iMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
@@ -358,43 +358,29 @@ function drawFrameAxes(
   const bottomLeftScreen = [topLeft[0], bottomRight[1]]
   const bottomRightScreen = bottomRight
   
-  // Origin in screen coordinates (always fixed at frame.origin in parent coordinates)
-  // This is the original frame origin, which doesn't change with panning
-  const originScreenAxes = worldToScreen(origin[0], origin[1], viewport, canvasWidth, canvasHeight)
+  // Origin in screen coordinates
+  // The origin in frame coordinates is (0, 0), which maps to frame.origin in parent coordinates
+  // When panning within the frame, this screen position changes because we're seeing a different part of the frame
+  // Use frameToScreen to correctly account for frame panning and zooming
+  const originScreenAxes = frameToScreen([0, 0], frame, viewport, canvasWidth, canvasHeight)
   
   // Get base vector directions in screen coordinates
   // The axes should always pass through the frame origin (0, 0 in frame coordinates)
-  // which maps to frame.origin in parent coordinates - this is FIXED and doesn't change with panning
-  // Base vectors define the direction of the axes, scaled by zoom
-  // We calculate the direction vectors directly from base vectors, scaled by zoom
+  // Base vectors define the direction of the axes
+  // We calculate the direction by transforming points (1, 0) and (0, 1) in frame coordinates to screen
+  // This correctly accounts for frame panning and zooming
   
-  const [originX, originY] = origin
-  const [iX, iY] = baseI
-  const [jX, jY] = baseJ
-  
-  // Calculate base vector directions in parent coordinates (scaled by zoom)
-  // These represent the direction of the axes from the origin
-  const baseIDirParentX = iX * frameZoom
-  const baseIDirParentY = iY * frameZoom
-  const baseJDirParentX = jX * frameZoom
-  const baseJDirParentY = jY * frameZoom
-  
-  // Transform direction vectors to screen coordinates
-  // We need to transform a point at the origin and a point offset by the direction vector
-  // Use originScreenAxes which is already calculated above
-  const baseIDirEndParentX = originX + baseIDirParentX
-  const baseIDirEndParentY = originY + baseIDirParentY
-  const baseJDirEndParentX = originX + baseJDirParentX
-  const baseJDirEndParentY = originY + baseJDirParentY
-  
-  const baseIDirEndScreen = worldToScreen(baseIDirEndParentX, baseIDirEndParentY, viewport, canvasWidth, canvasHeight)
-  const baseJDirEndScreen = worldToScreen(baseJDirEndParentX, baseJDirEndParentY, viewport, canvasWidth, canvasHeight)
+  // Transform unit vectors in frame coordinates to screen coordinates
+  // (1, 0) in frame coordinates gives us the direction of the i-axis
+  // (0, 1) in frame coordinates gives us the direction of the j-axis
+  const iAxisEndScreen = frameToScreen([1, 0], frame, viewport, canvasWidth, canvasHeight)
+  const jAxisEndScreen = frameToScreen([0, 1], frame, viewport, canvasWidth, canvasHeight)
   
   // Calculate direction vectors in screen space (from origin)
-  const baseIDirX = baseIDirEndScreen[0] - originScreenAxes[0]
-  const baseIDirY = baseIDirEndScreen[1] - originScreenAxes[1]
-  const baseJDirX = baseJDirEndScreen[0] - originScreenAxes[0]
-  const baseJDirY = baseJDirEndScreen[1] - originScreenAxes[1]
+  const baseIDirX = iAxisEndScreen[0] - originScreenAxes[0]
+  const baseIDirY = iAxisEndScreen[1] - originScreenAxes[1]
+  const baseJDirX = jAxisEndScreen[0] - originScreenAxes[0]
+  const baseJDirY = jAxisEndScreen[1] - originScreenAxes[1]
   
   // Find X axis endpoints (intersection with left and right edges)
   // X axis goes through the fixed origin, parallel to baseI direction
