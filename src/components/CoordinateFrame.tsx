@@ -359,6 +359,14 @@ function drawFrameAxes(
   const frameZoom = frameViewport.zoom
   const framePanX = frameViewport.x
   const framePanY = frameViewport.y
+  const parentZoomAxes = viewport.zoom
+  const frameToScreenScaleAxes = gridStep * frameZoom * parentZoomAxes
+  const halfFrameWidth = (frameScreenWidth / frameToScreenScaleAxes) / 2
+  const halfFrameHeight = (frameScreenHeight / frameToScreenScaleAxes) / 2
+  const minFrameX = -halfFrameWidth - framePanX
+  const maxFrameX = halfFrameWidth - framePanX
+  const minFrameY = -halfFrameHeight - framePanY
+  const maxFrameY = halfFrameHeight - framePanY
 
   // Axes should always be fixed at the origin (0, 0) in frame coordinates
   // They extend from the origin to the frame edges, regardless of panning
