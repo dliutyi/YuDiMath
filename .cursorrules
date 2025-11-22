@@ -1,0 +1,167 @@
+# YuDiMath Project Rules
+
+## General Principles
+- Write clean, maintainable, and well-documented code
+- Follow consistent naming conventions
+- Use TypeScript for type safety when possible
+- Prioritize accessibility and user experience
+- Write meaningful commit messages
+
+## ReactJS Rules
+
+### Component Structure
+- Use functional components with hooks (avoid class components)
+- Keep components small and focused on a single responsibility
+- Extract reusable logic into custom hooks
+- Use React.memo() for expensive components that re-render frequently
+- Prefer composition over inheritance
+
+### State Management
+- Use useState for local component state
+- Use useReducer for complex state logic
+- Consider Context API for shared state that doesn't need global state management
+- Use proper state management library (Redux, Zustand, etc.) only when necessary
+
+### Code Style
+- Use ES6+ features (arrow functions, destructuring, template literals)
+- Use meaningful variable and function names
+- Extract magic numbers and strings into constants
+- Use PropTypes or TypeScript for prop validation
+- Follow React naming conventions: PascalCase for components, camelCase for functions/variables
+
+### Performance
+- Avoid creating functions/objects inside render methods
+- Use useMemo and useCallback appropriately (don't overuse)
+- Implement code splitting with React.lazy() for large components
+- Optimize images and assets
+
+### File Organization
+- One component per file
+- Co-locate related files (component, styles, tests) in the same directory
+- Use index.js for clean imports
+- Group by feature, not by file type
+
+## Docker Rules
+
+### Dockerfile Best Practices
+- Use specific version tags, not 'latest'
+- Use multi-stage builds to reduce image size
+- Order Dockerfile instructions from least to most frequently changing
+- Use .dockerignore to exclude unnecessary files
+- Run as non-root user when possible
+- Combine RUN commands to reduce layers
+- Use COPY instead of ADD unless you need URL extraction
+
+### Container Guidelines
+- Keep containers stateless when possible
+- Use environment variables for configuration
+- Don't store secrets in images
+- Expose only necessary ports
+- Use health checks for long-running services
+
+### Docker Compose
+- Use docker-compose.yml for local development
+- Define services with clear names
+- Use volumes for development hot-reloading
+- Set up proper networking between services
+- Use environment files (.env) for configuration
+
+## npm Rules
+
+### Package Management
+- Use exact versions in package.json for production dependencies (or use package-lock.json)
+- Keep dependencies up to date and audit regularly
+- Remove unused dependencies
+- Use npm ci for CI/CD pipelines instead of npm install
+- Document why each dependency is needed
+
+### Scripts
+- Use meaningful script names in package.json
+- Group related scripts together
+- Use npm-run-all for parallel/concurrent scripts
+- Document scripts in README
+
+### Security
+- Run `npm audit` regularly
+- Fix security vulnerabilities promptly
+- Don't commit node_modules to version control
+- Use .npmrc for project-specific npm configuration
+
+### Version Management
+- Follow semantic versioning (semver)
+- Use npm version commands for version bumps
+- Tag releases appropriately in git
+
+## PyScript Rules
+
+### Integration
+- Load PyScript from CDN or local build
+- Use proper HTML structure with py-script tags
+- Keep Python code in separate .py files when possible
+- Use py-config for configuration
+
+### Code Organization
+- Write Python code following PEP 8 style guide
+- Use type hints where appropriate
+- Keep Python scripts modular and reusable
+- Handle errors gracefully with try-except blocks
+
+### Performance
+- Minimize Python code execution in the browser
+- Use async/await for long-running operations
+- Cache results when appropriate
+- Avoid blocking the main thread
+
+### Interoperability
+- Use proper data exchange between JavaScript and Python
+- Use PyScript's built-in methods for DOM manipulation
+- Leverage Python's strengths (data processing, calculations)
+- Use JavaScript for UI interactions and DOM manipulation
+
+## File Structure
+```
+project-root/
+├── src/
+│   ├── components/
+│   ├── hooks/
+│   ├── utils/
+│   ├── styles/
+│   └── assets/
+├── public/
+├── docker/
+│   ├── Dockerfile
+│   └── docker-compose.yml
+├── scripts/
+│   └── *.py (PyScript files)
+├── package.json
+├── .dockerignore
+├── .gitignore
+└── README.md
+```
+
+## Git Workflow
+- Use meaningful commit messages following conventional commits
+- Create feature branches for new features
+- Keep commits atomic and focused
+- Review code before merging
+
+## Testing
+- Write unit tests for utility functions
+- Write component tests for React components
+- Test critical user flows
+- Maintain good test coverage
+
+## Documentation
+- Document complex logic and algorithms
+- Keep README.md updated
+- Document API endpoints and data structures
+- Include setup and deployment instructions
+
+## Code Review Checklist
+- [ ] Code follows project style guidelines
+- [ ] No console.logs or debug code left in
+- [ ] Error handling is implemented
+- [ ] Accessibility considerations addressed
+- [ ] Performance implications considered
+- [ ] Security best practices followed
+- [ ] Tests pass and coverage is adequate
