@@ -239,4 +239,109 @@ describe('Canvas', () => {
     // Should not throw error
     expect(true).toBe(true)
   })
+
+  it('renders grid with different grid steps', async () => {
+    const mockContext = {
+      clearRect: vi.fn(),
+      scale: vi.fn(),
+      strokeStyle: '',
+      lineWidth: 0,
+      globalAlpha: 1.0,
+      imageSmoothingEnabled: true,
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      stroke: vi.fn(),
+      fillStyle: '',
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+      fillText: vi.fn(),
+    }
+
+    HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(mockContext)
+
+    // Test with gridStep = 1
+    const viewport1: ViewportState = {
+      ...defaultViewport,
+      gridStep: 1,
+    }
+    const { rerender } = render(<Canvas viewport={viewport1} />)
+    
+    // Wait for requestAnimationFrame to complete
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Grid should be drawn (moveTo and lineTo should be called)
+    expect(mockContext.beginPath).toHaveBeenCalled()
+    expect(mockContext.moveTo).toHaveBeenCalled()
+    expect(mockContext.lineTo).toHaveBeenCalled()
+    expect(mockContext.stroke).toHaveBeenCalled()
+
+    // Clear mocks
+    vi.clearAllMocks()
+
+    // Test with gridStep = 5
+    const viewport5: ViewportState = {
+      ...defaultViewport,
+      gridStep: 5,
+    }
+    rerender(<Canvas viewport={viewport5} />)
+    
+    // Wait for requestAnimationFrame to complete
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Grid should still be drawn with different step
+    expect(mockContext.beginPath).toHaveBeenCalled()
+    expect(mockContext.moveTo).toHaveBeenCalled()
+    expect(mockContext.lineTo).toHaveBeenCalled()
+    expect(mockContext.stroke).toHaveBeenCalled()
+  })
+
+  it('updates grid rendering when gridStep changes', async () => {
+    const mockContext = {
+      clearRect: vi.fn(),
+      scale: vi.fn(),
+      strokeStyle: '',
+      lineWidth: 0,
+      globalAlpha: 1.0,
+      imageSmoothingEnabled: true,
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      stroke: vi.fn(),
+      fillStyle: '',
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+      fillText: vi.fn(),
+    }
+
+    HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(mockContext)
+
+    const { rerender } = render(<Canvas viewport={defaultViewport} />)
+    
+    // Wait for requestAnimationFrame to complete
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Initial render should draw grid
+    const initialCalls = mockContext.lineTo.mock.calls.length
+    expect(initialCalls).toBeGreaterThan(0)
+
+    // Change gridStep
+    const newViewport: ViewportState = {
+      ...defaultViewport,
+      gridStep: 10,
+    }
+    vi.clearAllMocks()
+    rerender(<Canvas viewport={newViewport} />)
+    
+    // Wait for requestAnimationFrame to complete
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Grid should be redrawn with new step
+    expect(mockContext.beginPath).toHaveBeenCalled()
+    expect(mockContext.moveTo).toHaveBeenCalled()
+    expect(mockContext.lineTo).toHaveBeenCalled()
+    expect(mockContext.stroke).toHaveBeenCalled()
+  })
 })
