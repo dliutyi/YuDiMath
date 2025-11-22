@@ -3,25 +3,6 @@ import { worldToScreen } from '../utils/coordinates'
 import { drawArrow } from '../utils/arrows'
 
 /**
- * Transform a point from frame coordinates to parent coordinates
- * @param point Point in frame coordinates [u, v]
- * @param frame The coordinate frame
- * @returns Point in parent coordinates [x, y]
- */
-function frameToParent(point: Point2D, frame: CoordinateFrame): Point2D {
-  const [u, v] = point
-  const [originX, originY] = frame.origin
-  const [iX, iY] = frame.baseI
-  const [jX, jY] = frame.baseJ
-  
-  // Transform: origin + u * baseI + v * baseJ
-  return [
-    originX + u * iX + v * jX,
-    originY + u * iY + v * jY
-  ]
-}
-
-/**
  * Transform a point from frame coordinates to screen coordinates
  * Accounts for frame's viewport pan and zoom
  * @param point Point in frame coordinates [u, v]
