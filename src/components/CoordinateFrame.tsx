@@ -178,7 +178,7 @@ function drawFrameGrid(
   canvasHeight: number,
   nestingLevel: number = 0
 ) {
-  const { bounds, baseI, baseJ, origin } = frame
+  const { bounds, baseI, baseJ, origin, viewport: frameViewport } = frame
 
   // Calculate grid step based on base vector magnitudes
   // Grid step should be 1 unit in frame coordinates, which corresponds to base vector magnitudes
@@ -257,12 +257,12 @@ function drawFrameGrid(
 
   // Draw grid lines along baseI direction (lines parallel to baseJ)
   // These are lines at constant u values
-  const startU = Math.floor(minU / gridStep) * gridStep
-  const endU = Math.ceil(maxU / gridStep) * gridStep
+  const startU = Math.floor(expandedMinU / gridStep) * gridStep
+  const endU = Math.ceil(expandedMaxU / gridStep) * gridStep
   for (let u = startU; u <= endU; u += gridStep) {
-    // Line endpoints in frame coordinates: (u, minV) to (u, maxV)
-    const startPoint = frameToParent([u, minV], frame)
-    const endPoint = frameToParent([u, maxV], frame)
+    // Line endpoints in frame coordinates: (u, expandedMinV) to (u, expandedMaxV)
+    const startPoint = frameToParent([u, expandedMinV], frame)
+    const endPoint = frameToParent([u, expandedMaxV], frame)
     
     const startScreen = worldToScreen(startPoint[0], startPoint[1], viewport, canvasWidth, canvasHeight)
     const endScreen = worldToScreen(endPoint[0], endPoint[1], viewport, canvasWidth, canvasHeight)
@@ -275,12 +275,12 @@ function drawFrameGrid(
 
   // Draw grid lines along baseJ direction (lines parallel to baseI)
   // These are lines at constant v values
-  const startV = Math.floor(minV / gridStep) * gridStep
-  const endV = Math.ceil(maxV / gridStep) * gridStep
+  const startV = Math.floor(expandedMinV / gridStep) * gridStep
+  const endV = Math.ceil(expandedMaxV / gridStep) * gridStep
   for (let v = startV; v <= endV; v += gridStep) {
-    // Line endpoints in frame coordinates: (minU, v) to (maxU, v)
-    const startPoint = frameToParent([minU, v], frame)
-    const endPoint = frameToParent([maxU, v], frame)
+    // Line endpoints in frame coordinates: (expandedMinU, v) to (expandedMaxU, v)
+    const startPoint = frameToParent([expandedMinU, v], frame)
+    const endPoint = frameToParent([expandedMaxU, v], frame)
     
     const startScreen = worldToScreen(startPoint[0], startPoint[1], viewport, canvasWidth, canvasHeight)
     const endScreen = worldToScreen(endPoint[0], endPoint[1], viewport, canvasWidth, canvasHeight)

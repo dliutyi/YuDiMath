@@ -295,13 +295,11 @@ export default function Canvas({
         }
       }
       
+      // Handle frame selection (but don't prevent panning)
       if (clickedFrame && onFrameSelected) {
         // Select the clicked frame
         console.log('[Canvas] Frame clicked:', clickedFrame.id)
         onFrameSelected(clickedFrame.id)
-        e.preventDefault()
-        e.stopPropagation()
-        return
       } else if (onFrameSelected) {
         // Clicked on background, deselect
         console.log('[Canvas] Background clicked, deselecting frame')
@@ -320,7 +318,7 @@ export default function Canvas({
       lastPanPointRef.current = { x: screenX, y: screenY }
     }
     e.preventDefault()
-  }, [isDrawing, viewport, width, height])
+  }, [isDrawing, viewport, width, height, frames, onFrameSelected, onFrameViewportChange])
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
@@ -433,7 +431,7 @@ export default function Canvas({
       lastPanPointRef.current = currentPoint
     }
     e.preventDefault()
-  }, [isDrawing, drawingRect.start, viewport, onViewportChange, width, height])
+  }, [isDrawing, drawingRect, viewport, onViewportChange, onFrameViewportChange, frames, width, height])
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
