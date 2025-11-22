@@ -316,8 +316,11 @@ For each step:
 - Render frame rectangle with border
 - Render frame's own coordinate grid based on base vectors
 - Render base i vector (red) and base j vector (blue)
-- Transform frame coordinates to background coordinates
+- Transform frame coordinates to parent coordinates (background for top-level, parent frame for nested)
 - Display frame origin
+- Support recursive rendering of nested frames
+  - Each frame component should render its child frames recursively
+  - Child frames are transformed relative to their parent frame's coordinate system
 
 **Tests**:
 - Test frame component renders correctly
