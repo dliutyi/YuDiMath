@@ -329,7 +329,6 @@ function drawFrameAxes(
   // Convert frame bounds to screen coordinates
   const topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
   const bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
-  const originScreen = worldToScreen(origin[0], origin[1], viewport, canvasWidth, canvasHeight)
 
   // Frame viewport dimensions in screen coordinates
   const frameScreenWidth = bottomRight[0] - topLeft[0]
