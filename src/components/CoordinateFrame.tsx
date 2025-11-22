@@ -160,10 +160,10 @@ function drawFrameGrid(
   // Get color for this nesting level - each level has a distinct color
   const gridColor = getGridColorForLevel(nestingLevel)
   
-  // Frame grids should be more visible than background grid but still semi-transparent
+  // Frame grids should have high contrast and be more opaque for visibility
   ctx.strokeStyle = gridColor
   ctx.lineWidth = 1
-  ctx.globalAlpha = 0.5 // More visible than background (0.3) but still transparent
+  ctx.globalAlpha = 0.7 // More opaque for better contrast
   ctx.setLineDash([])
 
   // Calculate frame dimensions in frame coordinates
