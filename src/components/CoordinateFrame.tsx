@@ -277,11 +277,8 @@ function drawFrameGrid(
   // 1 unit in frame coordinates = base vector magnitude * frame zoom in parent coordinates
   // Then parent coordinates are scaled by parent zoom to screen
   const parentZoom = viewport.zoom
-  const iMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
-  const jMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
-  const avgMagnitude = (iMagnitude + jMagnitude) / 2
   // Combined scale: frame coordinate -> parent coordinate -> screen
-  const frameToScreenScale = avgMagnitude * frameZoom * parentZoom
+  const frameToScreenScale = gridStep * frameZoom * parentZoom
   
   const halfFrameWidth = (frameScreenWidth / frameToScreenScale) / 2
   const halfFrameHeight = (frameScreenHeight / frameToScreenScale) / 2
@@ -372,11 +369,8 @@ function drawFrameAxes(
   // Frame center in frame coordinates is at (0, 0) accounting for pan
   // We need to account for how frame coordinates map to parent coordinates
   const parentZoom = viewport.zoom
-  const iMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
-  const jMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
-  const avgMagnitude = (iMagnitude + jMagnitude) / 2
   // Combined scale: frame coordinate -> parent coordinate -> screen
-  const frameToScreenScale = avgMagnitude * frameZoom * parentZoom
+  const frameToScreenScale = gridStep * frameZoom * parentZoom
   
   const halfFrameWidth = (frameScreenWidth / frameToScreenScale) / 2
   const halfFrameHeight = (frameScreenHeight / frameToScreenScale) / 2
@@ -422,12 +416,9 @@ function drawFrameAxes(
   // Calculate label spacing based on grid step and zoom
   const minLabelSpacingPx = 40 // Minimum pixels between labels on screen
   const parentZoom = viewport.zoom
-  const iMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
-  const jMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
-  const avgMagnitude = (iMagnitude + jMagnitude) / 2
   // Combined scale: frame coordinate -> parent coordinate -> screen
-  const frameToScreenScale = avgMagnitude * frameZoom * parentZoom
-  const screenGridSpacing = gridStep * frameToScreenScale
+  const frameToScreenScale = gridStep * frameZoom * parentZoom
+  const screenGridSpacing = frameToScreenScale
   let labelSpacingMultiplier = 1
   if (screenGridSpacing < minLabelSpacingPx) {
     labelSpacingMultiplier = Math.ceil(minLabelSpacingPx / screenGridSpacing)
