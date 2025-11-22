@@ -178,7 +178,7 @@ function drawFrameGrid(
   canvasHeight: number,
   nestingLevel: number = 0
 ) {
-  const { bounds, baseI, baseJ, origin, viewport: frameViewport } = frame
+  const { bounds, baseI, baseJ, viewport: frameViewport } = frame
 
   // Calculate grid step based on base vector magnitudes
   // Grid step should be 1 unit in frame coordinates, which corresponds to base vector magnitudes
