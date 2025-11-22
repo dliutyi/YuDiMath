@@ -438,14 +438,6 @@ function drawFrameAxes(
     }
   }
 
-  // Draw a debug marker at the fixed origin to verify it's not moving
-  // This helps verify the axes are at the correct fixed position
-  ctx.fillStyle = '#ff00ff' // magenta debug marker
-  ctx.globalAlpha = 0.8
-  ctx.beginPath()
-  ctx.arc(originScreenAxes[0], originScreenAxes[1], 5, 0, Math.PI * 2)
-  ctx.fill()
-  
   ctx.strokeStyle = '#64748b' // axis color
   ctx.lineWidth = 2
   ctx.globalAlpha = 0.9
