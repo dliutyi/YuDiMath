@@ -200,60 +200,33 @@ function drawFrameGrid(
   ctx.globalAlpha = 0.7 // More opaque for better contrast
   ctx.setLineDash([])
 
-  // Calculate frame dimensions in frame coordinates
-  // The frame bounds are in parent coordinates, and the origin is at the center
-  // We need to find the corners of the frame in frame coordinates
-  
-  // Frame corners in parent coordinates
-  const corners = [
-    [bounds.x, bounds.y + bounds.height], // top-left
-    [bounds.x + bounds.width, bounds.y + bounds.height], // top-right
-    [bounds.x + bounds.width, bounds.y], // bottom-right
-    [bounds.x, bounds.y], // bottom-left
-  ]
-  
-  // Convert corners to frame coordinates
-  // To convert from parent to frame: solve origin + u*baseI + v*baseJ = corner
-  // This is a 2x2 linear system: [baseI baseJ] * [u; v] = corner - origin
-  const [originX, originY] = origin
-  
-  // Calculate inverse transformation matrix
-  // [u; v] = [baseI_x baseJ_x; baseI_y baseJ_y]^-1 * [x - originX; y - originY]
-  const det = baseI[0] * baseJ[1] - baseI[1] * baseJ[0]
-  if (Math.abs(det) < 1e-10) {
-    // Degenerate case: base vectors are parallel, skip grid
-    ctx.globalAlpha = 1.0
-    return
-  }
-  
-  const invDet = 1.0 / det
-  const invMatrix = [
-    [baseJ[1] * invDet, -baseJ[0] * invDet],
-    [-baseI[1] * invDet, baseI[0] * invDet]
-  ]
-  
-  // Find min/max u and v values in frame coordinates
-  let minU = Infinity, maxU = -Infinity
-  let minV = Infinity, maxV = -Infinity
-  
-  for (const [px, py] of corners) {
-    const dx = px - originX
-    const dy = py - originY
-    const u = invMatrix[0][0] * dx + invMatrix[0][1] * dy
-    const v = invMatrix[1][0] * dx + invMatrix[1][1] * dy
-    
-    minU = Math.min(minU, u)
-    maxU = Math.max(maxU, u)
-    minV = Math.min(minV, v)
-    maxV = Math.max(maxV, v)
-  }
+  // Convert frame bounds to screen coordinates
+  const topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
+  const bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
+  const frameScreenWidth = bottomRight[0] - topLeft[0]
+  const frameScreenHeight = bottomRight[1] - topLeft[1]
+
+  // Account for frame's own viewport (pan and zoom)
+  const frameZoom = frameViewport.zoom
+  const framePanX = frameViewport.x
+  const framePanY = frameViewport.y
+
+  // Calculate visible range in frame coordinates
+  // Frame center in frame coordinates is at (0, 0) accounting for pan
+  const halfFrameWidth = (frameScreenWidth / frameZoom) / 2
+  const halfFrameHeight = (frameScreenHeight / frameZoom) / 2
+
+  const minU = -halfFrameWidth - framePanX
+  const maxU = halfFrameWidth - framePanX
+  const minV = -halfFrameHeight - framePanY
+  const maxV = halfFrameHeight - framePanY
   
   // Expand range slightly to ensure full coverage
   const padding = gridStep * 2
-  minU -= padding
-  maxU += padding
-  minV -= padding
-  maxV += padding
+  const expandedMinU = minU - padding
+  const expandedMaxU = maxU + padding
+  const expandedMinV = minV - padding
+  const expandedMaxV = maxV + padding
 
   // Draw grid lines along baseI direction (lines parallel to baseJ)
   // These are lines at constant u values
