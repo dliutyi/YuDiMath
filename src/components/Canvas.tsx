@@ -48,10 +48,10 @@ export default function Canvas({
     // Get visible bounds
     const bounds = getVisibleBounds(viewport, canvasWidth, canvasHeight)
 
-    // Draw grid
+    // Draw grid first (so axes appear on top)
     drawGrid(ctx, bounds, viewport, canvasWidth, canvasHeight)
 
-    // Draw axes
+    // Draw axes on top
     drawAxes(ctx, viewport, canvasWidth, canvasHeight)
   }
 
@@ -112,63 +112,98 @@ function drawGrid(
   canvasWidth: number,
   canvasHeight: number
 ) {
-  ctx.strokeStyle = 'rgba(51, 65, 85, 0.7)' // grid-line color - more visible
+  // Set grid line style - make it more visible
+  ctx.strokeStyle = '#475569' // slate-600 - more visible than rgba
   ctx.lineWidth = 1
+  ctx.globalAlpha = 0.4
 
   const gridStep = viewport.gridStep
-  if (gridStep <= 0) return
+  if (gridStep <= 0) {
+    ctx.globalAlpha = 1.0
+    return
+  }
 
-  // Calculate grid line positions in world coordinates
-  const startX = Math.floor(bounds.minX / gridStep) * gridStep
-  const endX = Math.ceil(bounds.maxX / gridStep) * gridStep
-  const startY = Math.floor(bounds.minY / gridStep) * gridStep
-  const endY = Math.ceil(bounds.maxY / gridStep) * gridStep
+  // Calculate how many grid lines we need based on visible area
+  // Use screen-space to determine appropriate spacing
+  const centerX = canvasWidth / 2
+  const centerY = canvasHeight / 2
+  
+  // Calculate world-to-screen scale
+  const worldToScreenScale = viewport.zoom
+  const screenGridSpacing = gridStep * worldToScreenScale
+
+  // Only draw grid if spacing is reasonable (not too dense, not too sparse)
+  if (screenGridSpacing < 5) {
+    // Grid too dense, skip
+    ctx.globalAlpha = 1.0
+    return
+  }
 
   // Draw vertical grid lines
-  for (let x = startX; x <= endX; x += gridStep) {
-    // Skip the axis line (x=0) as it's drawn separately
-    if (Math.abs(x) < 0.001) continue
+  // Start from center and go outward
+  let x = 0
+  while (true) {
+    // Draw line at +x
+    if (x !== 0) {
+      const screenX = centerX + x * worldToScreenScale
+      if (screenX > canvasWidth + 10) break
+      if (screenX >= -10) {
+        ctx.beginPath()
+        ctx.moveTo(screenX, 0)
+        ctx.lineTo(screenX, canvasHeight)
+        ctx.stroke()
+      }
+    }
     
-    // Convert world coordinates to screen coordinates
-    // Use a large Y range to ensure the line covers the full visible height
-    const topY = bounds.minY - 1000 // Extend beyond visible area
-    const bottomY = bounds.maxY + 1000
+    // Draw line at -x
+    if (x !== 0) {
+      const screenX = centerX - x * worldToScreenScale
+      if (screenX < -10) break
+      if (screenX <= canvasWidth + 10) {
+        ctx.beginPath()
+        ctx.moveTo(screenX, 0)
+        ctx.lineTo(screenX, canvasHeight)
+        ctx.stroke()
+      }
+    }
     
-    const top = worldToScreen(x, topY, viewport, canvasWidth, canvasHeight)
-    const bottom = worldToScreen(x, bottomY, viewport, canvasWidth, canvasHeight)
-    
-    // Always draw - clip to canvas bounds if needed
-    ctx.beginPath()
-    // Clip to canvas bounds
-    const clippedTop = Math.max(0, Math.min(canvasHeight, top[1]))
-    const clippedBottom = Math.max(0, Math.min(canvasHeight, bottom[1]))
-    ctx.moveTo(top[0], clippedTop)
-    ctx.lineTo(bottom[0], clippedBottom)
-    ctx.stroke()
+    x += gridStep
+    if (x * worldToScreenScale > canvasWidth + 100) break
   }
 
   // Draw horizontal grid lines
-  for (let y = startY; y <= endY; y += gridStep) {
-    // Skip the axis line (y=0) as it's drawn separately
-    if (Math.abs(y) < 0.001) continue
+  let y = 0
+  while (true) {
+    // Draw line at +y
+    if (y !== 0) {
+      const screenY = centerY - y * worldToScreenScale // Note: Y is inverted
+      if (screenY < -10) break
+      if (screenY <= canvasHeight + 10) {
+        ctx.beginPath()
+        ctx.moveTo(0, screenY)
+        ctx.lineTo(canvasWidth, screenY)
+        ctx.stroke()
+      }
+    }
     
-    // Convert world coordinates to screen coordinates
-    // Use a large X range to ensure the line covers the full visible width
-    const leftX = bounds.minX - 1000 // Extend beyond visible area
-    const rightX = bounds.maxX + 1000
+    // Draw line at -y
+    if (y !== 0) {
+      const screenY = centerY + y * worldToScreenScale // Note: Y is inverted
+      if (screenY > canvasHeight + 10) break
+      if (screenY >= -10) {
+        ctx.beginPath()
+        ctx.moveTo(0, screenY)
+        ctx.lineTo(canvasWidth, screenY)
+        ctx.stroke()
+      }
+    }
     
-    const left = worldToScreen(leftX, y, viewport, canvasWidth, canvasHeight)
-    const right = worldToScreen(rightX, y, viewport, canvasWidth, canvasHeight)
-    
-    // Always draw - clip to canvas bounds if needed
-    ctx.beginPath()
-    // Clip to canvas bounds
-    const clippedLeft = Math.max(0, Math.min(canvasWidth, left[0]))
-    const clippedRight = Math.max(0, Math.min(canvasWidth, right[0]))
-    ctx.moveTo(clippedLeft, left[1])
-    ctx.lineTo(clippedRight, right[1])
-    ctx.stroke()
+    y += gridStep
+    if (y * worldToScreenScale > canvasHeight + 100) break
   }
+
+  // Restore alpha
+  ctx.globalAlpha = 1.0
 }
 
 function drawAxes(
