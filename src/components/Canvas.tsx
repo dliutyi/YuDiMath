@@ -26,9 +26,10 @@ export default function Canvas({
   const lastPanPointRef = useRef<{ x: number; y: number } | null>(null)
   
   // Zoom constraints
-  const MIN_ZOOM = 0.1
-  const MAX_ZOOM = 10.0
-  const ZOOM_SENSITIVITY = 0.001 // Adjust this to make zoom more/less sensitive
+  // Default zoom is 50 (1 unit = 50px), so min/max are relative to that
+  const MIN_ZOOM = 5.0   // 1 unit = 5px (zoomed out)
+  const MAX_ZOOM = 500.0 // 1 unit = 500px (zoomed in)
+  const ZOOM_SENSITIVITY = 0.01 // Adjust this to make zoom more/less sensitive
 
   const draw = () => {
     const canvas = canvasRef.current
@@ -404,15 +405,9 @@ function drawGrid(
   canvasWidth: number,
   canvasHeight: number
 ) {
-  // Set grid line style - make it more visible
-  ctx.strokeStyle = '#475569' // slate-600 - more visible than rgba
-  ctx.lineWidth = 1
-  ctx.globalAlpha = 0.4
-
   const gridStep = viewport.gridStep
   
   if (gridStep <= 0) {
-    ctx.globalAlpha = 1.0
     return
   }
 
@@ -429,13 +424,14 @@ function drawGrid(
   const screenGridSpacing = gridStep * viewport.zoom
   
   // Only draw grid if spacing is reasonable (not too dense)
-  // Allow grid to be drawn even if spacing is small, but limit the number of lines
-  // This ensures grid is visible even at default zoom with gridStep=1
-  if (screenGridSpacing < 0.5) {
-    // Grid is extremely dense - skip drawing to avoid performance issues
-    ctx.globalAlpha = 1.0
+  if (screenGridSpacing < 2) {
     return
   }
+
+  // Set grid line style
+  ctx.strokeStyle = '#475569' // slate-600
+  ctx.lineWidth = 1
+  ctx.globalAlpha = 0.4
 
   // Draw vertical grid lines (lines at x = n * gridStep in world coordinates)
   // Find the first grid line to the left of the visible area
@@ -443,9 +439,6 @@ function drawGrid(
   const endX = Math.ceil(maxX / gridStep) * gridStep
   
   for (let worldX = startX; worldX <= endX; worldX += gridStep) {
-    // Skip the axis line (x=0) - it will be drawn by drawAxes
-    if (Math.abs(worldX) < 0.001) continue
-    
     // Convert world coordinate to screen coordinate
     const screenPos = worldToScreen(worldX, 0, viewport, canvasWidth, canvasHeight)
     const screenX = Math.round(screenPos[0]) + 0.5 // Align to pixel boundary
@@ -465,9 +458,6 @@ function drawGrid(
   const endY = Math.ceil(maxY / gridStep) * gridStep
   
   for (let worldY = startY; worldY <= endY; worldY += gridStep) {
-    // Skip the axis line (y=0) - it will be drawn by drawAxes
-    if (Math.abs(worldY) < 0.001) continue
-    
     // Convert world coordinate to screen coordinate
     const screenPos = worldToScreen(0, worldY, viewport, canvasWidth, canvasHeight)
     const screenY = Math.round(screenPos[1]) + 0.5 // Align to pixel boundary
@@ -491,42 +481,38 @@ function drawAxes(
   canvasWidth: number,
   canvasHeight: number
 ) {
-  ctx.strokeStyle = '#64748b' // axis color
-  ctx.lineWidth = 2
+  // Axes are the 0th grid lines (x=0 and y=0)
+  // Draw them with a different style to distinguish from regular grid lines
   
-  // Calculate center - align to pixel boundaries for crisp rendering
-  const centerX = Math.round(canvasWidth / 2) + 0.5
-  const centerY = Math.round(canvasHeight / 2) + 0.5
-
-  // Draw X axis (horizontal line at y=0)
-  // Use centerY when viewport is at origin, otherwise calculate from world coordinates
-  let xAxisY: number
-  if (Math.abs(viewport.y) < 0.001) {
-    xAxisY = centerY
-  } else {
-    const originScreen = worldToScreen(0, 0, viewport, canvasWidth, canvasHeight)
-    xAxisY = Math.round(originScreen[1]) + 0.5
+  ctx.strokeStyle = '#64748b' // axis color - more prominent than grid
+  ctx.lineWidth = 2
+  ctx.globalAlpha = 1.0
+  
+  // Draw X axis (horizontal line at y=0 in world coordinates)
+  const xAxisScreen = worldToScreen(0, 0, viewport, canvasWidth, canvasHeight)
+  const xAxisY = Math.round(xAxisScreen[1]) + 0.5 // Align to pixel boundary
+  
+  // Only draw if axis is visible on screen
+  if (xAxisY >= -10 && xAxisY <= canvasHeight + 10) {
+    ctx.beginPath()
+    ctx.moveTo(0, xAxisY)
+    ctx.lineTo(canvasWidth, xAxisY)
+    ctx.stroke()
   }
-  ctx.beginPath()
-  ctx.moveTo(0, xAxisY)
-  ctx.lineTo(canvasWidth, xAxisY)
-  ctx.stroke()
 
-  // Draw Y axis (vertical line at x=0)
-  // Use centerX when viewport is at origin, otherwise calculate from world coordinates
-  let yAxisX: number
-  if (Math.abs(viewport.x) < 0.001) {
-    yAxisX = centerX
-  } else {
-    const originScreen = worldToScreen(0, 0, viewport, canvasWidth, canvasHeight)
-    yAxisX = Math.round(originScreen[0]) + 0.5
+  // Draw Y axis (vertical line at x=0 in world coordinates)
+  const yAxisScreen = worldToScreen(0, 0, viewport, canvasWidth, canvasHeight)
+  const yAxisX = Math.round(yAxisScreen[0]) + 0.5 // Align to pixel boundary
+  
+  // Only draw if axis is visible on screen
+  if (yAxisX >= -10 && yAxisX <= canvasWidth + 10) {
+    ctx.beginPath()
+    ctx.moveTo(yAxisX, 0)
+    ctx.lineTo(yAxisX, canvasHeight)
+    ctx.stroke()
   }
-  ctx.beginPath()
-  ctx.moveTo(yAxisX, 0)
-  ctx.lineTo(yAxisX, canvasHeight)
-  ctx.stroke()
 
-  // Draw axis labels with x and y values
+  // Draw axis labels at grid line intersections
   ctx.fillStyle = '#cbd5e1' // text-secondary
   ctx.font = '12px sans-serif'
   
@@ -545,10 +531,10 @@ function drawAxes(
   // Label spacing in world coordinates (must be a multiple of gridStep)
   const labelSpacing = viewport.gridStep * labelSpacingMultiplier
   
-  // Draw X-axis labels (horizontal axis)
+  // Draw X-axis labels (horizontal axis) - labels at grid line intersections
   drawAxisLabelsX(ctx, viewport, canvasWidth, canvasHeight, xAxisY, labelSpacing)
   
-  // Draw Y-axis labels (vertical axis)
+  // Draw Y-axis labels (vertical axis) - labels at grid line intersections
   drawAxisLabelsY(ctx, viewport, canvasWidth, canvasHeight, yAxisX, labelSpacing)
 }
 

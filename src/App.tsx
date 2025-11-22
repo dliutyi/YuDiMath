@@ -6,7 +6,7 @@ function App() {
   const [viewport, setViewport] = useState<ViewportState>({
     x: 0,
     y: 0,
-    zoom: 1.0,
+    zoom: 50.0, // Default: 1 unit = 50px
     gridStep: 1, // Default to 1 unit - the fundamental coordinate system step
   })
 
