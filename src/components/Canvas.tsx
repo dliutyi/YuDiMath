@@ -21,6 +21,7 @@ interface CanvasProps {
   onFrameCreated?: (frame: CoordinateFrame, parentFrameId: string | null) => void
   selectedFrameId?: string | null
   onFrameSelected?: (frameId: string | null) => void
+  onFrameViewportChange?: (frameId: string, viewport: ViewportState) => void
 }
 
 export default function Canvas({
@@ -34,6 +35,7 @@ export default function Canvas({
   onFrameCreated,
   selectedFrameId = null,
   onFrameSelected,
+  onFrameViewportChange,
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -41,6 +43,7 @@ export default function Canvas({
   // Pan state
   const isPanningRef = useRef(false)
   const lastPanPointRef = useRef<{ x: number; y: number } | null>(null)
+  const panningFrameRef = useRef<string | null>(null) // Track which frame is being panned
   
   // Rectangle drawing state
   const [drawingRect, setDrawingRect] = useState<{
@@ -305,7 +308,14 @@ export default function Canvas({
         onFrameSelected(null)
       }
       
-      // Start panning if not clicking on a frame
+      // Start panning - check if inside a frame for frame-level panning
+      if (clickedFrame && onFrameViewportChange) {
+        // Panning inside a frame - will update frame viewport
+        panningFrameRef.current = clickedFrame.id
+      } else {
+        // Panning background
+        panningFrameRef.current = null
+      }
       isPanningRef.current = true
       lastPanPointRef.current = { x: screenX, y: screenY }
     }
@@ -335,36 +345,102 @@ export default function Canvas({
       }
       
       setDrawingRect((prev) => ({ ...prev, end: snappedPoint }))
-    } else if (isPanningRef.current && lastPanPointRef.current && onViewportChange) {
-      // Panning
+    } else if (isPanningRef.current && lastPanPointRef.current) {
+      // Panning - check if inside a frame
       const currentPoint = { x: screenX, y: screenY }
+      
+      if (panningFrameRef.current && onFrameViewportChange) {
+        // Panning inside a frame - update frame viewport
+        const frame = frames.find(f => f.id === panningFrameRef.current)
+        if (frame) {
+          // Convert screen points to frame coordinates
+          // First convert to parent world coordinates
+          const lastWorld = screenToWorld(
+            lastPanPointRef.current.x,
+            lastPanPointRef.current.y,
+            viewport,
+            canvasWidth,
+            canvasHeight
+          )
+          const currentWorld = screenToWorld(
+            currentPoint.x,
+            currentPoint.y,
+            viewport,
+            canvasWidth,
+            canvasHeight
+          )
+          
+          // Convert to frame coordinates
+          const frameToParent = (point: Point2D, frame: CoordinateFrame): Point2D => {
+            const [u, v] = point
+            const [originX, originY] = frame.origin
+            const [iX, iY] = frame.baseI
+            const [jX, jY] = frame.baseJ
+            return [
+              originX + u * iX + v * jX,
+              originY + u * iY + v * jY
+            ]
+          }
+          
+          // Inverse transform: parent to frame coordinates
+          const parentToFrame = (point: Point2D, frame: CoordinateFrame): Point2D => {
+            const [px, py] = point
+            const [originX, originY] = frame.origin
+            const dx = px - originX
+            const dy = py - originY
+            const [iX, iY] = frame.baseI
+            const [jX, jY] = frame.baseJ
+            const det = iX * jY - iY * jX
+            if (Math.abs(det) < 1e-10) return [0, 0]
+            const invDet = 1.0 / det
+            const u = (jY * dx - jX * dy) * invDet
+            const v = (-iY * dx + iX * dy) * invDet
+            return [u, v]
+          }
+          
+          const lastFrame = parentToFrame(lastWorld, frame)
+          const currentFrame = parentToFrame(currentWorld, frame)
+          
+          // Calculate pan delta in frame coordinates
+          const deltaX = lastFrame[0] - currentFrame[0]
+          const deltaY = lastFrame[1] - currentFrame[1]
+          
+          // Update frame viewport
+          onFrameViewportChange(frame.id, {
+            ...frame.viewport,
+            x: frame.viewport.x + deltaX,
+            y: frame.viewport.y + deltaY,
+          })
+        }
+      } else if (onViewportChange) {
+        // Panning background
+        // Convert screen points to world coordinates
+        const lastWorld = screenToWorld(
+          lastPanPointRef.current.x,
+          lastPanPointRef.current.y,
+          viewport,
+          canvasWidth,
+          canvasHeight
+        )
+        const currentWorld = screenToWorld(
+          currentPoint.x,
+          currentPoint.y,
+          viewport,
+          canvasWidth,
+          canvasHeight
+        )
 
-      // Convert screen points to world coordinates
-      const lastWorld = screenToWorld(
-        lastPanPointRef.current.x,
-        lastPanPointRef.current.y,
-        viewport,
-        canvasWidth,
-        canvasHeight
-      )
-      const currentWorld = screenToWorld(
-        currentPoint.x,
-        currentPoint.y,
-        viewport,
-        canvasWidth,
-        canvasHeight
-      )
+        // Calculate pan delta in world coordinates
+        const deltaX = lastWorld[0] - currentWorld[0]
+        const deltaY = lastWorld[1] - currentWorld[1]
 
-      // Calculate pan delta in world coordinates
-      const deltaX = lastWorld[0] - currentWorld[0]
-      const deltaY = lastWorld[1] - currentWorld[1]
-
-      // Update viewport
-      onViewportChange({
-        ...viewport,
-        x: viewport.x + deltaX,
-        y: viewport.y + deltaY,
-      })
+        // Update viewport
+        onViewportChange({
+          ...viewport,
+          x: viewport.x + deltaX,
+          y: viewport.y + deltaY,
+        })
+      }
 
       lastPanPointRef.current = currentPoint
     }
@@ -468,12 +544,19 @@ export default function Canvas({
             }
           }
 
+          // Initialize frame with its own viewport state (independent panning and zooming)
           const newFrame: CoordinateFrame = {
             id: frameId,
             origin: [originX, originY],
             baseI,
             baseJ,
             bounds: newBounds,
+            viewport: {
+              x: 0, // Frame's own pan offset in frame coordinates
+              y: 0,
+              zoom: 50.0, // Frame's own zoom level (1 unit = 50px in frame coordinates)
+              gridStep: 1, // Frame's grid step (based on base vectors, not used for grid but kept for consistency)
+            },
             mode: '2d',
             vectors: [],
             functions: [],
@@ -498,17 +581,17 @@ export default function Canvas({
     
     isPanningRef.current = false
     lastPanPointRef.current = null
-  }, [isDrawing, drawingRect, onFrameCreated, onDrawingModeChange, viewport, width, height])
+    panningFrameRef.current = null
+  }, [isDrawing, drawingRect, onFrameCreated, onDrawingModeChange, viewport, width, height, frames, onFrameViewportChange])
 
   const handleMouseLeave = useCallback(() => {
     isPanningRef.current = false
     lastPanPointRef.current = null
+    panningFrameRef.current = null
   }, [])
 
   // Zoom handler - prevent browser zoom interference
   const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
-    if (!onViewportChange) return
-
     // Prevent browser zoom - must be called early
     e.preventDefault()
     e.stopPropagation()
@@ -525,32 +608,94 @@ export default function Canvas({
     const mouseX = e.clientX - rect.left
     const mouseY = e.clientY - rect.top
 
-    // Get world coordinates of mouse position before zoom
-    const worldBefore = screenToWorld(mouseX, mouseY, viewport, canvasWidth, canvasHeight)
-
-    // Calculate new zoom level
-    const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY
-    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom + zoomDelta))
-
-    // If zoom didn't change (hit constraint), don't update
-    if (newZoom === viewport.zoom) return
-
-    // Update viewport with new zoom
-    const newViewport: ViewportState = {
-      ...viewport,
-      zoom: newZoom,
+    // Check if mouse is inside a frame
+    const worldPoint = screenToWorld(mouseX, mouseY, viewport, canvasWidth, canvasHeight)
+    let zoomingFrame: CoordinateFrame | null = null
+    let smallestArea = Infinity
+    
+    for (const frame of frames) {
+      if (isPointInFrame(worldPoint, frame.bounds)) {
+        const frameArea = frame.bounds.width * frame.bounds.height
+        if (frameArea < smallestArea) {
+          smallestArea = frameArea
+          zoomingFrame = frame
+        }
+      }
     }
 
-    // Get world coordinates of mouse position after zoom
-    const worldAfter = screenToWorld(mouseX, mouseY, newViewport, canvasWidth, canvasHeight)
+    if (zoomingFrame && onFrameViewportChange) {
+      // Zooming inside a frame - update frame viewport
+      // Convert mouse position to frame coordinates
+      const parentToFrame = (point: Point2D, frame: CoordinateFrame): Point2D => {
+        const [px, py] = point
+        const [originX, originY] = frame.origin
+        const dx = px - originX
+        const dy = py - originY
+        const [iX, iY] = frame.baseI
+        const [jX, jY] = frame.baseJ
+        const det = iX * jY - iY * jX
+        if (Math.abs(det) < 1e-10) return [0, 0]
+        const invDet = 1.0 / det
+        const u = (jY * dx - jX * dy) * invDet
+        const v = (-iY * dx + iX * dy) * invDet
+        return [u, v]
+      }
+      
+      const frameBefore = parentToFrame(worldPoint, zoomingFrame)
+      
+      // Calculate new zoom level
+      const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY
+      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomingFrame.viewport.zoom + zoomDelta))
+      
+      // If zoom didn't change (hit constraint), don't update
+      if (newZoom === zoomingFrame.viewport.zoom) return
+      
+      // Update frame viewport with new zoom
+      const newFrameViewport: ViewportState = {
+        ...zoomingFrame.viewport,
+        zoom: newZoom,
+      }
+      
+      // Get frame coordinates of mouse position after zoom
+      // Need to account for frame's viewport pan
+      const frameAfterX = (frameBefore[0] - zoomingFrame.viewport.x) * (zoomingFrame.viewport.zoom / newZoom) + newFrameViewport.x
+      const frameAfterY = (frameBefore[1] - zoomingFrame.viewport.y) * (zoomingFrame.viewport.zoom / newZoom) + newFrameViewport.y
+      
+      // Adjust frame viewport position to keep the point under the mouse fixed
+      onFrameViewportChange(zoomingFrame.id, {
+        ...newFrameViewport,
+        x: newFrameViewport.x + (frameBefore[0] - frameAfterX),
+        y: newFrameViewport.y + (frameBefore[1] - frameAfterY),
+      })
+    } else if (onViewportChange) {
+      // Zooming background
+      // Get world coordinates of mouse position before zoom
+      const worldBefore = screenToWorld(mouseX, mouseY, viewport, canvasWidth, canvasHeight)
 
-    // Adjust viewport position to keep the point under the mouse fixed
-    onViewportChange({
-      ...newViewport,
-      x: viewport.x + (worldBefore[0] - worldAfter[0]),
-      y: viewport.y + (worldBefore[1] - worldAfter[1]),
-    })
-  }, [viewport, onViewportChange, width, height, MIN_ZOOM, MAX_ZOOM, ZOOM_SENSITIVITY])
+      // Calculate new zoom level
+      const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY
+      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom + zoomDelta))
+
+      // If zoom didn't change (hit constraint), don't update
+      if (newZoom === viewport.zoom) return
+
+      // Update viewport with new zoom
+      const newViewport: ViewportState = {
+        ...viewport,
+        zoom: newZoom,
+      }
+
+      // Get world coordinates of mouse position after zoom
+      const worldAfter = screenToWorld(mouseX, mouseY, newViewport, canvasWidth, canvasHeight)
+
+      // Adjust viewport position to keep the point under the mouse fixed
+      onViewportChange({
+        ...newViewport,
+        x: viewport.x + (worldBefore[0] - worldAfter[0]),
+        y: viewport.y + (worldBefore[1] - worldAfter[1]),
+      })
+    }
+  }, [viewport, onViewportChange, onFrameViewportChange, frames, width, height, MIN_ZOOM, MAX_ZOOM, ZOOM_SENSITIVITY])
 
   // Touch handlers for mobile support
   const touchStartRef = useRef<{ x: number; y: number; distance: number } | null>(null)

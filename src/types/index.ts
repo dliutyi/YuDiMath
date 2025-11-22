@@ -95,6 +95,8 @@ export interface CoordinateFrame {
   baseJ: Point2D
   /** Bounds of the frame viewport (in parent coordinate system) */
   bounds: FrameBounds
+  /** Frame's own viewport state (independent panning and zooming) */
+  viewport: ViewportState
   /** Coordinate mode (2D or 3D) */
   mode: CoordinateMode
   /** Vectors defined in this frame (via draw() calls) */

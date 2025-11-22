@@ -365,7 +365,7 @@ For each step:
 - Transform frame grid coordinates to background coordinate system for rendering
 - Render frame grid within frame bounds only
 - Grid lines should be visually distinct from background grid (different color/opacity)
-- Grid spacing should be configurable per frame (or inherit from viewport grid step)
+- Grid spacing should be based on base vector magnitudes (independent of viewport grid step)
 - The frame grid represents the frame's own coordinate system, independent of the background
 
 **Tests**:
@@ -379,6 +379,59 @@ For each step:
 
 ---
 
+### [ ] Step 3.5: Implement Frame as Independent Coordinate System
+**Task**: Each frame is its own infinite coordinate system with independent panning, zooming, and axes.
+
+**Implementation**:
+- Each frame maintains its own viewport state (pan x/y, zoom level)
+- Frame viewport is independent of background viewport
+- Implement frame-level panning (click and drag within frame)
+- Implement frame-level zooming (mouse wheel within frame)
+- Draw frame axes (X and Y axes in frame coordinates) with labels
+- Frame axes should be drawn at the frame's origin (center of viewport)
+- Axis labels should show frame coordinate values (not parent coordinates)
+- Frame axes should be visually distinct from frame grid
+- Frame panning/zooming should only affect the frame's internal viewport, not the background
+- When panning/zooming a frame, the frame's bounds in parent coordinates remain fixed
+- Frame coordinate system is infinite - can pan/zoom within frame independently
+
+**Tests**:
+- Test frame viewport state management
+- Test frame panning within frame bounds
+- Test frame zooming within frame bounds
+- Test frame axes rendering
+- Test frame axis labels show correct frame coordinates
+- Test frame panning/zooming doesn't affect background
+- Test nested frame panning/zooming independence
+
+**Commit**: `feat: implement frame as independent coordinate system with panning, zooming, and axes`
+
+---
+
+### [ ] Step 3.6: Render Vectors as Arrows
+**Task**: Draw vectors as arrows with arrowheads, not just lines.
+
+**Implementation**:
+- Create arrow drawing utility function
+- Draw arrowhead at vector endpoint
+- Arrowhead should point in the direction of the vector
+- Arrowhead size should scale with vector magnitude (or use fixed size)
+- Arrow should be drawn from origin (or specified start point) to endpoint
+- Support different arrow styles (filled, outlined)
+- Arrow color should match vector color (if specified)
+- Arrow should be visible in frame coordinate system
+
+**Tests**:
+- Test arrow rendering with different directions
+- Test arrow rendering with different magnitudes
+- Test arrow color customization
+- Test arrow rendering in frame coordinates
+- Test arrow transformation to parent coordinates
+
+**Commit**: `feat: render vectors as arrows with arrowheads`
+
+---
+
 ### [ ] Step 3.5: Add Frame Properties Editor
 **Task**: Create UI panel for editing frame properties (origin, base vectors).
 
@@ -389,7 +442,7 @@ For each step:
 - Add input fields for base j vector (x, y)
 - Add validation (ensure base vectors are not collinear)
 - Update frame state on input change
-- Add normalization toggle for base vectors
+- Add normalization toggle for base vectors (should be if enabled and not by default)
 
 **Tests**:
 - Test origin input updates frame origin

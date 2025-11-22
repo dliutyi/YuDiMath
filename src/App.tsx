@@ -45,6 +45,20 @@ function App() {
     setIsDrawing(false)
   }
 
+  const handleFrameViewportChange = (frameId: string, newViewport: ViewportState) => {
+    setFrames((prev) => {
+      return prev.map((frame) => {
+        if (frame.id === frameId) {
+          return {
+            ...frame,
+            viewport: newViewport,
+          }
+        }
+        return frame
+      })
+    })
+  }
+
   return (
     <div className="h-screen bg-bg-primary text-text-primary flex flex-col overflow-hidden">
       <div className="p-4 border-b border-border flex-shrink-0">
@@ -63,6 +77,7 @@ function App() {
           onFrameCreated={handleFrameCreated}
           selectedFrameId={selectedFrameId}
           onFrameSelected={setSelectedFrameId}
+          onFrameViewportChange={handleFrameViewportChange}
         />
         <div className="absolute bottom-4 left-4 z-10">
           <GridStepSelector

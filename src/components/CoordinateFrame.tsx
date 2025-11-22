@@ -1,5 +1,6 @@
 import type { CoordinateFrame, ViewportState, Point2D } from '../types'
 import { worldToScreen } from '../utils/coordinates'
+import { drawArrow } from '../utils/arrows'
 
 /**
  * Transform a point from frame coordinates to parent coordinates
@@ -120,21 +121,11 @@ export function drawCoordinateFrame(
   const baseIEndScreen = worldToScreen(baseIEnd[0], baseIEnd[1], viewport, canvasWidth, canvasHeight)
   const baseJEndScreen = worldToScreen(baseJEnd[0], baseJEnd[1], viewport, canvasWidth, canvasHeight)
 
-  // Draw base i vector (red)
-  ctx.strokeStyle = '#ef4444' // red
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(Math.round(originScreen[0]) + 0.5, Math.round(originScreen[1]) + 0.5)
-  ctx.lineTo(Math.round(baseIEndScreen[0]) + 0.5, Math.round(baseIEndScreen[1]) + 0.5)
-  ctx.stroke()
+  // Draw base i vector (red) as arrow
+  drawArrow(ctx, originScreen, baseIEndScreen, '#ef4444', 2, 8)
 
-  // Draw base j vector (blue)
-  ctx.strokeStyle = '#3b82f6' // blue
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(Math.round(originScreen[0]) + 0.5, Math.round(originScreen[1]) + 0.5)
-  ctx.lineTo(Math.round(baseJEndScreen[0]) + 0.5, Math.round(baseJEndScreen[1]) + 0.5)
-  ctx.stroke()
+  // Draw base j vector (blue) as arrow
+  drawArrow(ctx, originScreen, baseJEndScreen, '#3b82f6', 2, 8)
 
   // Draw frame origin
   ctx.fillStyle = '#cbd5e1' // text-secondary
@@ -159,6 +150,9 @@ export function drawCoordinateFrame(
   
   // Draw grid within clipped region with color based on nesting level
   drawFrameGrid(ctx, frame, viewport, canvasWidth, canvasHeight, nestingLevel)
+  
+  // Draw frame axes with labels
+  drawFrameAxes(ctx, frame, viewport, canvasWidth, canvasHeight)
   
   // Restore context state (removes clip)
   ctx.restore()
@@ -298,6 +292,130 @@ function drawFrameGrid(
   }
 
   // Restore global alpha
+  ctx.globalAlpha = 1.0
+}
+
+/**
+ * Draw axes for a frame with labels
+ * Axes are drawn in frame coordinates at the frame's origin
+ */
+function drawFrameAxes(
+  ctx: CanvasRenderingContext2D,
+  frame: CoordinateFrame,
+  viewport: ViewportState,
+  canvasWidth: number,
+  canvasHeight: number
+) {
+  const { bounds, baseI, baseJ, origin, viewport: frameViewport } = frame
+
+  // Calculate grid step based on base vector magnitudes
+  const iMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
+  const jMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
+  const avgMagnitude = (iMagnitude + jMagnitude) / 2
+  const gridStep = avgMagnitude > 0 ? avgMagnitude : 1.0
+
+  // Convert frame bounds to screen coordinates
+  const topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
+  const bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
+  const originScreen = worldToScreen(origin[0], origin[1], viewport, canvasWidth, canvasHeight)
+
+  // Frame viewport dimensions in screen coordinates
+  const frameScreenWidth = bottomRight[0] - topLeft[0]
+  const frameScreenHeight = bottomRight[1] - topLeft[1]
+
+  // Calculate frame coordinate system bounds in frame coordinates
+  // Account for frame's own viewport (pan and zoom)
+  const frameZoom = frameViewport.zoom
+  const framePanX = frameViewport.x
+  const framePanY = frameViewport.y
+
+  // Calculate visible range in frame coordinates
+  // Frame center in frame coordinates is at (0, 0) accounting for pan
+  const halfFrameWidth = (frameScreenWidth / frameZoom) / 2
+  const halfFrameHeight = (frameScreenHeight / frameZoom) / 2
+
+  const minFrameX = -halfFrameWidth - framePanX
+  const maxFrameX = halfFrameWidth - framePanX
+  const minFrameY = -halfFrameHeight - framePanY
+  const maxFrameY = halfFrameHeight - framePanY
+
+  // Draw X axis (horizontal line in frame coordinates, parallel to baseI)
+  // X axis is at y=0 in frame coordinates
+  const xAxisStart = frameToParent([minFrameX, 0], frame)
+  const xAxisEnd = frameToParent([maxFrameX, 0], frame)
+  const xAxisStartScreen = worldToScreen(xAxisStart[0], xAxisStart[1], viewport, canvasWidth, canvasHeight)
+  const xAxisEndScreen = worldToScreen(xAxisEnd[0], xAxisEnd[1], viewport, canvasWidth, canvasHeight)
+
+  ctx.strokeStyle = '#64748b' // axis color
+  ctx.lineWidth = 2
+  ctx.globalAlpha = 0.9
+  ctx.beginPath()
+  ctx.moveTo(Math.round(xAxisStartScreen[0]) + 0.5, Math.round(xAxisStartScreen[1]) + 0.5)
+  ctx.lineTo(Math.round(xAxisEndScreen[0]) + 0.5, Math.round(xAxisEndScreen[1]) + 0.5)
+  ctx.stroke()
+
+  // Draw Y axis (vertical line in frame coordinates, parallel to baseJ)
+  // Y axis is at x=0 in frame coordinates
+  const yAxisStart = frameToParent([0, minFrameY], frame)
+  const yAxisEnd = frameToParent([0, maxFrameY], frame)
+  const yAxisStartScreen = worldToScreen(yAxisStart[0], yAxisStart[1], viewport, canvasWidth, canvasHeight)
+  const yAxisEndScreen = worldToScreen(yAxisEnd[0], yAxisEnd[1], viewport, canvasWidth, canvasHeight)
+
+  ctx.beginPath()
+  ctx.moveTo(Math.round(yAxisStartScreen[0]) + 0.5, Math.round(yAxisStartScreen[1]) + 0.5)
+  ctx.lineTo(Math.round(yAxisEndScreen[0]) + 0.5, Math.round(yAxisEndScreen[1]) + 0.5)
+  ctx.stroke()
+
+  // Draw axis labels
+  ctx.fillStyle = '#cbd5e1' // text-secondary
+  ctx.font = '11px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.globalAlpha = 1.0
+
+  // Calculate label spacing based on grid step and zoom
+  const minLabelSpacingPx = 40 // Minimum pixels between labels on screen
+  const screenGridSpacing = gridStep * frameZoom
+  let labelSpacingMultiplier = 1
+  if (screenGridSpacing < minLabelSpacingPx) {
+    labelSpacingMultiplier = Math.ceil(minLabelSpacingPx / screenGridSpacing)
+  }
+  const labelSpacing = gridStep * labelSpacingMultiplier
+
+  // Draw X axis labels
+  const startXLabel = Math.floor(minFrameX / labelSpacing) * labelSpacing
+  const endXLabel = Math.ceil(maxFrameX / labelSpacing) * labelSpacing
+  for (let x = startXLabel; x <= endXLabel; x += labelSpacing) {
+    if (Math.abs(x) < 0.001) continue // Skip label at origin (will be drawn separately)
+    
+    const labelPoint = frameToParent([x, 0], frame)
+    const labelScreen = worldToScreen(labelPoint[0], labelPoint[1], viewport, canvasWidth, canvasHeight)
+    
+    // Format label (remove unnecessary decimals)
+    const labelText = x % 1 === 0 ? x.toString() : x.toFixed(2).replace(/\.?0+$/, '')
+    ctx.fillText(labelText, labelScreen[0], labelScreen[1] + 15)
+  }
+
+  // Draw Y axis labels
+  const startYLabel = Math.floor(minFrameY / labelSpacing) * labelSpacing
+  const endYLabel = Math.ceil(maxFrameY / labelSpacing) * labelSpacing
+  for (let y = startYLabel; y <= endYLabel; y += labelSpacing) {
+    if (Math.abs(y) < 0.001) continue // Skip label at origin
+    
+    const labelPoint = frameToParent([0, y], frame)
+    const labelScreen = worldToScreen(labelPoint[0], labelPoint[1], viewport, canvasWidth, canvasHeight)
+    
+    // Format label (remove unnecessary decimals)
+    const labelText = y % 1 === 0 ? y.toString() : y.toFixed(2).replace(/\.?0+$/, '')
+    ctx.textAlign = 'right'
+    ctx.fillText(labelText, labelScreen[0] - 8, labelScreen[1])
+  }
+
+  // Draw origin label (0, 0)
+  ctx.textAlign = 'right'
+  ctx.textBaseline = 'top'
+  ctx.fillText('0', originScreen[0] - 5, originScreen[1] + 5)
+
   ctx.globalAlpha = 1.0
 }
 
