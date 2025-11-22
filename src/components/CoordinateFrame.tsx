@@ -368,12 +368,12 @@ function drawFrameAxes(
   // Calculate visible range in frame coordinates
   // Frame center in frame coordinates is at (0, 0) accounting for pan
   // We need to account for how frame coordinates map to parent coordinates
-  const parentZoom = viewport.zoom
+  const parentZoomAxes = viewport.zoom
   // Combined scale: frame coordinate -> parent coordinate -> screen
-  const frameToScreenScale = gridStep * frameZoom * parentZoom
+  const frameToScreenScaleAxes = gridStep * frameZoom * parentZoomAxes
   
-  const halfFrameWidth = (frameScreenWidth / frameToScreenScale) / 2
-  const halfFrameHeight = (frameScreenHeight / frameToScreenScale) / 2
+  const halfFrameWidth = (frameScreenWidth / frameToScreenScaleAxes) / 2
+  const halfFrameHeight = (frameScreenHeight / frameToScreenScaleAxes) / 2
 
   const minFrameX = -halfFrameWidth - framePanX
   const maxFrameX = halfFrameWidth - framePanX
@@ -415,10 +415,10 @@ function drawFrameAxes(
 
   // Calculate label spacing based on grid step and zoom
   const minLabelSpacingPx = 40 // Minimum pixels between labels on screen
-  const parentZoom = viewport.zoom
+  const parentZoomLabels = viewport.zoom
   // Combined scale: frame coordinate -> parent coordinate -> screen
-  const frameToScreenScale = gridStep * frameZoom * parentZoom
-  const screenGridSpacing = frameToScreenScale
+  const frameToScreenScaleLabels = gridStep * frameZoom * parentZoomLabels
+  const screenGridSpacing = frameToScreenScaleLabels
   let labelSpacingMultiplier = 1
   if (screenGridSpacing < minLabelSpacingPx) {
     labelSpacingMultiplier = Math.ceil(minLabelSpacingPx / screenGridSpacing)
