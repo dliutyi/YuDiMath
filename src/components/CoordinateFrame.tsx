@@ -392,7 +392,6 @@ function drawFrameAxes(
   const baseJDirEndScreen = worldToScreen(baseJDirEndParentX, baseJDirEndParentY, viewport, canvasWidth, canvasHeight)
   
   // Calculate direction vectors in screen space (from origin)
-  // Calculate direction vectors in screen space (from origin)
   const baseIDirX = baseIDirEndScreen[0] - originScreenAxes[0]
   const baseIDirY = baseIDirEndScreen[1] - originScreenAxes[1]
   const baseJDirX = baseJDirEndScreen[0] - originScreenAxes[0]
@@ -440,6 +439,14 @@ function drawFrameAxes(
     }
   }
 
+  // Draw a debug marker at the fixed origin to verify it's not moving
+  // This helps verify the axes are at the correct fixed position
+  ctx.fillStyle = '#ff00ff' // magenta debug marker
+  ctx.globalAlpha = 0.8
+  ctx.beginPath()
+  ctx.arc(originScreenAxes[0], originScreenAxes[1], 5, 0, Math.PI * 2)
+  ctx.fill()
+  
   ctx.strokeStyle = '#64748b' // axis color
   ctx.lineWidth = 2
   ctx.globalAlpha = 0.9
@@ -505,10 +512,10 @@ function drawFrameAxes(
     ctx.fillText(labelText, labelScreen[0] - 8, labelScreen[1])
   }
 
-  // Draw origin label (0, 0)
+  // Draw origin label (0, 0) at the fixed origin
   ctx.textAlign = 'right'
   ctx.textBaseline = 'top'
-  ctx.fillText('0', originScreen[0] - 5, originScreen[1] + 5)
+  ctx.fillText('0', originScreenAxes[0] - 5, originScreenAxes[1] + 5)
 
   ctx.globalAlpha = 1.0
 }
