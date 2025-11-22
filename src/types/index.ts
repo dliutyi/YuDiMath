@@ -82,17 +82,18 @@ export interface FrameBounds {
  * Coordinate frame - represents a viewport with its own coordinate system
  * Each frame is a rectangular region snapped to the background coordinate system
  * but has its own independent coordinate grid based on base vectors
+ * Supports nested frames (Russian doll pattern)
  */
 export interface CoordinateFrame {
   /** Unique identifier for the frame */
   id: string
-  /** Origin position in background coordinate system (snapped to grid) */
+  /** Origin position in parent coordinate system (background or parent frame, snapped to grid) */
   origin: Point2D
   /** Base i vector (default: [1, 0] - normalized) */
   baseI: Point2D
   /** Base j vector (default: [0, 1] - normalized) */
   baseJ: Point2D
-  /** Bounds of the frame viewport */
+  /** Bounds of the frame viewport (in parent coordinate system) */
   bounds: FrameBounds
   /** Coordinate mode (2D or 3D) */
   mode: CoordinateMode
@@ -102,6 +103,10 @@ export interface CoordinateFrame {
   functions: FunctionPlot[]
   /** Python code for this frame */
   code: string
+  /** ID of parent frame (null for top-level frames) */
+  parentFrameId: string | null
+  /** IDs of child frames (nested frames) */
+  childFrameIds: string[]
 }
 
 /**

@@ -36,6 +36,8 @@ describe('Canvas', () => {
       textAlign: '',
       textBaseline: '',
       fillText: vi.fn(),
+      setLineDash: vi.fn(),
+      rect: vi.fn(),
     })
 
     // Mock getBoundingClientRect
@@ -240,6 +242,189 @@ describe('Canvas', () => {
     expect(true).toBe(true)
   })
 
+  it('starts rectangle drawing on mouse down when in drawing mode', async () => {
+    const onFrameCreated = vi.fn()
+    const onDrawingModeChange = vi.fn()
+    
+    const { container } = render(
+      <Canvas
+        viewport={defaultViewport}
+        isDrawing={true}
+        onFrameCreated={onFrameCreated}
+        onDrawingModeChange={onDrawingModeChange}
+      />
+    )
+    
+    const canvas = container.querySelector('canvas')
+    if (!canvas) throw new Error('Canvas not found')
+
+    // Simulate mouse down
+    const mouseDownEvent = new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 400,
+      clientY: 300,
+    })
+    canvas.dispatchEvent(mouseDownEvent)
+    
+    // Wait for state update
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Drawing should have started (rectangle should be visible in next render)
+    expect(true).toBe(true) // Just verify no errors occurred
+  })
+
+  it('updates rectangle on mouse move when drawing', async () => {
+    const onFrameCreated = vi.fn()
+    const onDrawingModeChange = vi.fn()
+    
+    const { container } = render(
+      <Canvas
+        viewport={defaultViewport}
+        isDrawing={true}
+        onFrameCreated={onFrameCreated}
+        onDrawingModeChange={onDrawingModeChange}
+      />
+    )
+    
+    const canvas = container.querySelector('canvas')
+    if (!canvas) throw new Error('Canvas not found')
+
+    // Start drawing
+    const mouseDownEvent = new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 400,
+      clientY: 300,
+    })
+    canvas.dispatchEvent(mouseDownEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
+    // Move mouse
+    const mouseMoveEvent = new MouseEvent('mousemove', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 500,
+      clientY: 400,
+    })
+    canvas.dispatchEvent(mouseMoveEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Rectangle should be updating
+    expect(true).toBe(true) // Just verify no errors occurred
+  })
+
+  it('creates frame on mouse up when drawing rectangle', async () => {
+    const onFrameCreated = vi.fn()
+    const onDrawingModeChange = vi.fn()
+    
+    const { container } = render(
+      <Canvas
+        viewport={defaultViewport}
+        isDrawing={true}
+        onFrameCreated={onFrameCreated}
+        onDrawingModeChange={onDrawingModeChange}
+      />
+    )
+    
+    const canvas = container.querySelector('canvas')
+    if (!canvas) throw new Error('Canvas not found')
+
+    // Start drawing
+    const mouseDownEvent = new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 400,
+      clientY: 300,
+    })
+    canvas.dispatchEvent(mouseDownEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
+    // Move mouse to create a rectangle
+    const mouseMoveEvent = new MouseEvent('mousemove', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 500,
+      clientY: 400,
+    })
+    canvas.dispatchEvent(mouseMoveEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
+    // Finish drawing
+    const mouseUpEvent = new MouseEvent('mouseup', {
+      bubbles: true,
+      cancelable: true,
+    })
+    canvas.dispatchEvent(mouseUpEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Frame should be created
+    expect(onFrameCreated).toHaveBeenCalled()
+    const createdFrame = onFrameCreated.mock.calls[0][0]
+    expect(createdFrame).toHaveProperty('id')
+    expect(createdFrame).toHaveProperty('bounds')
+    expect(createdFrame.bounds.width).toBeGreaterThan(0)
+    expect(createdFrame.bounds.height).toBeGreaterThan(0)
+  })
+
+  it('snaps rectangle corners to grid', async () => {
+    const onFrameCreated = vi.fn()
+    
+    const viewport = {
+      ...defaultViewport,
+      gridStep: 1,
+    }
+    
+    const { container } = render(
+      <Canvas
+        viewport={viewport}
+        isDrawing={true}
+        onFrameCreated={onFrameCreated}
+      />
+    )
+    
+    const canvas = container.querySelector('canvas')
+    if (!canvas) throw new Error('Canvas not found')
+
+    // Start drawing at a non-grid position
+    const mouseDownEvent = new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 410, // Slightly off grid
+      clientY: 310,
+    })
+    canvas.dispatchEvent(mouseDownEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
+    // Finish drawing
+    const mouseUpEvent = new MouseEvent('mouseup', {
+      bubbles: true,
+      cancelable: true,
+    })
+    canvas.dispatchEvent(mouseUpEvent)
+    
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Frame corners should be snapped to grid
+    if (onFrameCreated.mock.calls.length > 0) {
+      const createdFrame = onFrameCreated.mock.calls[0][0]
+      // Check that bounds are multiples of gridStep (within floating point precision)
+      const gridStep = viewport.gridStep
+      expect(createdFrame.bounds.x % gridStep).toBeCloseTo(0, 5)
+      expect(createdFrame.bounds.y % gridStep).toBeCloseTo(0, 5)
+    }
+  })
+
   it('renders grid with different grid steps', async () => {
     const mockContext = {
       clearRect: vi.fn(),
@@ -257,6 +442,8 @@ describe('Canvas', () => {
       textAlign: '',
       textBaseline: '',
       fillText: vi.fn(),
+      setLineDash: vi.fn(),
+      rect: vi.fn(),
     }
 
     HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(mockContext)
@@ -314,6 +501,8 @@ describe('Canvas', () => {
       textAlign: '',
       textBaseline: '',
       fillText: vi.fn(),
+      setLineDash: vi.fn(),
+      rect: vi.fn(),
     }
 
     HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(mockContext)

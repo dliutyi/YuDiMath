@@ -1,8 +1,9 @@
-import { useEffect, useRef, useCallback } from 'react'
-import type { ViewportState } from '../types'
+import { useEffect, useRef, useCallback, useState } from 'react'
+import type { ViewportState, CoordinateFrame, Point2D } from '../types'
 import {
   worldToScreen,
   screenToWorld,
+  snapPointToGrid,
 } from '../utils/coordinates'
 
 interface CanvasProps {
@@ -10,6 +11,10 @@ interface CanvasProps {
   onViewportChange?: (viewport: ViewportState) => void
   width?: number
   height?: number
+  frames?: CoordinateFrame[]
+  isDrawing?: boolean
+  onDrawingModeChange?: (isDrawing: boolean) => void
+  onFrameCreated?: (frame: CoordinateFrame) => void
 }
 
 export default function Canvas({
@@ -17,6 +22,10 @@ export default function Canvas({
   onViewportChange,
   width,
   height,
+  frames: _frames = [], // Will be used for rendering existing frames in future steps
+  isDrawing = false,
+  onDrawingModeChange,
+  onFrameCreated,
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -24,6 +33,12 @@ export default function Canvas({
   // Pan state
   const isPanningRef = useRef(false)
   const lastPanPointRef = useRef<{ x: number; y: number } | null>(null)
+  
+  // Rectangle drawing state
+  const [drawingRect, setDrawingRect] = useState<{
+    start: Point2D | null
+    end: Point2D | null
+  }>({ start: null, end: null })
   
   // Zoom constraints
   // Default zoom is 50 (1 unit = 50px), so min/max are relative to that
@@ -79,6 +94,40 @@ export default function Canvas({
     // Draw axes on top
     console.log('[Canvas.draw] Drawing axes...')
     drawAxes(ctx, viewport, canvasWidth, canvasHeight)
+
+    // Draw rectangle being created
+    if (drawingRect.start && drawingRect.end) {
+      const [x1, y1] = drawingRect.start
+      const [x2, y2] = drawingRect.end
+
+      // Calculate bounds
+      const minX = Math.min(x1, x2)
+      const maxX = Math.max(x1, x2)
+      const minY = Math.min(y1, y2)
+      const maxY = Math.max(y1, y2)
+
+      // Convert corners to screen coordinates
+      const topLeft = worldToScreen(minX, maxY, viewport, canvasWidth, canvasHeight)
+      const bottomRight = worldToScreen(maxX, minY, viewport, canvasWidth, canvasHeight)
+
+      const screenWidth = bottomRight[0] - topLeft[0]
+      const screenHeight = bottomRight[1] - topLeft[1]
+
+      // Draw rectangle outline
+      ctx.strokeStyle = '#3b82f6' // primary color
+      ctx.lineWidth = 2
+      ctx.setLineDash([5, 5]) // Dashed line for drawing state
+      ctx.beginPath()
+      ctx.rect(
+        Math.round(topLeft[0]) + 0.5,
+        Math.round(topLeft[1]) + 0.5,
+        screenWidth,
+        screenHeight
+      )
+      ctx.stroke()
+      ctx.setLineDash([]) // Reset line dash
+    }
+
     console.log('[Canvas.draw] Drawing complete')
   }
 
@@ -88,7 +137,7 @@ export default function Canvas({
       draw()
     })
     return () => cancelAnimationFrame(frameId)
-  }, [viewport, width, height])
+  }, [viewport, width, height, drawingRect])
 
   // Also redraw on window resize
   useEffect(() => {
@@ -138,23 +187,11 @@ export default function Canvas({
     }
   }, [onViewportChange])
 
-  // Pan handlers
+  // Pan and drawing handlers
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Only pan with left mouse button
+    // Only handle left mouse button
     if (e.button !== 0) return
     
-    isPanningRef.current = true
-    const rect = e.currentTarget.getBoundingClientRect()
-    lastPanPointRef.current = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    }
-    e.preventDefault()
-  }, [])
-
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isPanningRef.current || !lastPanPointRef.current || !onViewportChange) return
-
     const canvas = canvasRef.current
     const container = containerRef.current
     if (!canvas || !container) return
@@ -163,46 +200,124 @@ export default function Canvas({
     const canvasWidth = width || rect.width || 800
     const canvasHeight = height || rect.height || 600
 
-    const currentPoint = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+    const screenX = e.clientX - rect.left
+    const screenY = e.clientY - rect.top
+
+    if (isDrawing) {
+      // Start drawing rectangle
+      const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+      const snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
+      setDrawingRect({ start: snappedPoint, end: snappedPoint })
+    } else {
+      // Start panning
+      isPanningRef.current = true
+      lastPanPointRef.current = { x: screenX, y: screenY }
     }
-
-    // Convert screen points to world coordinates
-    const lastWorld = screenToWorld(
-      lastPanPointRef.current.x,
-      lastPanPointRef.current.y,
-      viewport,
-      canvasWidth,
-      canvasHeight
-    )
-    const currentWorld = screenToWorld(
-      currentPoint.x,
-      currentPoint.y,
-      viewport,
-      canvasWidth,
-      canvasHeight
-    )
-
-    // Calculate pan delta in world coordinates
-    const deltaX = lastWorld[0] - currentWorld[0]
-    const deltaY = lastWorld[1] - currentWorld[1]
-
-    // Update viewport
-    onViewportChange({
-      ...viewport,
-      x: viewport.x + deltaX,
-      y: viewport.y + deltaY,
-    })
-
-    lastPanPointRef.current = currentPoint
     e.preventDefault()
-  }, [viewport, onViewportChange, width, height])
+  }, [isDrawing, viewport, width, height])
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    const container = containerRef.current
+    if (!canvas || !container) return
+
+    const rect = container.getBoundingClientRect()
+    const canvasWidth = width || rect.width || 800
+    const canvasHeight = height || rect.height || 600
+
+    const screenX = e.clientX - rect.left
+    const screenY = e.clientY - rect.top
+
+    if (isDrawing && drawingRect.start) {
+      // Update rectangle drawing
+      const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+      const snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
+      setDrawingRect((prev) => ({ ...prev, end: snappedPoint }))
+    } else if (isPanningRef.current && lastPanPointRef.current && onViewportChange) {
+      // Panning
+      const currentPoint = { x: screenX, y: screenY }
+
+      // Convert screen points to world coordinates
+      const lastWorld = screenToWorld(
+        lastPanPointRef.current.x,
+        lastPanPointRef.current.y,
+        viewport,
+        canvasWidth,
+        canvasHeight
+      )
+      const currentWorld = screenToWorld(
+        currentPoint.x,
+        currentPoint.y,
+        viewport,
+        canvasWidth,
+        canvasHeight
+      )
+
+      // Calculate pan delta in world coordinates
+      const deltaX = lastWorld[0] - currentWorld[0]
+      const deltaY = lastWorld[1] - currentWorld[1]
+
+      // Update viewport
+      onViewportChange({
+        ...viewport,
+        x: viewport.x + deltaX,
+        y: viewport.y + deltaY,
+      })
+
+      lastPanPointRef.current = currentPoint
+    }
+    e.preventDefault()
+  }, [isDrawing, drawingRect.start, viewport, onViewportChange, width, height])
 
   const handleMouseUp = useCallback(() => {
+    if (isDrawing && drawingRect.start && drawingRect.end && onFrameCreated) {
+      // Finalize rectangle and create frame
+      const [x1, y1] = drawingRect.start
+      const [x2, y2] = drawingRect.end
+      
+      // Calculate bounds (ensure positive width and height)
+      const minX = Math.min(x1, x2)
+      const maxX = Math.max(x1, x2)
+      const minY = Math.min(y1, y2)
+      const maxY = Math.max(y1, y2)
+      
+      const frameWidth = maxX - minX
+      const frameHeight = maxY - minY
+      
+      // Only create frame if it has minimum size
+      if (frameWidth > 0.1 && frameHeight > 0.1) {
+        const frameId = `frame-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        const newFrame: CoordinateFrame = {
+          id: frameId,
+          origin: [minX, minY],
+          baseI: [1, 0],
+          baseJ: [0, 1],
+          bounds: {
+            x: minX,
+            y: minY,
+            width: frameWidth,
+            height: frameHeight,
+          },
+          mode: '2d',
+          vectors: [],
+          functions: [],
+          code: '',
+          parentFrameId: null, // Top-level frame for now
+          childFrameIds: [],
+        }
+        onFrameCreated(newFrame)
+      }
+      
+      // Reset drawing state
+      setDrawingRect({ start: null, end: null })
+      if (onDrawingModeChange) {
+        onDrawingModeChange(false)
+      }
+    }
+    
     isPanningRef.current = false
     lastPanPointRef.current = null
-  }, [])
+  }, [isDrawing, drawingRect, onFrameCreated, onDrawingModeChange])
 
   const handleMouseLeave = useCallback(() => {
     isPanningRef.current = false
