@@ -250,21 +250,21 @@ For each step:
 
 ---
 
-### [ ] Step 2.4: Add Grid Step Configuration
+### [x] Step 2.4: Add Grid Step Configuration
 **Task**: Implement configurable grid step size with UI control.
 
 **Implementation**:
 - Add grid step state to viewport
-- Create grid step selector in toolbar
+- Create grid step slider in bottom right corner of the screen
 - Update grid rendering based on step
-- Implement step presets (0.5, 1, 2, 5, 10)
-- Allow custom step input
+- Slider should support range (e.g., 0.1 to 20) with smooth transitions
+- Display current grid step value near the slider
 
 **Tests**:
 - Test grid step state management
 - Test grid rendering with different steps
-- Test grid step selector updates state
-- Test custom step input validation
+- Test grid step slider updates state
+- Test slider value display
 - Test grid snapping with different steps
 
 **Commit**: `feat: add configurable grid step with UI controls`

@@ -1,88 +1,68 @@
-import { useState, useEffect } from 'react'
-
 interface GridStepSelectorProps {
   gridStep: number
   onGridStepChange: (step: number) => void
 }
 
-const GRID_STEP_PRESETS = [0.5, 1, 2, 5, 10]
+const MIN_GRID_STEP = 0.1
+const MAX_GRID_STEP = 20
+
+// Convert linear slider value (0-100) to logarithmic grid step (0.1-20)
+function sliderToGridStep(sliderValue: number): number {
+  const normalized = sliderValue / 100 // 0 to 1
+  const logMin = Math.log10(MIN_GRID_STEP)
+  const logMax = Math.log10(MAX_GRID_STEP)
+  const logValue = logMin + normalized * (logMax - logMin)
+  return Math.pow(10, logValue)
+}
+
+// Convert grid step (0.1-20) to linear slider value (0-100)
+function gridStepToSlider(gridStep: number): number {
+  const clamped = Math.max(MIN_GRID_STEP, Math.min(MAX_GRID_STEP, gridStep))
+  const logMin = Math.log10(MIN_GRID_STEP)
+  const logMax = Math.log10(MAX_GRID_STEP)
+  const logValue = Math.log10(clamped)
+  const normalized = (logValue - logMin) / (logMax - logMin)
+  return normalized * 100
+}
 
 export default function GridStepSelector({
   gridStep,
   onGridStepChange,
 }: GridStepSelectorProps) {
-  const [isCustom, setIsCustom] = useState(!GRID_STEP_PRESETS.includes(gridStep))
-  const [customValue, setCustomValue] = useState(gridStep.toString())
+  const sliderValue = gridStepToSlider(gridStep)
 
-  // Sync internal state when gridStep prop changes
-  useEffect(() => {
-    const isPreset = GRID_STEP_PRESETS.includes(gridStep)
-    setIsCustom(!isPreset)
-    if (!isPreset) {
-      setCustomValue(gridStep.toString())
-    }
-  }, [gridStep])
-
-  const handlePresetChange = (preset: number) => {
-    setIsCustom(false)
-    onGridStepChange(preset)
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newSliderValue = parseFloat(e.target.value)
+    const newGridStep = sliderToGridStep(newSliderValue)
+    onGridStepChange(newGridStep)
   }
 
-  const handleCustomChange = (value: string) => {
-    setCustomValue(value)
-    const numValue = parseFloat(value)
-    if (!isNaN(numValue) && numValue > 0) {
-      setIsCustom(true)
-      onGridStepChange(numValue)
-    }
-  }
-
-  const handleCustomBlur = () => {
-    const numValue = parseFloat(customValue)
-    if (isNaN(numValue) || numValue <= 0) {
-      // Reset to a valid preset if custom value is invalid
-      setCustomValue('1')
-      setIsCustom(false)
-      onGridStepChange(1)
-    }
+  // Format grid step for display (remove unnecessary decimals)
+  const formatGridStep = (value: number): string => {
+    if (value >= 10) return value.toFixed(0)
+    if (value >= 1) return value.toFixed(1)
+    return value.toFixed(2)
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <label className="text-sm text-text-secondary whitespace-nowrap">
-        Grid Step:
-      </label>
-      <div className="flex items-center gap-1">
-        {GRID_STEP_PRESETS.map((preset) => (
-          <button
-            key={preset}
-            onClick={() => handlePresetChange(preset)}
-            className={`px-2 py-1 text-sm rounded transition-colors ${
-              !isCustom && Math.abs(gridStep - preset) < 0.001
-                ? 'bg-accent text-accent-foreground'
-                : 'bg-bg-secondary hover:bg-bg-tertiary text-text-primary'
-            }`}
-          >
-            {preset}
-          </button>
-        ))}
-        <input
-          type="number"
-          min="0.01"
-          step="0.1"
-          value={isCustom ? customValue : ''}
-          onChange={(e) => handleCustomChange(e.target.value)}
-          onBlur={handleCustomBlur}
-          onFocus={() => {
-            if (!isCustom) {
-              setCustomValue(gridStep.toString())
-              setIsCustom(true)
-            }
-          }}
-          placeholder="Custom"
-          className="w-16 px-2 py-1 text-sm rounded bg-bg-secondary border border-border text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-        />
+    <div className="flex flex-col items-end gap-1 p-3 bg-panel-bg/90 backdrop-blur-sm rounded-lg border border-border shadow-lg">
+      <div className="flex items-center gap-2 w-full">
+        <label className="text-xs text-text-secondary whitespace-nowrap">
+          Grid Step:
+        </label>
+        <span className="text-sm font-mono text-text-primary min-w-[3rem] text-right">
+          {formatGridStep(gridStep)}
+        </span>
       </div>
+      <input
+        type="range"
+        min="0"
+        max="100"
+        step="0.1"
+        value={sliderValue}
+        onChange={handleSliderChange}
+        className="w-32 h-2 bg-grid-line rounded-lg appearance-none cursor-pointer accent-primary"
+      />
     </div>
   )
 }
