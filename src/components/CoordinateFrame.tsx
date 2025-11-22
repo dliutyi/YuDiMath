@@ -47,9 +47,10 @@ function frameToScreen(
   // 
   // To transform frame coordinate (u, v) to screen:
   // 1. Account for frame pan: (u - framePanX, v - framePanY)
-  // 2. Transform to parent coordinates using base vectors
+  // 2. Transform to parent coordinates using base vectors scaled by frame zoom
+  //    - Higher zoom means base vectors appear larger (more pixels per unit)
+  //    - So we scale base vectors by frame zoom
   // 3. Transform to screen coordinates using parent viewport
-  // 4. Apply frame zoom as a scale factor
   
   const [originX, originY] = frame.origin
   const [iX, iY] = frame.baseI
@@ -59,18 +60,22 @@ function frameToScreen(
   const frameU = u - frameViewport.x
   const frameV = v - frameViewport.y
   
-  // Transform to parent coordinates using base vectors (no zoom applied here)
-  const parentX = originX + frameU * iX + frameV * jX
-  const parentY = originY + frameU * iY + frameV * jY
+  // Transform to parent coordinates using base vectors scaled by frame zoom
+  // Frame zoom = 50 means 1 unit in frame coordinates = 50 pixels worth of base vector
+  // So we scale base vectors by zoom
+  const scaledIX = iX * frameViewport.zoom
+  const scaledIY = iY * frameViewport.zoom
+  const scaledJX = jX * frameViewport.zoom
+  const scaledJY = jY * frameViewport.zoom
+  
+  const parentX = originX + frameU * scaledIX + frameV * scaledJX
+  const parentY = originY + frameU * scaledIY + frameV * scaledJY
   
   // Transform to screen coordinates using parent viewport
   const centerX = canvasWidth / 2
   const centerY = canvasHeight / 2
-  
-  // Apply frame zoom: scale the offset from parent viewport center
-  // Higher zoom means we see less of the frame coordinate space (more detail)
-  const screenX = centerX + (parentX - parentViewport.x) * parentViewport.zoom * frameViewport.zoom
-  const screenY = centerY - (parentY - parentViewport.y) * parentViewport.zoom * frameViewport.zoom
+  const screenX = centerX + (parentX - parentViewport.x) * parentViewport.zoom
+  const screenY = centerY - (parentY - parentViewport.y) * parentViewport.zoom
   
   return [screenX, screenY]
 }
@@ -268,12 +273,18 @@ function drawFrameGrid(
   // Calculate visible range in frame coordinates
   // Frame center in frame coordinates is at (0, 0) accounting for pan
   // The frame zoom affects how much of the frame coordinate space is visible
-  // We need to account for both parent viewport zoom and frame zoom
+  // We need to account for how frame coordinates map to parent coordinates
+  // 1 unit in frame coordinates = base vector magnitude * frame zoom in parent coordinates
+  // Then parent coordinates are scaled by parent zoom to screen
   const parentZoom = viewport.zoom
-  const combinedZoom = parentZoom * frameZoom
+  const iMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
+  const jMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
+  const avgMagnitude = (iMagnitude + jMagnitude) / 2
+  // Combined scale: frame coordinate -> parent coordinate -> screen
+  const frameToScreenScale = avgMagnitude * frameZoom * parentZoom
   
-  const halfFrameWidth = (frameScreenWidth / combinedZoom) / 2
-  const halfFrameHeight = (frameScreenHeight / combinedZoom) / 2
+  const halfFrameWidth = (frameScreenWidth / frameToScreenScale) / 2
+  const halfFrameHeight = (frameScreenHeight / frameToScreenScale) / 2
 
   const minU = -halfFrameWidth - framePanX
   const maxU = halfFrameWidth - framePanX
@@ -359,12 +370,16 @@ function drawFrameAxes(
 
   // Calculate visible range in frame coordinates
   // Frame center in frame coordinates is at (0, 0) accounting for pan
-  // We need to account for both parent viewport zoom and frame zoom
+  // We need to account for how frame coordinates map to parent coordinates
   const parentZoom = viewport.zoom
-  const combinedZoom = parentZoom * frameZoom
+  const iMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
+  const jMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
+  const avgMagnitude = (iMagnitude + jMagnitude) / 2
+  // Combined scale: frame coordinate -> parent coordinate -> screen
+  const frameToScreenScale = avgMagnitude * frameZoom * parentZoom
   
-  const halfFrameWidth = (frameScreenWidth / combinedZoom) / 2
-  const halfFrameHeight = (frameScreenHeight / combinedZoom) / 2
+  const halfFrameWidth = (frameScreenWidth / frameToScreenScale) / 2
+  const halfFrameHeight = (frameScreenHeight / frameToScreenScale) / 2
 
   const minFrameX = -halfFrameWidth - framePanX
   const maxFrameX = halfFrameWidth - framePanX
@@ -406,7 +421,13 @@ function drawFrameAxes(
 
   // Calculate label spacing based on grid step and zoom
   const minLabelSpacingPx = 40 // Minimum pixels between labels on screen
-  const screenGridSpacing = gridStep * frameZoom
+  const parentZoom = viewport.zoom
+  const iMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
+  const jMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
+  const avgMagnitude = (iMagnitude + jMagnitude) / 2
+  // Combined scale: frame coordinate -> parent coordinate -> screen
+  const frameToScreenScale = avgMagnitude * frameZoom * parentZoom
+  const screenGridSpacing = gridStep * frameToScreenScale
   let labelSpacingMultiplier = 1
   if (screenGridSpacing < minLabelSpacingPx) {
     labelSpacingMultiplier = Math.ceil(minLabelSpacingPx / screenGridSpacing)
