@@ -29,7 +29,7 @@ export default function Canvas({
   // Default zoom is 50 (1 unit = 50px), so min/max are relative to that
   const MIN_ZOOM = 5.0   // 1 unit = 5px (zoomed out)
   const MAX_ZOOM = 500.0 // 1 unit = 500px (zoomed in)
-  const ZOOM_SENSITIVITY = 0.01 // Adjust this to make zoom more/less sensitive
+  const ZOOM_SENSITIVITY = 0.1 // 10x more sensitive than before (was 0.01)
 
   const draw = () => {
     const canvas = canvasRef.current
