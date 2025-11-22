@@ -186,9 +186,16 @@ function drawFrameGrid(
 ) {
   const { bounds, baseI, baseJ, origin } = frame
 
-  // Use viewport grid step (inherited from background grid)
-  // This ensures frame grid aligns with background grid when base vectors are standard
-  const gridStep = viewport.gridStep
+  // Calculate grid step based on base vector magnitudes
+  // Grid step should be 1 unit in frame coordinates, which corresponds to base vector magnitudes
+  // Use the average magnitude of baseI and baseJ as the grid step
+  const iMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
+  const jMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
+  const avgMagnitude = (iMagnitude + jMagnitude) / 2
+  
+  // Grid step is 1 unit in frame coordinates
+  // In parent coordinates, 1 unit in frame coordinates = avgMagnitude
+  const gridStep = avgMagnitude > 0 ? avgMagnitude : 1.0
 
   // Get color for this nesting level - each level has a distinct color
   const gridColor = getGridColorForLevel(nestingLevel)
