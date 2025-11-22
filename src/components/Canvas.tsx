@@ -429,7 +429,10 @@ function drawGrid(
   const screenGridSpacing = gridStep * viewport.zoom
   
   // Only draw grid if spacing is reasonable (not too dense)
-  if (screenGridSpacing < 2) {
+  // Allow grid to be drawn even if spacing is small, but limit the number of lines
+  // This ensures grid is visible even at default zoom with gridStep=1
+  if (screenGridSpacing < 0.5) {
+    // Grid is extremely dense - skip drawing to avoid performance issues
     ctx.globalAlpha = 1.0
     return
   }
@@ -527,44 +530,26 @@ function drawAxes(
   ctx.fillStyle = '#cbd5e1' // text-secondary
   ctx.font = '12px sans-serif'
   
-  // Calculate label spacing based on zoom level
-  // When zoomed out, skip labels to prevent overlap
-  const minLabelSpacing = 60 // Minimum pixels between labels
-  const screenToWorldScale = 1 / viewport.zoom
-  const worldLabelSpacing = minLabelSpacing * screenToWorldScale
+  // Calculate label spacing based on gridStep
+  // Labels should appear at gridStep intervals, but only when there's enough screen space
+  const minLabelSpacingPx = 50 // Minimum pixels between labels on screen
+  const screenGridSpacing = viewport.gridStep * viewport.zoom
   
-  // Round to nice numbers (1, 2, 5, 10, 20, 50, 100, etc.)
-  const niceSpacing = getNiceSpacing(worldLabelSpacing)
-  
-  // Draw X-axis labels (horizontal axis)
-  drawAxisLabelsX(ctx, viewport, canvasWidth, canvasHeight, xAxisY, niceSpacing)
-  
-  // Draw Y-axis labels (vertical axis)
-  drawAxisLabelsY(ctx, viewport, canvasWidth, canvasHeight, yAxisX, niceSpacing)
-}
-
-/**
- * Get a "nice" spacing value (1, 2, 5, 10, 20, 50, 100, etc.)
- */
-function getNiceSpacing(spacing: number): number {
-  if (spacing <= 0) return 1
-  
-  const magnitude = Math.pow(10, Math.floor(Math.log10(spacing)))
-  const normalized = spacing / magnitude
-  
-  // Round to 1, 2, or 5
-  let nice: number
-  if (normalized <= 1) {
-    nice = 1
-  } else if (normalized <= 2) {
-    nice = 2
-  } else if (normalized <= 5) {
-    nice = 5
-  } else {
-    nice = 10
+  // Calculate how many gridStep units we need to skip to achieve minLabelSpacingPx
+  let labelSpacingMultiplier = 1
+  if (screenGridSpacing < minLabelSpacingPx) {
+    // Need to skip some grid lines to maintain minimum spacing
+    labelSpacingMultiplier = Math.ceil(minLabelSpacingPx / screenGridSpacing)
   }
   
-  return nice * magnitude
+  // Label spacing in world coordinates (must be a multiple of gridStep)
+  const labelSpacing = viewport.gridStep * labelSpacingMultiplier
+  
+  // Draw X-axis labels (horizontal axis)
+  drawAxisLabelsX(ctx, viewport, canvasWidth, canvasHeight, xAxisY, labelSpacing)
+  
+  // Draw Y-axis labels (vertical axis)
+  drawAxisLabelsY(ctx, viewport, canvasWidth, canvasHeight, yAxisX, labelSpacing)
 }
 
 /**
