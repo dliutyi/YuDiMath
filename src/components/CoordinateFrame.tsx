@@ -360,36 +360,42 @@ function drawFrameAxes(
   const bottomRightScreen = bottomRight
   
   // Origin in screen coordinates (always fixed at frame.origin in parent coordinates)
+  // This is the original frame origin, which doesn't change with panning
   const originScreenAxes = worldToScreen(origin[0], origin[1], viewport, canvasWidth, canvasHeight)
   
-  // Calculate axis directions in screen coordinates
-  // X axis is parallel to baseI, Y axis is parallel to baseJ
-  // We need to find where these axes intersect the frame edges
-  
-  // For X axis (parallel to baseI): find intersection with left and right edges
-  // For Y axis (parallel to baseJ): find intersection with top and bottom edges
-  
   // Get base vector directions in screen coordinates
-  // Base vectors should be calculated without applying frame pan - only zoom
-  // The origin is at (0, 0) in frame coordinates, which maps to frame.origin in parent coordinates
-  // Base I vector: (1, 0) in frame coordinates -> frame.origin + baseI in parent coordinates
-  // Base J vector: (0, 1) in frame coordinates -> frame.origin + baseJ in parent coordinates
-  // We need to apply frame zoom to scale the base vectors, then transform to screen
+  // The axes should always pass through the frame origin (0, 0 in frame coordinates)
+  // which maps to frame.origin in parent coordinates - this is FIXED and doesn't change with panning
+  // Base vectors define the direction of the axes, scaled by zoom
+  // We calculate the direction vectors directly from base vectors, scaled by zoom
   
   const [originX, originY] = origin
   const [iX, iY] = baseI
   const [jX, jY] = baseJ
   
-  // Calculate base vector endpoints in parent coordinates (with zoom applied)
-  // Frame zoom scales the base vectors
-  const baseIEndParentX = originX + iX * frameZoom
-  const baseIEndParentY = originY + iY * frameZoom
-  const baseJEndParentX = originX + jX * frameZoom
-  const baseJEndParentY = originY + jY * frameZoom
+  // Calculate base vector directions in parent coordinates (scaled by zoom)
+  // These represent the direction of the axes from the origin
+  const baseIDirParentX = iX * frameZoom
+  const baseIDirParentY = iY * frameZoom
+  const baseJDirParentX = jX * frameZoom
+  const baseJDirParentY = jY * frameZoom
   
-  // Transform to screen coordinates using parent viewport
-  const baseIEndScreen = worldToScreen(baseIEndParentX, baseIEndParentY, viewport, canvasWidth, canvasHeight)
-  const baseJEndScreen = worldToScreen(baseJEndParentX, baseJEndParentY, viewport, canvasWidth, canvasHeight)
+  // Transform direction vectors to screen coordinates
+  // We need to transform a point at the origin and a point offset by the direction vector
+  const originScreen = worldToScreen(originX, originY, viewport, canvasWidth, canvasHeight)
+  const baseIDirEndParentX = originX + baseIDirParentX
+  const baseIDirEndParentY = originY + baseIDirParentY
+  const baseJDirEndParentX = originX + baseJDirParentX
+  const baseJDirEndParentY = originY + baseJDirParentY
+  
+  const baseIDirEndScreen = worldToScreen(baseIDirEndParentX, baseIDirEndParentY, viewport, canvasWidth, canvasHeight)
+  const baseJDirEndScreen = worldToScreen(baseJDirEndParentX, baseJDirEndParentY, viewport, canvasWidth, canvasHeight)
+  
+  // Calculate direction vectors in screen space (from origin)
+  const baseIDirX = baseIDirEndScreen[0] - originScreen[0]
+  const baseIDirY = baseIDirEndScreen[1] - originScreen[1]
+  const baseJDirX = baseJDirEndScreen[0] - originScreen[0]
+  const baseJDirY = baseJDirEndScreen[1] - originScreen[1]
   
   // Calculate direction vectors in screen space
   const baseIDirX = baseIEndScreen[0] - originScreenAxes[0]
@@ -398,7 +404,7 @@ function drawFrameAxes(
   const baseJDirY = baseJEndScreen[1] - originScreenAxes[1]
   
   // Find X axis endpoints (intersection with left and right edges)
-  // X axis goes through origin, parallel to baseI
+  // X axis goes through the fixed origin, parallel to baseI direction
   let xAxisStartScreen = originScreenAxes
   let xAxisEndScreen = originScreenAxes
   
@@ -419,7 +425,7 @@ function drawFrameAxes(
   }
   
   // Find Y axis endpoints (intersection with top and bottom edges)
-  // Y axis goes through origin, parallel to baseJ
+  // Y axis goes through the fixed origin, parallel to baseJ direction
   let yAxisStartScreen = originScreenAxes
   let yAxisEndScreen = originScreenAxes
   
