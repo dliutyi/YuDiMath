@@ -120,7 +120,10 @@ export function drawCoordinateFrame(
   // Convert frame bounds to screen coordinates
   const topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
   const bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
-  const originScreen = worldToScreen(origin[0], origin[1], viewport, canvasWidth, canvasHeight)
+  // Calculate origin in screen coordinates
+  // The origin in frame coordinates is (0, 0), which maps to frame.origin in parent coordinates
+  // Use frameToScreen to correctly account for frame panning and zooming
+  const originScreen = frameToScreen([0, 0], frame, viewport, canvasWidth, canvasHeight)
 
   // Draw frame background with semi-transparent color
   // This provides visual separation while still showing parent grid
