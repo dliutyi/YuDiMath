@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import type { ViewportState } from '../types'
 import {
   worldToScreen,
-  getVisibleBounds,
 } from '../utils/coordinates'
 
 interface CanvasProps {
@@ -44,9 +43,6 @@ export default function Canvas({
 
     // Clear canvas
     ctx.clearRect(0, 0, canvasWidth, canvasHeight)
-
-    // Get visible bounds
-    const bounds = getVisibleBounds(viewport, canvasWidth, canvasHeight)
 
     // Draw grid first (so axes appear on top)
     drawGrid(ctx, viewport, canvasWidth, canvasHeight)
