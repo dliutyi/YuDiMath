@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import type { ViewportState } from '../types'
 import {
   worldToScreen,
+  screenToWorld,
 } from '../utils/coordinates'
 
 interface CanvasProps {
@@ -13,11 +14,21 @@ interface CanvasProps {
 
 export default function Canvas({
   viewport,
+  onViewportChange,
   width,
   height,
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  
+  // Pan state
+  const isPanningRef = useRef(false)
+  const lastPanPointRef = useRef<{ x: number; y: number } | null>(null)
+  
+  // Zoom constraints
+  const MIN_ZOOM = 0.1
+  const MAX_ZOOM = 10.0
+  const ZOOM_SENSITIVITY = 0.001 // Adjust this to make zoom more/less sensitive
 
   const draw = () => {
     const canvas = canvasRef.current
@@ -106,6 +117,242 @@ export default function Canvas({
     return () => resizeObserver.disconnect()
   }, [])
 
+  // Pan handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Only pan with left mouse button
+    if (e.button !== 0) return
+    
+    isPanningRef.current = true
+    const rect = e.currentTarget.getBoundingClientRect()
+    lastPanPointRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    }
+    e.preventDefault()
+  }, [])
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isPanningRef.current || !lastPanPointRef.current || !onViewportChange) return
+
+    const canvas = canvasRef.current
+    const container = containerRef.current
+    if (!canvas || !container) return
+
+    const rect = container.getBoundingClientRect()
+    const canvasWidth = width || rect.width || 800
+    const canvasHeight = height || rect.height || 600
+
+    const currentPoint = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    }
+
+    // Convert screen points to world coordinates
+    const lastWorld = screenToWorld(
+      lastPanPointRef.current.x,
+      lastPanPointRef.current.y,
+      viewport,
+      canvasWidth,
+      canvasHeight
+    )
+    const currentWorld = screenToWorld(
+      currentPoint.x,
+      currentPoint.y,
+      viewport,
+      canvasWidth,
+      canvasHeight
+    )
+
+    // Calculate pan delta in world coordinates
+    const deltaX = lastWorld[0] - currentWorld[0]
+    const deltaY = lastWorld[1] - currentWorld[1]
+
+    // Update viewport
+    onViewportChange({
+      ...viewport,
+      x: viewport.x + deltaX,
+      y: viewport.y + deltaY,
+    })
+
+    lastPanPointRef.current = currentPoint
+    e.preventDefault()
+  }, [viewport, onViewportChange, width, height])
+
+  const handleMouseUp = useCallback(() => {
+    isPanningRef.current = false
+    lastPanPointRef.current = null
+  }, [])
+
+  const handleMouseLeave = useCallback(() => {
+    isPanningRef.current = false
+    lastPanPointRef.current = null
+  }, [])
+
+  // Zoom handler
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
+    if (!onViewportChange) return
+
+    e.preventDefault()
+
+    const canvas = canvasRef.current
+    const container = containerRef.current
+    if (!canvas || !container) return
+
+    const rect = container.getBoundingClientRect()
+    const canvasWidth = width || rect.width || 800
+    const canvasHeight = height || rect.height || 600
+
+    // Get mouse position relative to canvas
+    const mouseX = e.clientX - rect.left
+    const mouseY = e.clientY - rect.top
+
+    // Get world coordinates of mouse position before zoom
+    const worldBefore = screenToWorld(mouseX, mouseY, viewport, canvasWidth, canvasHeight)
+
+    // Calculate new zoom level
+    const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY
+    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom + zoomDelta))
+
+    // If zoom didn't change (hit constraint), don't update
+    if (newZoom === viewport.zoom) return
+
+    // Update viewport with new zoom
+    const newViewport: ViewportState = {
+      ...viewport,
+      zoom: newZoom,
+    }
+
+    // Get world coordinates of mouse position after zoom
+    const worldAfter = screenToWorld(mouseX, mouseY, newViewport, canvasWidth, canvasHeight)
+
+    // Adjust viewport position to keep the point under the mouse fixed
+    onViewportChange({
+      ...newViewport,
+      x: viewport.x + (worldBefore[0] - worldAfter[0]),
+      y: viewport.y + (worldBefore[1] - worldAfter[1]),
+    })
+  }, [viewport, onViewportChange, width, height, MIN_ZOOM, MAX_ZOOM, ZOOM_SENSITIVITY])
+
+  // Touch handlers for mobile support
+  const touchStartRef = useRef<{ x: number; y: number; distance: number } | null>(null)
+
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length === 1) {
+      // Single touch - start panning
+      const touch = e.touches[0]
+      const rect = e.currentTarget.getBoundingClientRect()
+      isPanningRef.current = true
+      lastPanPointRef.current = {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top,
+      }
+    } else if (e.touches.length === 2) {
+      // Two touches - prepare for pinch zoom
+      const touch1 = e.touches[0]
+      const touch2 = e.touches[1]
+      const distance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      )
+      const rect = e.currentTarget.getBoundingClientRect()
+      const centerX = ((touch1.clientX + touch2.clientX) / 2) - rect.left
+      const centerY = ((touch1.clientY + touch2.clientY) / 2) - rect.top
+      touchStartRef.current = { x: centerX, y: centerY, distance }
+      isPanningRef.current = false
+    }
+    e.preventDefault()
+  }, [])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!onViewportChange) return
+
+    const canvas = canvasRef.current
+    const container = containerRef.current
+    if (!canvas || !container) return
+
+    const rect = container.getBoundingClientRect()
+    const canvasWidth = width || rect.width || 800
+    const canvasHeight = height || rect.height || 600
+
+    if (e.touches.length === 1 && isPanningRef.current && lastPanPointRef.current) {
+      // Single touch - panning
+      const touch = e.touches[0]
+      const currentPoint = {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top,
+      }
+
+      const lastWorld = screenToWorld(
+        lastPanPointRef.current.x,
+        lastPanPointRef.current.y,
+        viewport,
+        canvasWidth,
+        canvasHeight
+      )
+      const currentWorld = screenToWorld(
+        currentPoint.x,
+        currentPoint.y,
+        viewport,
+        canvasWidth,
+        canvasHeight
+      )
+
+      const deltaX = lastWorld[0] - currentWorld[0]
+      const deltaY = lastWorld[1] - currentWorld[1]
+
+      onViewportChange({
+        ...viewport,
+        x: viewport.x + deltaX,
+        y: viewport.y + deltaY,
+      })
+
+      lastPanPointRef.current = currentPoint
+    } else if (e.touches.length === 2 && touchStartRef.current) {
+      // Two touches - pinch zoom
+      const touch1 = e.touches[0]
+      const touch2 = e.touches[1]
+      const distance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      )
+      const scale = distance / touchStartRef.current.distance
+
+      const centerX = ((touch1.clientX + touch2.clientX) / 2) - rect.left
+      const centerY = ((touch1.clientY + touch2.clientY) / 2) - rect.top
+
+      // Get world coordinates before zoom
+      const worldBefore = screenToWorld(centerX, centerY, viewport, canvasWidth, canvasHeight)
+
+      // Calculate new zoom
+      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom * scale))
+
+      if (newZoom !== viewport.zoom) {
+        const newViewport: ViewportState = {
+          ...viewport,
+          zoom: newZoom,
+        }
+
+        const worldAfter = screenToWorld(centerX, centerY, newViewport, canvasWidth, canvasHeight)
+
+        onViewportChange({
+          ...newViewport,
+          x: viewport.x + (worldBefore[0] - worldAfter[0]),
+          y: viewport.y + (worldBefore[1] - worldAfter[1]),
+        })
+      }
+
+      touchStartRef.current.distance = distance
+    }
+
+    e.preventDefault()
+  }, [viewport, onViewportChange, width, height, MIN_ZOOM, MAX_ZOOM])
+
+  const handleTouchEnd = useCallback(() => {
+    isPanningRef.current = false
+    lastPanPointRef.current = null
+    touchStartRef.current = null
+  }, [])
+
   return (
     <div
       ref={containerRef}
@@ -114,7 +361,15 @@ export default function Canvas({
     >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
+        className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       />
     </div>
   )
