@@ -13,6 +13,7 @@ function App() {
 
   const [frames, setFrames] = useState<CoordinateFrame[]>([])
   const [isDrawing, setIsDrawing] = useState(false)
+  const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null)
 
   const handleGridStepChange = (gridStep: number) => {
     setViewport((prev) => ({ ...prev, gridStep }))
@@ -60,6 +61,8 @@ function App() {
           isDrawing={isDrawing}
           onDrawingModeChange={setIsDrawing}
           onFrameCreated={handleFrameCreated}
+          selectedFrameId={selectedFrameId}
+          onFrameSelected={setSelectedFrameId}
         />
         <div className="absolute bottom-4 left-4 z-10">
           <GridStepSelector

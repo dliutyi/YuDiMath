@@ -6,6 +6,7 @@ import {
   snapPointToGrid,
   isFrameInsideFrame,
   clampPointToFrameBounds,
+  isPointInFrame,
 } from '../utils/coordinates'
 import { drawCoordinateFrame } from './CoordinateFrame'
 
@@ -18,6 +19,8 @@ interface CanvasProps {
   isDrawing?: boolean
   onDrawingModeChange?: (isDrawing: boolean) => void
   onFrameCreated?: (frame: CoordinateFrame, parentFrameId: string | null) => void
+  selectedFrameId?: string | null
+  onFrameSelected?: (frameId: string | null) => void
 }
 
 export default function Canvas({
@@ -29,6 +32,8 @@ export default function Canvas({
   isDrawing = false,
   onDrawingModeChange,
   onFrameCreated,
+  selectedFrameId = null,
+  onFrameSelected,
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -103,7 +108,7 @@ export default function Canvas({
     console.log('[Canvas.draw] Drawing frames:', frames.length)
     const topLevelFrames = frames.filter(f => f.parentFrameId === null)
     topLevelFrames.forEach((frame) => {
-      drawCoordinateFrame(ctx, frame, viewport, canvasWidth, canvasHeight, frames)
+      drawCoordinateFrame(ctx, frame, viewport, canvasWidth, canvasHeight, frames, selectedFrameId)
     })
 
     // Draw rectangle being created
@@ -269,7 +274,38 @@ export default function Canvas({
       console.log('[Canvas] Starting rectangle drawing at:', snappedPoint, 'parent frame:', parentFrame?.id)
       setDrawingRect({ start: snappedPoint, end: snappedPoint, parentFrame })
     } else {
-      // Start panning
+      // Check if clicking on a frame (for selection)
+      const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+      
+      // Find the innermost frame that contains the click point
+      // We want the most nested frame (smallest area) that contains the point
+      let clickedFrame: CoordinateFrame | null = null
+      let smallestArea = Infinity
+      
+      for (const frame of frames) {
+        if (isPointInFrame(worldPoint, frame.bounds)) {
+          const frameArea = frame.bounds.width * frame.bounds.height
+          if (frameArea < smallestArea) {
+            smallestArea = frameArea
+            clickedFrame = frame
+          }
+        }
+      }
+      
+      if (clickedFrame && onFrameSelected) {
+        // Select the clicked frame
+        console.log('[Canvas] Frame clicked:', clickedFrame.id)
+        onFrameSelected(clickedFrame.id)
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      } else if (onFrameSelected) {
+        // Clicked on background, deselect
+        console.log('[Canvas] Background clicked, deselecting frame')
+        onFrameSelected(null)
+      }
+      
+      // Start panning if not clicking on a frame
       isPanningRef.current = true
       lastPanPointRef.current = { x: screenX, y: screenY }
     }

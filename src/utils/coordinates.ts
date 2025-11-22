@@ -174,3 +174,19 @@ export function clampPointToFrameBounds(point: Point2D, bounds: FrameBounds): Po
   ]
 }
 
+/**
+ * Check if a point is inside a frame's bounds
+ * @param point Point to check [x, y] in world coordinates
+ * @param bounds Frame bounds to check against
+ * @returns true if point is inside the frame bounds
+ */
+export function isPointInFrame(point: Point2D, bounds: FrameBounds): boolean {
+  const [x, y] = point
+  return (
+    x >= bounds.x &&
+    x <= bounds.x + bounds.width &&
+    y >= bounds.y &&
+    y <= bounds.y + bounds.height
+  )
+}
+

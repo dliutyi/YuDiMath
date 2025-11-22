@@ -30,18 +30,20 @@ export function drawCoordinateFrame(
   viewport: ViewportState,
   canvasWidth: number,
   canvasHeight: number,
-  allFrames: CoordinateFrame[]
+  allFrames: CoordinateFrame[],
+  selectedFrameId: string | null = null
 ) {
   const { bounds, origin } = frame
+  const isSelected = frame.id === selectedFrameId
 
   // Convert frame bounds to screen coordinates
   const topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
   const bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
   const originScreen = worldToScreen(origin[0], origin[1], viewport, canvasWidth, canvasHeight)
 
-  // Draw frame border
-  ctx.strokeStyle = '#60a5fa' // lighter blue
-  ctx.lineWidth = 2
+  // Draw frame border with different style if selected
+  ctx.strokeStyle = isSelected ? '#3b82f6' : '#60a5fa' // brighter blue if selected
+  ctx.lineWidth = isSelected ? 3 : 2 // thicker if selected
   ctx.setLineDash([])
   ctx.beginPath()
   ctx.rect(
@@ -92,7 +94,7 @@ export function drawCoordinateFrame(
   frame.childFrameIds.forEach(childId => {
     const childFrame = allFrames.find(f => f.id === childId)
     if (childFrame) {
-      drawCoordinateFrame(ctx, childFrame, viewport, canvasWidth, canvasHeight, allFrames)
+      drawCoordinateFrame(ctx, childFrame, viewport, canvasWidth, canvasHeight, allFrames, selectedFrameId)
     }
   })
 }
