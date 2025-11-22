@@ -112,7 +112,7 @@ function drawGrid(
   canvasWidth: number,
   canvasHeight: number
 ) {
-  ctx.strokeStyle = 'rgba(51, 65, 85, 0.5)' // grid-line with better visibility
+  ctx.strokeStyle = 'rgba(51, 65, 85, 0.6)' // grid-line color - more visible
   ctx.lineWidth = 1
 
   const gridStep = viewport.gridStep
@@ -125,11 +125,20 @@ function drawGrid(
 
   // Draw vertical grid lines
   for (let x = startX; x <= endX; x += gridStep) {
+    // Skip the axis line (x=0) as it's drawn separately
+    if (Math.abs(x) < 0.001) continue
+    
     const start = worldToScreen(x, bounds.minY, viewport, canvasWidth, canvasHeight)
     const end = worldToScreen(x, bounds.maxY, viewport, canvasWidth, canvasHeight)
     
-    // Only draw if line is within canvas bounds
-    if (start[0] >= 0 && start[0] <= canvasWidth && end[0] >= 0 && end[0] <= canvasWidth) {
+    // Draw line if it intersects the canvas (less strict bounds check)
+    const lineIntersectsCanvas = 
+      (start[0] >= -10 && start[0] <= canvasWidth + 10) ||
+      (end[0] >= -10 && end[0] <= canvasWidth + 10) ||
+      (start[0] < 0 && end[0] > canvasWidth) ||
+      (start[0] > canvasWidth && end[0] < 0)
+    
+    if (lineIntersectsCanvas) {
       ctx.beginPath()
       ctx.moveTo(start[0], start[1])
       ctx.lineTo(end[0], end[1])
@@ -139,11 +148,20 @@ function drawGrid(
 
   // Draw horizontal grid lines
   for (let y = startY; y <= endY; y += gridStep) {
+    // Skip the axis line (y=0) as it's drawn separately
+    if (Math.abs(y) < 0.001) continue
+    
     const start = worldToScreen(bounds.minX, y, viewport, canvasWidth, canvasHeight)
     const end = worldToScreen(bounds.maxX, y, viewport, canvasWidth, canvasHeight)
     
-    // Only draw if line is within canvas bounds
-    if (start[1] >= 0 && start[1] <= canvasHeight && end[1] >= 0 && end[1] <= canvasHeight) {
+    // Draw line if it intersects the canvas (less strict bounds check)
+    const lineIntersectsCanvas = 
+      (start[1] >= -10 && start[1] <= canvasHeight + 10) ||
+      (end[1] >= -10 && end[1] <= canvasHeight + 10) ||
+      (start[1] < 0 && end[1] > canvasHeight) ||
+      (start[1] > canvasHeight && end[1] < 0)
+    
+    if (lineIntersectsCanvas) {
       ctx.beginPath()
       ctx.moveTo(start[0], start[1])
       ctx.lineTo(end[0], end[1])
