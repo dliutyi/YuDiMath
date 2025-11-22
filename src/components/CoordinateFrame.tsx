@@ -114,7 +114,7 @@ export function drawCoordinateFrame(
   selectedFrameId: string | null = null,
   nestingLevel: number = 0
 ) {
-  const { bounds, origin } = frame
+  const { bounds } = frame
   const isSelected = frame.id === selectedFrameId
 
   // Convert frame bounds to screen coordinates
