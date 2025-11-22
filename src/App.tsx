@@ -18,8 +18,29 @@ function App() {
     setViewport((prev) => ({ ...prev, gridStep }))
   }
 
-  const handleFrameCreated = (frame: CoordinateFrame) => {
-    setFrames((prev) => [...prev, frame])
+  const handleFrameCreated = (frame: CoordinateFrame, parentFrameId: string | null) => {
+    console.log('[App] Frame created:', frame)
+    console.log('[App] Parent frame ID:', parentFrameId)
+    setFrames((prev) => {
+      // Add the new frame
+      const newFrames = [...prev, frame]
+      
+      // If there's a parent frame, update its childFrameIds
+      if (parentFrameId) {
+        const parentIndex = newFrames.findIndex(f => f.id === parentFrameId)
+        if (parentIndex !== -1) {
+          newFrames[parentIndex] = {
+            ...newFrames[parentIndex],
+            childFrameIds: [...newFrames[parentIndex].childFrameIds, frame.id]
+          }
+          console.log('[App] Updated parent frame childFrameIds:', newFrames[parentIndex].childFrameIds)
+        }
+      }
+      
+      console.log('[App] Current frames count:', prev.length, 'New frames count:', newFrames.length)
+      console.log('[App] All frames:', JSON.stringify(newFrames, null, 2))
+      return newFrames
+    })
     setIsDrawing(false)
   }
 

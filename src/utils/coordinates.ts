@@ -1,4 +1,4 @@
-import type { ViewportState, Point2D } from '../types'
+import type { ViewportState, Point2D, FrameBounds } from '../types'
 
 /**
  * Convert world coordinates to screen coordinates
@@ -127,5 +127,50 @@ export function getVisibleBounds(
     minY: Math.min(topLeft[1], bottomRight[1]),
     maxY: Math.max(topLeft[1], bottomRight[1]),
   }
+}
+
+/**
+ * Check if a frame is completely contained within another frame's bounds
+ * @param innerFrame Bounds of the inner frame (the one being checked)
+ * @param outerFrame Bounds of the outer frame (the potential parent)
+ * @returns true if innerFrame is completely inside outerFrame
+ */
+export function isFrameInsideFrame(innerFrame: FrameBounds, outerFrame: FrameBounds): boolean {
+  const innerLeft = innerFrame.x
+  const innerRight = innerFrame.x + innerFrame.width
+  const innerTop = innerFrame.y + innerFrame.height
+  const innerBottom = innerFrame.y
+
+  const outerLeft = outerFrame.x
+  const outerRight = outerFrame.x + outerFrame.width
+  const outerTop = outerFrame.y + outerFrame.height
+  const outerBottom = outerFrame.y
+
+  // Check if inner frame is completely inside outer frame
+  return (
+    innerLeft >= outerLeft &&
+    innerRight <= outerRight &&
+    innerTop <= outerTop &&
+    innerBottom >= outerBottom
+  )
+}
+
+/**
+ * Clamp a point to stay within frame bounds
+ * @param point Point to clamp [x, y]
+ * @param bounds Frame bounds to clamp to
+ * @returns Clamped point [x, y]
+ */
+export function clampPointToFrameBounds(point: Point2D, bounds: FrameBounds): Point2D {
+  const [x, y] = point
+  const minX = bounds.x
+  const maxX = bounds.x + bounds.width
+  const minY = bounds.y
+  const maxY = bounds.y + bounds.height
+
+  return [
+    Math.max(minX, Math.min(maxX, x)),
+    Math.max(minY, Math.min(maxY, y))
+  ]
 }
 

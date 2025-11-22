@@ -283,7 +283,7 @@ For each step:
 
 **Note on Nested Frames**: The frame system supports recursive nesting (Russian doll pattern). Frames can be drawn inside other frames, creating a hierarchy where each nested frame has its own coordinate system relative to its parent. This nesting can continue to any depth. When implementing frame features, ensure they work correctly for both top-level frames (relative to background) and nested frames (relative to parent frame).
 
-### [ ] Step 3.1: Implement Frame Drawing (Rectangle Creation)
+### [x] Step 3.1: Implement Frame Drawing (Rectangle Creation)
 **Task**: Allow users to draw rectangles that become coordinate frames.
 
 **Implementation**:

@@ -1,10 +1,13 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
-import type { ViewportState, CoordinateFrame, Point2D } from '../types'
+import type { ViewportState, CoordinateFrame, Point2D, FrameBounds } from '../types'
 import {
   worldToScreen,
   screenToWorld,
   snapPointToGrid,
+  isFrameInsideFrame,
+  clampPointToFrameBounds,
 } from '../utils/coordinates'
+import { drawCoordinateFrame } from './CoordinateFrame'
 
 interface CanvasProps {
   viewport: ViewportState
@@ -14,7 +17,7 @@ interface CanvasProps {
   frames?: CoordinateFrame[]
   isDrawing?: boolean
   onDrawingModeChange?: (isDrawing: boolean) => void
-  onFrameCreated?: (frame: CoordinateFrame) => void
+  onFrameCreated?: (frame: CoordinateFrame, parentFrameId: string | null) => void
 }
 
 export default function Canvas({
@@ -22,7 +25,7 @@ export default function Canvas({
   onViewportChange,
   width,
   height,
-  frames: _frames = [], // Will be used for rendering existing frames in future steps
+  frames = [],
   isDrawing = false,
   onDrawingModeChange,
   onFrameCreated,
@@ -38,7 +41,8 @@ export default function Canvas({
   const [drawingRect, setDrawingRect] = useState<{
     start: Point2D | null
     end: Point2D | null
-  }>({ start: null, end: null })
+    parentFrame: CoordinateFrame | null
+  }>({ start: null, end: null, parentFrame: null })
   
   // Zoom constraints
   // Default zoom is 50 (1 unit = 50px), so min/max are relative to that
@@ -95,8 +99,38 @@ export default function Canvas({
     console.log('[Canvas.draw] Drawing axes...')
     drawAxes(ctx, viewport, canvasWidth, canvasHeight)
 
+    // Draw existing frames (only top-level frames, children are drawn recursively)
+    console.log('[Canvas.draw] Drawing frames:', frames.length)
+    const topLevelFrames = frames.filter(f => f.parentFrameId === null)
+    topLevelFrames.forEach((frame) => {
+      drawCoordinateFrame(ctx, frame, viewport, canvasWidth, canvasHeight, frames)
+    })
+
     // Draw rectangle being created
     if (drawingRect.start && drawingRect.end) {
+      // If drawing inside a parent frame, draw the parent frame's border as a constraint indicator
+      if (drawingRect.parentFrame) {
+        const parentBounds = drawingRect.parentFrame.bounds
+        const parentTopLeft = worldToScreen(parentBounds.x, parentBounds.y + parentBounds.height, viewport, canvasWidth, canvasHeight)
+        const parentBottomRight = worldToScreen(parentBounds.x + parentBounds.width, parentBounds.y, viewport, canvasWidth, canvasHeight)
+        const parentScreenWidth = parentBottomRight[0] - parentTopLeft[0]
+        const parentScreenHeight = parentBottomRight[1] - parentTopLeft[1]
+        
+        // Draw parent frame border as a constraint indicator (darker, thicker)
+        ctx.strokeStyle = '#3b82f6' // primary color
+        ctx.lineWidth = 3
+        ctx.setLineDash([10, 5]) // Longer dashes for constraint
+        ctx.beginPath()
+        ctx.rect(
+          Math.round(parentTopLeft[0]) + 0.5,
+          Math.round(parentTopLeft[1]) + 0.5,
+          parentScreenWidth,
+          parentScreenHeight
+        )
+        ctx.stroke()
+        ctx.setLineDash([]) // Reset line dash
+      }
+      
       const [x1, y1] = drawingRect.start
       const [x2, y2] = drawingRect.end
 
@@ -137,7 +171,7 @@ export default function Canvas({
       draw()
     })
     return () => cancelAnimationFrame(frameId)
-  }, [viewport, width, height, drawingRect])
+  }, [viewport, width, height, drawingRect, frames])
 
   // Also redraw on window resize
   useEffect(() => {
@@ -207,7 +241,33 @@ export default function Canvas({
       // Start drawing rectangle
       const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
       const snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
-      setDrawingRect({ start: snappedPoint, end: snappedPoint })
+      
+      // Find the innermost parent frame that contains the starting point
+      let parentFrame: CoordinateFrame | null = null
+      let smallestArea = Infinity
+      
+      for (const frame of frames) {
+        const { bounds } = frame
+        const pointX = snappedPoint[0]
+        const pointY = snappedPoint[1]
+        
+        // Check if point is inside frame bounds
+        if (
+          pointX >= bounds.x &&
+          pointX <= bounds.x + bounds.width &&
+          pointY >= bounds.y &&
+          pointY <= bounds.y + bounds.height
+        ) {
+          const frameArea = bounds.width * bounds.height
+          if (frameArea < smallestArea) {
+            smallestArea = frameArea
+            parentFrame = frame
+          }
+        }
+      }
+      
+      console.log('[Canvas] Starting rectangle drawing at:', snappedPoint, 'parent frame:', parentFrame?.id)
+      setDrawingRect({ start: snappedPoint, end: snappedPoint, parentFrame })
     } else {
       // Start panning
       isPanningRef.current = true
@@ -231,7 +291,13 @@ export default function Canvas({
     if (isDrawing && drawingRect.start) {
       // Update rectangle drawing
       const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
-      const snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
+      let snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
+      
+      // If drawing inside a parent frame, constrain the point to stay within bounds
+      if (drawingRect.parentFrame) {
+        snappedPoint = clampPointToFrameBounds(snappedPoint, drawingRect.parentFrame.bounds)
+      }
+      
       setDrawingRect((prev) => ({ ...prev, end: snappedPoint }))
     } else if (isPanningRef.current && lastPanPointRef.current && onViewportChange) {
       // Panning
@@ -269,47 +335,107 @@ export default function Canvas({
     e.preventDefault()
   }, [isDrawing, drawingRect.start, viewport, onViewportChange, width, height])
 
-  const handleMouseUp = useCallback(() => {
-    if (isDrawing && drawingRect.start && drawingRect.end && onFrameCreated) {
-      // Finalize rectangle and create frame
-      const [x1, y1] = drawingRect.start
-      const [x2, y2] = drawingRect.end
+  const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    const container = containerRef.current
+    if (!canvas || !container) return
+
+    console.log('[Canvas] Mouse up - isDrawing:', isDrawing, 'drawingRect:', drawingRect)
+
+    if (isDrawing && drawingRect.start) {
+      // Get current mouse position for end point
+      const rect = container.getBoundingClientRect()
+      const canvasWidth = width || rect.width || 800
+      const canvasHeight = height || rect.height || 600
+      const screenX = e.clientX - rect.left
+      const screenY = e.clientY - rect.top
+      const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+      let endPoint = drawingRect.end || snapPointToGrid(worldPoint, viewport.gridStep)
       
-      // Calculate bounds (ensure positive width and height)
-      const minX = Math.min(x1, x2)
-      const maxX = Math.max(x1, x2)
-      const minY = Math.min(y1, y2)
-      const maxY = Math.max(y1, y2)
-      
-      const frameWidth = maxX - minX
-      const frameHeight = maxY - minY
-      
-      // Only create frame if it has minimum size
-      if (frameWidth > 0.1 && frameHeight > 0.1) {
-        const frameId = `frame-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        const newFrame: CoordinateFrame = {
-          id: frameId,
-          origin: [minX, minY],
-          baseI: [1, 0],
-          baseJ: [0, 1],
-          bounds: {
+      // If drawing inside a parent frame, constrain the end point to stay within bounds
+      if (drawingRect.parentFrame) {
+        endPoint = clampPointToFrameBounds(endPoint, drawingRect.parentFrame.bounds)
+      }
+
+      console.log('[Canvas] End point:', endPoint, 'start:', drawingRect.start)
+
+      if (onFrameCreated) {
+        // Finalize rectangle and create frame
+        const [x1, y1] = drawingRect.start
+        const [x2, y2] = endPoint
+        
+        // Calculate bounds (ensure positive width and height)
+        let minX = Math.min(x1, x2)
+        let maxX = Math.max(x1, x2)
+        let minY = Math.min(y1, y2)
+        let maxY = Math.max(y1, y2)
+        
+        // If drawing inside a parent frame, constrain bounds to stay within parent
+        if (drawingRect.parentFrame) {
+          const parentBounds = drawingRect.parentFrame.bounds
+          minX = Math.max(parentBounds.x, minX)
+          maxX = Math.min(parentBounds.x + parentBounds.width, maxX)
+          minY = Math.max(parentBounds.y, minY)
+          maxY = Math.min(parentBounds.y + parentBounds.height, maxY)
+        }
+        
+        const frameWidth = maxX - minX
+        const frameHeight = maxY - minY
+        
+        // Only create frame if it has minimum size
+        if (frameWidth > 0.1 && frameHeight > 0.1) {
+          const frameId = `frame-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          const newBounds: FrameBounds = {
             x: minX,
             y: minY,
             width: frameWidth,
             height: frameHeight,
-          },
-          mode: '2d',
-          vectors: [],
-          functions: [],
-          code: '',
-          parentFrameId: null, // Top-level frame for now
-          childFrameIds: [],
+          }
+
+          // Find the innermost parent frame that contains this new frame
+          // We want the most nested parent (the one closest to the new frame)
+          // Strategy: Find all frames that contain the new frame, then pick the one with smallest area
+          // (since nested frames are smaller than their parents)
+          let parentFrameId: string | null = null
+          let smallestArea = Infinity
+
+          // Check all existing frames to find the innermost parent
+          for (const frame of frames) {
+            if (isFrameInsideFrame(newBounds, frame.bounds)) {
+              const frameArea = frame.bounds.width * frame.bounds.height
+              // Pick the frame with the smallest area (most nested)
+              if (frameArea < smallestArea) {
+                smallestArea = frameArea
+                parentFrameId = frame.id
+              }
+            }
+          }
+
+          console.log('[Canvas] Found parent frame:', parentFrameId, 'from', frames.length, 'frames')
+
+          const newFrame: CoordinateFrame = {
+            id: frameId,
+            origin: [minX, minY],
+            baseI: [1, 0],
+            baseJ: [0, 1],
+            bounds: newBounds,
+            mode: '2d',
+            vectors: [],
+            functions: [],
+            code: '',
+            parentFrameId,
+            childFrameIds: [],
+          }
+          console.log('[Canvas] Creating frame:', newFrame)
+          console.log('[Canvas] Parent frame ID:', parentFrameId)
+          onFrameCreated(newFrame, parentFrameId)
+        } else {
+          console.log('[Canvas] Frame too small, not creating:', { frameWidth, frameHeight })
         }
-        onFrameCreated(newFrame)
       }
       
       // Reset drawing state
-      setDrawingRect({ start: null, end: null })
+      setDrawingRect({ start: null, end: null, parentFrame: null })
       if (onDrawingModeChange) {
         onDrawingModeChange(false)
       }
@@ -317,7 +443,7 @@ export default function Canvas({
     
     isPanningRef.current = false
     lastPanPointRef.current = null
-  }, [isDrawing, drawingRect, onFrameCreated, onDrawingModeChange])
+  }, [isDrawing, drawingRect, onFrameCreated, onDrawingModeChange, viewport, width, height])
 
   const handleMouseLeave = useCallback(() => {
     isPanningRef.current = false
@@ -759,4 +885,8 @@ function formatNumber(value: number): string {
   const rounded = Math.round(value * 1000) / 1000
   return rounded.toString()
 }
+
+/**
+ * Draw an existing frame on the canvas
+ */
 
