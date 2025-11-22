@@ -370,18 +370,6 @@ export default function Canvas({
             canvasHeight
           )
           
-          // Convert to frame coordinates
-          const frameToParent = (point: Point2D, frame: CoordinateFrame): Point2D => {
-            const [u, v] = point
-            const [originX, originY] = frame.origin
-            const [iX, iY] = frame.baseI
-            const [jX, jY] = frame.baseJ
-            return [
-              originX + u * iX + v * jX,
-              originY + u * iY + v * jY
-            ]
-          }
-          
           // Inverse transform: parent to frame coordinates
           const parentToFrame = (point: Point2D, frame: CoordinateFrame): Point2D => {
             const [px, py] = point
