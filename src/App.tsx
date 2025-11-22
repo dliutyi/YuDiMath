@@ -25,7 +25,7 @@ function App() {
       </div>
       <div className="flex-1 relative min-h-0">
         <Canvas viewport={viewport} onViewportChange={setViewport} />
-        <div className="absolute bottom-4 right-4 z-10">
+        <div className="absolute bottom-4 left-4 z-10">
           <GridStepSelector
             gridStep={viewport.gridStep}
             onGridStepChange={handleGridStepChange}

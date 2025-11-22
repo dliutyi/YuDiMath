@@ -45,7 +45,7 @@ export default function GridStepSelector({
   }
 
   return (
-    <div className="flex flex-col items-end gap-1 p-3 bg-panel-bg/90 backdrop-blur-sm rounded-lg border border-border shadow-lg">
+    <div className="flex flex-col items-start gap-1 p-3 bg-panel-bg/90 backdrop-blur-sm rounded-lg border border-border shadow-lg">
       <div className="flex items-center gap-2 w-full">
         <label className="text-xs text-text-secondary whitespace-nowrap">
           Grid Step:
@@ -58,10 +58,10 @@ export default function GridStepSelector({
         type="range"
         min="0"
         max="100"
-        step="0.1"
+        step="0.25"
         value={sliderValue}
         onChange={handleSliderChange}
-        className="w-32 h-2 bg-grid-line rounded-lg appearance-none cursor-pointer accent-primary"
+        className="w-64 h-2 bg-grid-line rounded-lg appearance-none cursor-pointer accent-primary"
       />
     </div>
   )
