@@ -3,7 +3,6 @@ import type { ViewportState } from '../types'
 import {
   worldToScreen,
   getVisibleBounds,
-  calculateViewportMatrix,
 } from '../utils/coordinates'
 
 interface CanvasProps {
@@ -128,8 +127,6 @@ function drawAxes(
   canvasWidth: number,
   canvasHeight: number
 ) {
-  const matrix = calculateViewportMatrix(viewport, canvasWidth, canvasHeight)
-
   ctx.strokeStyle = '#64748b' // axis color
   ctx.lineWidth = 2
 
