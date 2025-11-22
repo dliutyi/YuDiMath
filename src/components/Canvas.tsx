@@ -49,7 +49,7 @@ export default function Canvas({
     const bounds = getVisibleBounds(viewport, canvasWidth, canvasHeight)
 
     // Draw grid first (so axes appear on top)
-    drawGrid(ctx, bounds, viewport, canvasWidth, canvasHeight)
+    drawGrid(ctx, viewport, canvasWidth, canvasHeight)
 
     // Draw axes on top
     drawAxes(ctx, viewport, canvasWidth, canvasHeight)
@@ -107,7 +107,6 @@ export default function Canvas({
 
 function drawGrid(
   ctx: CanvasRenderingContext2D,
-  bounds: { minX: number; maxX: number; minY: number; maxY: number },
   viewport: ViewportState,
   canvasWidth: number,
   canvasHeight: number
