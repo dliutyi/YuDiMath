@@ -83,19 +83,20 @@ describe('GridStepSelector', () => {
     expect(maxCall[0]).toBeCloseTo(20, 0)
   })
 
-  it('handles logarithmic scale conversion and rounds to 0.25 increments', () => {
+  it('handles linear scale conversion and rounds to 0.25 increments', () => {
     const onGridStepChange = vi.fn()
     render(<GridStepSelector gridStep={1} onGridStepChange={onGridStepChange} />)
     
     const slider = screen.getByRole('slider') as HTMLInputElement
     
-    // Test middle value (50 should map to approximately 1, rounded to 0.25)
+    // Test middle value (50 should map to approximately 10, rounded to 0.25)
+    // Linear: 0.25 + (50/100) * (20 - 0.25) = 0.25 + 0.5 * 19.75 = 0.25 + 9.875 = 10.125 ≈ 10.25
     fireEvent.change(slider, { target: { value: '50' } })
     expect(onGridStepChange).toHaveBeenCalled()
     const middleCall = onGridStepChange.mock.calls[onGridStepChange.mock.calls.length - 1]
-    // Middle of log scale should be around 1-2, rounded to 0.25
-    expect(middleCall[0]).toBeGreaterThan(0.5)
-    expect(middleCall[0]).toBeLessThan(3)
+    // Middle of linear scale should be around 10, rounded to 0.25
+    expect(middleCall[0]).toBeGreaterThan(9)
+    expect(middleCall[0]).toBeLessThan(11)
     // Value should be a multiple of 0.25
     expect(middleCall[0] % 0.25).toBeCloseTo(0, 5)
   })

@@ -12,31 +12,25 @@ function roundToQuarter(value: number): number {
   return Math.round(value / GRID_STEP_INCREMENT) * GRID_STEP_INCREMENT
 }
 
-// Convert linear slider value (0-100) to logarithmic grid step (0.1-20)
+// Convert linear slider value (0-100) to linear grid step (0.25-20)
 // and round to nearest 0.25 increment
 function sliderToGridStep(sliderValue: number): number {
   const normalized = sliderValue / 100 // 0 to 1
-  const logMin = Math.log10(MIN_GRID_STEP)
-  const logMax = Math.log10(MAX_GRID_STEP)
-  const logValue = logMin + normalized * (logMax - logMin)
-  const rawValue = Math.pow(10, logValue)
+  // Use linear interpolation from 0.25 to 20
+  const minStep = GRID_STEP_INCREMENT // Start from 0.25 (smallest valid increment)
+  const rawValue = minStep + normalized * (MAX_GRID_STEP - minStep)
   // Round to nearest 0.25 increment
-  let rounded = roundToQuarter(rawValue)
-  // If rounded value is less than minimum, use the smallest valid 0.25 increment (0.25)
-  if (rounded < MIN_GRID_STEP) {
-    rounded = GRID_STEP_INCREMENT
-  }
-  // Clamp to maximum
-  return Math.min(MAX_GRID_STEP, rounded)
+  const rounded = roundToQuarter(rawValue)
+  // Clamp to valid range
+  return Math.max(minStep, Math.min(MAX_GRID_STEP, rounded))
 }
 
-// Convert grid step (0.1-20) to linear slider value (0-100)
+// Convert grid step (0.25-20) to linear slider value (0-100)
 function gridStepToSlider(gridStep: number): number {
-  const clamped = Math.max(MIN_GRID_STEP, Math.min(MAX_GRID_STEP, gridStep))
-  const logMin = Math.log10(MIN_GRID_STEP)
-  const logMax = Math.log10(MAX_GRID_STEP)
-  const logValue = Math.log10(clamped)
-  const normalized = (logValue - logMin) / (logMax - logMin)
+  const minStep = GRID_STEP_INCREMENT // Start from 0.25
+  const clamped = Math.max(minStep, Math.min(MAX_GRID_STEP, gridStep))
+  // Linear interpolation
+  const normalized = (clamped - minStep) / (MAX_GRID_STEP - minStep)
   return normalized * 100
 }
 
