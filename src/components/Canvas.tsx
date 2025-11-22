@@ -108,7 +108,7 @@ export default function Canvas({
     console.log('[Canvas.draw] Drawing frames:', frames.length)
     const topLevelFrames = frames.filter(f => f.parentFrameId === null)
     topLevelFrames.forEach((frame) => {
-      drawCoordinateFrame(ctx, frame, viewport, canvasWidth, canvasHeight, frames, selectedFrameId)
+      drawCoordinateFrame(ctx, frame, viewport, canvasWidth, canvasHeight, frames, selectedFrameId, 0)
     })
 
     // Draw rectangle being created
@@ -724,10 +724,10 @@ function drawGrid(
     return
   }
 
-  // Set grid line style
+  // Set grid line style - semi-transparent background grid
   ctx.strokeStyle = '#475569' // slate-600
   ctx.lineWidth = 1
-  ctx.globalAlpha = 0.4
+  ctx.globalAlpha = 0.3 // Semi-transparent
 
   // Draw vertical grid lines (lines at x = n * gridStep in world coordinates)
   // Find the first grid line to the left of the visible area

@@ -24,6 +24,28 @@ function frameToParent(point: Point2D, frame: CoordinateFrame): Point2D {
  * Draw a coordinate frame on the canvas
  * This function is called from the Canvas component's draw function
  */
+/**
+ * Get grid color for a given nesting level
+ * Each level gets a distinct color that contrasts with its parent
+ */
+function getGridColorForLevel(level: number): string {
+  // Color palette for different nesting levels
+  // Colors chosen to provide good contrast with each other
+  const colors = [
+    '#6366f1', // indigo-500 - level 0 (top-level frames)
+    '#ec4899', // pink-500 - level 1
+    '#10b981', // emerald-500 - level 2
+    '#f59e0b', // amber-500 - level 3
+    '#8b5cf6', // violet-500 - level 4
+    '#06b6d4', // cyan-500 - level 5
+    '#ef4444', // red-500 - level 6
+    '#14b8a6', // teal-500 - level 7
+  ]
+  
+  // Cycle through colors if nesting is deeper than palette
+  return colors[level % colors.length]
+}
+
 export function drawCoordinateFrame(
   ctx: CanvasRenderingContext2D,
   frame: CoordinateFrame,
@@ -31,7 +53,8 @@ export function drawCoordinateFrame(
   canvasWidth: number,
   canvasHeight: number,
   allFrames: CoordinateFrame[],
-  selectedFrameId: string | null = null
+  selectedFrameId: string | null = null,
+  nestingLevel: number = 0
 ) {
   const { bounds, origin } = frame
   const isSelected = frame.id === selectedFrameId
@@ -101,17 +124,17 @@ export function drawCoordinateFrame(
   )
   ctx.clip()
   
-  // Draw grid within clipped region
-  drawFrameGrid(ctx, frame, viewport, canvasWidth, canvasHeight)
+  // Draw grid within clipped region with color based on nesting level
+  drawFrameGrid(ctx, frame, viewport, canvasWidth, canvasHeight, nestingLevel)
   
   // Restore context state (removes clip)
   ctx.restore()
 
-  // Recursively draw child frames
+  // Recursively draw child frames with incremented nesting level
   frame.childFrameIds.forEach(childId => {
     const childFrame = allFrames.find(f => f.id === childId)
     if (childFrame) {
-      drawCoordinateFrame(ctx, childFrame, viewport, canvasWidth, canvasHeight, allFrames, selectedFrameId)
+      drawCoordinateFrame(ctx, childFrame, viewport, canvasWidth, canvasHeight, allFrames, selectedFrameId, nestingLevel + 1)
     }
   })
 }
@@ -125,7 +148,8 @@ function drawFrameGrid(
   frame: CoordinateFrame,
   viewport: ViewportState,
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
+  nestingLevel: number = 0
 ) {
   const { bounds, baseI, baseJ, origin } = frame
 
@@ -133,11 +157,13 @@ function drawFrameGrid(
   // This ensures frame grid aligns with background grid when base vectors are standard
   const gridStep = viewport.gridStep
 
-  // Make frame grid visually distinct from background grid
-  // Use a different color (purple/indigo) and slightly higher opacity
-  ctx.strokeStyle = '#6366f1' // indigo-500 - distinct from background grid
+  // Get color for this nesting level - each level has a distinct color
+  const gridColor = getGridColorForLevel(nestingLevel)
+  
+  // Frame grids should be more visible than background grid but still semi-transparent
+  ctx.strokeStyle = gridColor
   ctx.lineWidth = 1
-  ctx.globalAlpha = 0.4 // Slightly more visible than background grid (0.3)
+  ctx.globalAlpha = 0.5 // More visible than background (0.3) but still transparent
   ctx.setLineDash([])
 
   // Calculate frame dimensions in frame coordinates
