@@ -12,7 +12,7 @@ import { drawArrow } from '../utils/arrows'
  * @param canvasHeight Canvas height in pixels
  * @returns Point in screen coordinates [x, y]
  */
-function frameToScreen(
+export function frameToScreen(
   point: Point2D,
   frame: CoordinateFrame,
   parentViewport: ViewportState,
