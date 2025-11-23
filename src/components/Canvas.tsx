@@ -52,6 +52,9 @@ export default function Canvas({
     parentFrame: CoordinateFrame | null
   }>({ start: null, end: null, parentFrame: null })
   
+  // Use a ref to track the latest drawingRect.end to avoid stale closures
+  const drawingRectEndRef = useRef<Point2D | null>(null)
+  
   // Zoom constraints
   // Default zoom is 50 (1 unit = 50px), so min/max are relative to that
   const MIN_ZOOM = 5.0   // 1 unit = 5px (zoomed out)
@@ -430,6 +433,7 @@ export default function Canvas({
       }
       
       console.log('[Canvas] Starting rectangle drawing at:', snappedPoint, 'parent frame:', parentFrame?.id)
+      drawingRectEndRef.current = snappedPoint
       setDrawingRect({ start: snappedPoint, end: snappedPoint, parentFrame })
     } else {
       // Check if clicking on a frame (for selection)
@@ -542,7 +546,10 @@ export default function Canvas({
         snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
       }
       
-      setDrawingRect((prev) => ({ ...prev, end: snappedPoint }))
+      setDrawingRect((prev) => {
+        drawingRectEndRef.current = snappedPoint
+        return { ...prev, end: snappedPoint }
+      })
     } else if (isPanningRef.current && lastPanPointRef.current) {
       // Panning - check if inside a frame
       const currentPoint = { x: screenX, y: screenY }
@@ -645,9 +652,9 @@ export default function Canvas({
     console.log('[Canvas] Mouse up - isDrawing:', isDrawing, 'drawingRect:', drawingRect)
 
     if (isDrawing && drawingRect.start) {
-      // Use the end point that was already calculated in handleMouseMove
-      // This ensures consistency - the frame is created at the same location it was drawn
-      const endPoint = drawingRect.end || drawingRect.start
+      // Use the end point from the ref to avoid stale closure issues
+      // This ensures we get the latest value that was set in handleMouseMove
+      const endPoint = drawingRectEndRef.current || drawingRect.end || drawingRect.start
 
       console.log('[Canvas] End point:', endPoint, 'start:', drawingRect.start)
 
@@ -753,6 +760,7 @@ export default function Canvas({
       }
       
       // Reset drawing state
+      drawingRectEndRef.current = null
       setDrawingRect({ start: null, end: null, parentFrame: null })
       if (onDrawingModeChange) {
         onDrawingModeChange(false)
