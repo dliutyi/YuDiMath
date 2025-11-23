@@ -384,13 +384,11 @@ export default function Canvas({
       if (parentFrame) {
         // Convert to parent frame coordinates and snap there
         const framePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
-        console.log('[Canvas] Frame point (before snap):', framePoint, 'parent frame:', parentFrame.id)
         // In frame coordinates, grid step is always 1.0
         const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
-        console.log('[Canvas] Snapped frame point:', snappedFramePoint)
-        // Convert back to world coordinates
-        snappedPoint = frameToParent(snappedFramePoint, parentFrame)
-        console.log('[Canvas] Snapped world point:', snappedPoint)
+        // Convert back to parent world coordinates
+        // Use frameCoordsToParentWorld (not frameToParent) because we want raw transformation
+        snappedPoint = frameCoordsToParentWorld(snappedFramePoint, parentFrame)
       } else {
         // Snap to background grid
         snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
