@@ -598,15 +598,19 @@ export default function Canvas({
         const maxV = Math.max(bottomLeftFrame[1], topRightFrame[1])
         
         // Clamp snapped raw frame point to frame bounds
+        const beforeClamp = [...snappedRawFramePoint]
         snappedRawFramePoint = [
           Math.max(minU, Math.min(maxU, snappedRawFramePoint[0])),
           Math.max(minV, Math.min(maxV, snappedRawFramePoint[1]))
         ]
+        if (beforeClamp[0] !== snappedRawFramePoint[0] || beforeClamp[1] !== snappedRawFramePoint[1]) {
+          console.error('[Canvas] MOUSE MOVE - CLAMPED from:', beforeClamp, 'to:', snappedRawFramePoint)
+        }
         
         // Convert raw frame coordinates to parent world coordinates
         // This ensures bounds are stored correctly regardless of parent's viewport state
         snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, drawingRect.parentFrame)
-        console.error('[Canvas] MOUSE MOVE - final snapped point (parent world):', snappedPoint)
+        console.error('[Canvas] MOUSE MOVE - raw frame coords:', snappedRawFramePoint, '-> parent world:', snappedPoint, 'parent origin:', drawingRect.parentFrame.origin)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
