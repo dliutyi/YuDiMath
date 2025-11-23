@@ -6,6 +6,13 @@
 - Use TypeScript for type safety when possible
 - Prioritize accessibility and user experience
 - Write meaningful commit messages
+- **PRIORITY: Code Modularity** - Prefer many small, focused files over few large all-in-one files
+  - Maximum file size: ~300-500 lines (soft limit - refactor if significantly exceeded)
+  - Break down large files into smaller, focused modules
+  - Each file should have a single, clear responsibility
+  - Extract reusable logic into separate utility files
+  - Split large components into smaller sub-components
+  - Keep functions/classes focused and cohesive
 
 ## ReactJS Rules
 
@@ -40,6 +47,16 @@
 - Co-locate related files (component, styles, tests) in the same directory
 - Use index.js for clean imports
 - Group by feature, not by file type
+- **File Size Guidelines**:
+  - Target: 200-400 lines per file (ideal)
+  - Maximum: ~500 lines (hard limit - must refactor if exceeded)
+  - If a file exceeds 300 lines, consider splitting it:
+    - Extract utility functions to separate files
+    - Split large components into smaller sub-components
+    - Move complex logic to custom hooks
+    - Separate types/interfaces into dedicated files
+    - Extract constants and configuration to separate files
+- **Modularity Priority**: Always prefer creating new small files over adding to existing large files
 
 ## Docker Rules
 

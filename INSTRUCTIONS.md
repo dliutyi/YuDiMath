@@ -64,6 +64,20 @@ For each step:
 - ❌ **DO NOT commit intermediate changes** - only commit when work is complete and verified
 - ❌ **DO NOT commit automatically** - always wait for explicit confirmation from the developer
 
+**IMPORTANT - Code Modularity and File Size Rules:**
+- ✅ **PRIORITY: Prefer many small, focused files over few large all-in-one files**
+- ✅ **Target file size: 200-400 lines** (ideal range)
+- ✅ **Maximum file size: ~500 lines** (hard limit - must refactor if exceeded)
+- ✅ **Single Responsibility Principle**: Each file should have one clear purpose
+- ✅ **When a file exceeds 300 lines, consider refactoring**:
+  - Extract utility functions to separate files (`src/utils/`)
+  - Split large components into smaller sub-components
+  - Move complex logic to custom hooks (`src/hooks/`)
+  - Separate types/interfaces into dedicated files (`src/types/`)
+  - Extract constants and configuration to separate files
+- ✅ **Modularity over convenience**: Always prefer creating new small files over adding to existing large files
+- ✅ **Break down large files proactively**: Don't wait until files become unmanageable
+
 ---
 
 ## Phase 1: Project Setup and Foundation
