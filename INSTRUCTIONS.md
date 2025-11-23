@@ -379,7 +379,7 @@ For each step:
 
 ---
 
-### [ ] Step 3.5: Implement Frame as Independent Coordinate System
+### [x] Step 3.5: Implement Frame as Independent Coordinate System
 **Task**: Each frame is its own infinite coordinate system with independent panning, zooming, and axes.
 
 **Implementation**:
@@ -394,6 +394,8 @@ For each step:
 - Frame panning/zooming should only affect the frame's internal viewport, not the background
 - When panning/zooming a frame, the frame's bounds in parent coordinates remain fixed
 - Frame coordinate system is infinite - can pan/zoom within frame independently
+- Support nested frames with independent pan/zoom that correctly account for parent viewport transformations
+- Nested frame drawing correctly snaps to parent frame grid and accounts for parent viewport pan/zoom
 
 **Tests**:
 - Test frame viewport state management
@@ -403,6 +405,8 @@ For each step:
 - Test frame axis labels show correct frame coordinates
 - Test frame panning/zooming doesn't affect background
 - Test nested frame panning/zooming independence
+- Test nested frame drawing with parent viewport transformations
+- Test nested frame coordinate transformations through parent chain
 
 **Commit**: `feat: implement frame as independent coordinate system with panning, zooming, and axes`
 
@@ -432,7 +436,7 @@ For each step:
 
 ---
 
-### [ ] Step 3.5: Add Frame Properties Editor
+### [ ] Step 3.7: Add Frame Properties Editor
 **Task**: Create UI panel for editing frame properties (origin, base vectors).
 
 **Implementation**:
