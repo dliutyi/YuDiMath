@@ -126,15 +126,41 @@ export default function Canvas({
       let bottomRight: Point2D
       
       if (drawingRect.parentFrame) {
-        // For nested frames, convert parent world coordinates to parent frame coordinates, then use frameToScreen
+        // For nested frames, use the same transformation as nested frame bounds rendering
+        // Convert parent world coordinates to parent frame coordinates (raw)
         const topLeftWorld: Point2D = [minX, maxY]
         const bottomRightWorld: Point2D = [maxX, minY]
         
         const topLeftFrame = parentToFrame(topLeftWorld, drawingRect.parentFrame)
         const bottomRightFrame = parentToFrame(bottomRightWorld, drawingRect.parentFrame)
         
-        topLeft = frameToScreen(topLeftFrame, drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
-        bottomRight = frameToScreen(bottomRightFrame, drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
+        // Apply parent frame's viewport transformation
+        const topLeftFrameWithViewport: Point2D = [
+          (topLeftFrame[0] - drawingRect.parentFrame.viewport.x) * drawingRect.parentFrame.viewport.zoom,
+          (topLeftFrame[1] - drawingRect.parentFrame.viewport.y) * drawingRect.parentFrame.viewport.zoom
+        ]
+        const bottomRightFrameWithViewport: Point2D = [
+          (bottomRightFrame[0] - drawingRect.parentFrame.viewport.x) * drawingRect.parentFrame.viewport.zoom,
+          (bottomRightFrame[1] - drawingRect.parentFrame.viewport.y) * drawingRect.parentFrame.viewport.zoom
+        ]
+        
+        // Transform back to parent world coordinates using base vectors
+        const [originX, originY] = drawingRect.parentFrame.origin
+        const [iX, iY] = drawingRect.parentFrame.baseI
+        const [jX, jY] = drawingRect.parentFrame.baseJ
+        
+        const topLeftParentWorldWithViewport: Point2D = [
+          originX + topLeftFrameWithViewport[0] * iX + topLeftFrameWithViewport[1] * jX,
+          originY + topLeftFrameWithViewport[0] * iY + topLeftFrameWithViewport[1] * jY
+        ]
+        const bottomRightParentWorldWithViewport: Point2D = [
+          originX + bottomRightFrameWithViewport[0] * iX + bottomRightFrameWithViewport[1] * jX,
+          originY + bottomRightFrameWithViewport[0] * iY + bottomRightFrameWithViewport[1] * jY
+        ]
+        
+        // Transform to screen using root viewport
+        topLeft = worldToScreen(topLeftParentWorldWithViewport[0], topLeftParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
+        bottomRight = worldToScreen(bottomRightParentWorldWithViewport[0], bottomRightParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
       } else {
         topLeft = worldToScreen(minX, maxY, viewport, canvasWidth, canvasHeight)
         bottomRight = worldToScreen(maxX, minY, viewport, canvasWidth, canvasHeight)
