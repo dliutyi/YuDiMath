@@ -651,17 +651,14 @@ export default function Canvas({
       let endPoint: Point2D
       
       if (drawingRect.parentFrame) {
-        // Convert screen to parent world coordinates first (using main viewport)
-        const parentWorldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
-        
-        // Convert parent world coordinates to parent frame coordinates (without viewport)
-        // This gives us the "raw" frame coordinates, not accounting for parent's viewport pan/zoom
-        const framePoint = parentToFrame(parentWorldPoint, drawingRect.parentFrame)
+        // Convert screen coordinates directly to parent frame coordinates
+        // This accounts for the parent's viewport pan/zoom
+        const framePoint = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
         
         // In frame coordinates, grid step is always 1.0
         const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
         
-        // Convert back to parent world coordinates using raw transformation
+        // Convert back to parent world coordinates using raw transformation (without viewport)
         // This ensures bounds are stored correctly regardless of parent's viewport state
         endPoint = frameCoordsToParentWorld(snappedFramePoint, drawingRect.parentFrame)
         // Constrain to parent frame bounds
