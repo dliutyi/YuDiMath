@@ -575,10 +575,14 @@ export default function Canvas({
       if (drawingRect.parentFrame) {
         // Convert screen to parent world, then to raw frame coordinates
         const parentWorldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+        console.error('[Canvas] MOUSE MOVE - screen:', [screenX, screenY], 'parent world:', parentWorldPoint, 'parent viewport:', viewport)
+        
         const rawFramePoint = parentToFrame(parentWorldPoint, drawingRect.parentFrame)
+        console.error('[Canvas] MOUSE MOVE - raw frame point:', rawFramePoint, 'parent frame origin:', drawingRect.parentFrame.origin, 'parent frame viewport:', drawingRect.parentFrame.viewport)
         
         // In frame coordinates, grid step is always 1.0
         let snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
+        console.error('[Canvas] MOUSE MOVE - snapped raw frame point:', snappedRawFramePoint)
         
         // Clamp raw frame coordinates to parent frame bounds in frame coordinate space
         // Convert parent bounds corners to frame coordinates
@@ -601,6 +605,7 @@ export default function Canvas({
         // Convert raw frame coordinates to parent world coordinates
         // This ensures bounds are stored correctly regardless of parent's viewport state
         snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, drawingRect.parentFrame)
+        console.error('[Canvas] MOUSE MOVE - final snapped point (parent world):', snappedPoint)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
