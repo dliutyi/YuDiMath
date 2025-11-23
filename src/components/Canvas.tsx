@@ -558,13 +558,29 @@ export default function Canvas({
         const rawFramePoint = parentToFrame(parentWorldPoint, drawingRect.parentFrame)
         
         // In frame coordinates, grid step is always 1.0
-        const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
+        let snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
+        
+        // Clamp raw frame coordinates to parent frame bounds in frame coordinate space
+        // Convert parent bounds corners to frame coordinates
+        const parentBounds = drawingRect.parentFrame.bounds
+        const bottomLeftWorld: Point2D = [parentBounds.x, parentBounds.y]
+        const topRightWorld: Point2D = [parentBounds.x + parentBounds.width, parentBounds.y + parentBounds.height]
+        const bottomLeftFrame = parentToFrame(bottomLeftWorld, drawingRect.parentFrame)
+        const topRightFrame = parentToFrame(topRightWorld, drawingRect.parentFrame)
+        const minU = Math.min(bottomLeftFrame[0], topRightFrame[0])
+        const maxU = Math.max(bottomLeftFrame[0], topRightFrame[0])
+        const minV = Math.min(bottomLeftFrame[1], topRightFrame[1])
+        const maxV = Math.max(bottomLeftFrame[1], topRightFrame[1])
+        
+        // Clamp snapped raw frame point to frame bounds
+        snappedRawFramePoint = [
+          Math.max(minU, Math.min(maxU, snappedRawFramePoint[0])),
+          Math.max(minV, Math.min(maxV, snappedRawFramePoint[1]))
+        ]
         
         // Convert raw frame coordinates to parent world coordinates
         // This ensures bounds are stored correctly regardless of parent's viewport state
         snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, drawingRect.parentFrame)
-        // Constrain to parent frame bounds
-        snappedPoint = clampPointToFrameBounds(snappedPoint, drawingRect.parentFrame.bounds)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
