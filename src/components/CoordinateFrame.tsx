@@ -366,6 +366,11 @@ export function drawCoordinateFrame(
       // Transform to screen using root viewport
       topLeft = worldToScreen(topLeftParentWorldWithViewport[0], topLeftParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
       bottomRight = worldToScreen(bottomRightParentWorldWithViewport[0], bottomRightParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
+      
+      console.error('[CoordinateFrame] topLeftParentFrame:', topLeftParentFrame, 'bottomRightParentFrame:', bottomRightParentFrame)
+      console.error('[CoordinateFrame] topLeftFrameWithViewport:', topLeftFrameWithViewport, 'bottomRightFrameWithViewport:', bottomRightFrameWithViewport)
+      console.error('[CoordinateFrame] topLeftParentWorldWithViewport:', topLeftParentWorldWithViewport, 'bottomRightParentWorldWithViewport:', bottomRightParentWorldWithViewport)
+      console.error('[CoordinateFrame] topLeft screen:', topLeft, 'bottomRight screen:', bottomRight)
     } else {
       // Parent not found, fall back to direct transformation
       topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
