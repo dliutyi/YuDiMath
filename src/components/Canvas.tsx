@@ -595,7 +595,6 @@ export default function Canvas({
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
         endPoint = drawingRect.end || snapPointToGrid(worldPoint, viewport.gridStep)
       }
-      }
 
       console.log('[Canvas] End point:', endPoint, 'start:', drawingRect.start)
 
