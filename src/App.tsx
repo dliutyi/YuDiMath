@@ -4,6 +4,7 @@ import Canvas from './components/Canvas'
 import GridStepSelector from './components/GridStepSelector'
 import FrameEditorPanel from './components/FrameEditorPanel'
 import LoadingOverlay from './components/LoadingOverlay'
+import Modal from './components/Modal'
 import { generateCode } from './utils/codeGenerator'
 import { usePyScript } from './hooks/usePyScript'
 import { useWorkspace } from './hooks/useWorkspace'
@@ -15,6 +16,23 @@ function App() {
   const [isDrawing, setIsDrawing] = useState(false)
   const { isReady, executeCode, isExecuting } = usePyScript()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Modal state
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    confirmText?: string
+    cancelText?: string
+    onConfirm: () => void
+    onCancel?: () => void
+    variant?: 'default' | 'danger'
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  })
 
   const handleGridStepChange = (gridStep: number) => {
     workspace.updateViewport({ gridStep })
@@ -188,29 +206,38 @@ function App() {
   const handleImportWorkspace = async (file: File) => {
     const imported = await importWorkspaceFromFile(file)
     if (!imported) {
-      alert('Failed to import workspace. The file may be invalid or corrupted.')
+      setModalState({
+        isOpen: true,
+        title: 'Import Failed',
+        message: 'Failed to import workspace. The file may be invalid or corrupted.',
+        confirmText: 'OK',
+        onConfirm: () => {},
+        variant: 'danger',
+      })
       return
     }
 
-    // Ask user if they want to replace or merge
-    const replace = window.confirm(
-      'Import workspace?\n\n' +
-      'OK = Replace current workspace\n' +
-      'Cancel = Merge with current workspace'
-    )
-
-    if (replace) {
-      // Replace: set the entire workspace state
-      workspace.setWorkspace(imported)
-    } else {
-      // Merge: add imported frames to existing ones, update viewport if needed
-      const mergedFrames = [...workspace.frames, ...imported.frames]
-      workspace.setWorkspace({
-        viewport: imported.viewport, // Use imported viewport
-        frames: mergedFrames,
-        selectedFrameId: imported.selectedFrameId || workspace.selectedFrameId,
-      })
-    }
+    // Show modal to ask user if they want to replace or merge
+    setModalState({
+      isOpen: true,
+      title: 'Import Workspace',
+      message: 'How would you like to import the workspace?\n\n• Replace: Replace current workspace with imported one\n• Merge: Add imported frames to current workspace',
+      confirmText: 'Replace',
+      cancelText: 'Merge',
+      onConfirm: () => {
+        // Replace: set the entire workspace state
+        workspace.setWorkspace(imported)
+      },
+      onCancel: () => {
+        // Merge: add imported frames to existing ones, update viewport if needed
+        const mergedFrames = [...workspace.frames, ...imported.frames]
+        workspace.setWorkspace({
+          viewport: imported.viewport, // Use imported viewport
+          frames: mergedFrames,
+          selectedFrameId: imported.selectedFrameId || workspace.selectedFrameId,
+        })
+      },
+    })
   }
 
   const handleImportClick = () => {
@@ -385,9 +412,17 @@ function App() {
                 document.activeElement.blur()
               }
               e.currentTarget.blur()
-              if (window.confirm('Are you sure you want to clear the entire workspace? This will remove all frames and reset the viewport.')) {
-                workspace.clearWorkspace()
-              }
+              setModalState({
+                isOpen: true,
+                title: 'Clear Workspace',
+                message: 'Are you sure you want to clear the entire workspace? This will remove all frames and reset the viewport.',
+                confirmText: 'Clear',
+                cancelText: 'Cancel',
+                onConfirm: () => {
+                  workspace.clearWorkspace()
+                },
+                variant: 'danger',
+              })
             }}
             onMouseDown={(e) => {
               e.currentTarget.classList.add('active-touch')
@@ -516,6 +551,18 @@ function App() {
           autoExecuteCode={autoExecuteCode}
         />
       </div>
+      {/* Modal */}
+      <Modal
+        isOpen={modalState.isOpen}
+        onClose={() => setModalState({ ...modalState, isOpen: false })}
+        title={modalState.title}
+        message={modalState.message}
+        confirmText={modalState.confirmText}
+        cancelText={modalState.cancelText}
+        onConfirm={modalState.onConfirm}
+        onCancel={modalState.onCancel}
+        variant={modalState.variant}
+      />
     </div>
   )
 }
