@@ -52,8 +52,10 @@ export default function Canvas({
     parentFrame: CoordinateFrame | null
   }>({ start: null, end: null, parentFrame: null })
   
-  // Use a ref to track the latest drawingRect.end to avoid stale closures
+  // Use refs to track the latest drawingRect values to avoid stale closures
   const drawingRectEndRef = useRef<Point2D | null>(null)
+  const drawingRectStartRef = useRef<Point2D | null>(null)
+  const drawingRectParentFrameRef = useRef<CoordinateFrame | null>(null)
   
   // Zoom constraints
   // Default zoom is 50 (1 unit = 50px), so min/max are relative to that
@@ -433,7 +435,9 @@ export default function Canvas({
       }
       
       console.log('[Canvas] Starting rectangle drawing at:', snappedPoint, 'parent frame:', parentFrame?.id)
+      drawingRectStartRef.current = snappedPoint
       drawingRectEndRef.current = snappedPoint
+      drawingRectParentFrameRef.current = parentFrame
       setDrawingRect({ start: snappedPoint, end: snappedPoint, parentFrame })
     } else {
       // Check if clicking on a frame (for selection)
@@ -651,7 +655,11 @@ export default function Canvas({
 
     console.log('[Canvas] Mouse up - isDrawing:', isDrawing, 'drawingRect:', drawingRect)
 
-    if (isDrawing && drawingRect.start) {
+    if (isDrawing && drawingRectStartRef.current) {
+      // Use refs to get the latest values to avoid stale closures
+      const startPoint = drawingRectStartRef.current
+      const parentFrame = drawingRectParentFrameRef.current
+      
       // Recalculate end point using the same logic as handleMouseMove
       // This ensures we use the exact mouse position at mouse up time
       const rect = container.getBoundingClientRect()
@@ -662,15 +670,15 @@ export default function Canvas({
       
       let endPoint: Point2D
       
-      if (drawingRect.parentFrame) {
+      if (parentFrame) {
         // Convert to parent frame coordinates and snap there (same as handleMouseMove)
-        const framePoint = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
+        const framePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
         // In frame coordinates, grid step is always 1.0
         const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
         // Convert back to world coordinates
-        endPoint = frameToParent(snappedFramePoint, drawingRect.parentFrame)
+        endPoint = frameToParent(snappedFramePoint, parentFrame)
         // Constrain to parent frame bounds
-        endPoint = clampPointToFrameBounds(endPoint, drawingRect.parentFrame.bounds)
+        endPoint = clampPointToFrameBounds(endPoint, parentFrame.bounds)
         console.log('[Canvas] Mouse up - frame point:', framePoint, 'snapped:', snappedFramePoint, 'world:', endPoint)
       } else {
         // Snap to background grid
@@ -678,9 +686,9 @@ export default function Canvas({
         endPoint = snapPointToGrid(worldPoint, viewport.gridStep)
       }
 
-      console.log('[Canvas] End point:', endPoint, 'start:', drawingRect.start)
-      console.log('[Canvas] Parent frame:', drawingRect.parentFrame?.id, 'bounds:', drawingRect.parentFrame?.bounds)
-      console.log('[Canvas] Parent frame origin:', drawingRect.parentFrame?.origin)
+      console.log('[Canvas] End point:', endPoint, 'start:', startPoint)
+      console.log('[Canvas] Parent frame:', parentFrame?.id, 'bounds:', parentFrame?.bounds)
+      console.log('[Canvas] Parent frame origin:', parentFrame?.origin)
 
       if (onFrameCreated) {
         // Finalize rectangle and create frame
@@ -717,26 +725,10 @@ export default function Canvas({
             height: frameHeight,
           }
 
-          // Find the innermost parent frame that contains this new frame
-          // We want the most nested parent (the one closest to the new frame)
-          // Strategy: Find all frames that contain the new frame, then pick the one with smallest area
-          // (since nested frames are smaller than their parents)
-          let parentFrameId: string | null = null
-          let smallestArea = Infinity
-
-          // Check all existing frames to find the innermost parent
-          for (const frame of frames) {
-            if (isFrameInsideFrame(newBounds, frame.bounds)) {
-              const frameArea = frame.bounds.width * frame.bounds.height
-              // Pick the frame with the smallest area (most nested)
-              if (frameArea < smallestArea) {
-                smallestArea = frameArea
-                parentFrameId = frame.id
-              }
-            }
-          }
-
-          console.log('[Canvas] Found parent frame:', parentFrameId, 'from', frames.length, 'frames')
+          // Use the parent frame from the ref (the one we were drawing inside)
+          const parentFrameId = parentFrame?.id || null
+          
+          console.log('[Canvas] Using parent frame from drawing:', parentFrameId)
 
           // Set origin to the center of the frame viewport
           const originX = minX + frameWidth / 2
@@ -747,9 +739,7 @@ export default function Canvas({
           let baseI: Point2D = [1, 0]
           let baseJ: Point2D = [0, 1]
           
-          if (parentFrameId) {
-            const parentFrame = frames.find(f => f.id === parentFrameId)
-            if (parentFrame) {
+          if (parentFrame) {
               // Inherit base vectors from parent
               baseI = [...parentFrame.baseI]
               baseJ = [...parentFrame.baseJ]
@@ -786,7 +776,9 @@ export default function Canvas({
       }
       
       // Reset drawing state
+      drawingRectStartRef.current = null
       drawingRectEndRef.current = null
+      drawingRectParentFrameRef.current = null
       setDrawingRect({ start: null, end: null, parentFrame: null })
       if (onDrawingModeChange) {
         onDrawingModeChange(false)
