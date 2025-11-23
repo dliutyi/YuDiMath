@@ -36,3 +36,20 @@ export function areVectorsCollinear(v1: Point2D, v2: Point2D, threshold: number 
   return determinant < threshold
 }
 
+/**
+ * Calculate a vector orthogonal to the given vector
+ * For a 2D vector [a, b], an orthogonal vector is [-b, a] (rotated 90 degrees counterclockwise)
+ * The result is normalized to unit length
+ * @param vector Input vector
+ * @returns Normalized vector orthogonal to the input, or [0, 0] if input is zero
+ */
+export function orthogonalVector(vector: Point2D): Point2D {
+  const magnitude = vectorMagnitude(vector)
+  if (magnitude < 1e-10) {
+    return [0, 0]
+  }
+  // Rotate 90 degrees counterclockwise: [a, b] -> [-b, a]
+  const orthogonal: Point2D = [-vector[1], vector[0]]
+  return normalizeVector(orthogonal)
+}
+

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react'
 import type { ViewportState, CoordinateFrame, Point2D } from '../types'
-import { worldToScreen, screenToWorld } from '../utils/coordinates'
+import { worldToScreen, screenToWorld, isPointInPolygon } from '../utils/coordinates'
 import { drawCoordinateFrame, parentToFrame, nestedFrameToScreen } from './CoordinateFrame'
+import { frameToScreen } from '../utils/frameTransforms'
 import { drawGrid, drawAxes } from '../utils/canvasDrawing'
 import { useCanvasZoom } from '../hooks/useCanvasZoom'
 import { useCanvasDrawing } from '../hooks/useCanvasDrawing'
@@ -135,39 +136,32 @@ export default function Canvas({
         : null
       
       if (parentFrame) {
-        // For nested frames, bounds are in parent world coordinates
-        // Need to account for parent's viewport (pan/zoom) and base vectors
-        const cornersWorld: Point2D[] = [
-          [minX, maxY], // top-left
-          [maxX, maxY], // top-right
-          [maxX, minY], // bottom-right
-          [minX, minY], // bottom-left
-        ]
+        // For nested frames, start and end are in parent world coordinates
+        // But they represent a rectangle in parent frame coordinates
+        // So we need to:
+        // 1. Convert start and end to frame coordinates
+        // 2. Create rectangle in frame coordinates
+        // 3. Convert all 4 corners to world coordinates
+        // 4. Transform to screen
         
-        // Transform each corner: parent world -> parent frame -> apply viewport -> back to parent world -> screen
-        const cornersScreen: Point2D[] = cornersWorld.map(cornerWorld => {
-          // Step 1: Convert parent world to parent frame coordinates (accounts for base vectors)
-          const cornerFrame = parentToFrame(cornerWorld, parentFrame)
-          
-          // Step 2: Apply parent frame's viewport pan/zoom
-          const cornerFrameWithViewport: Point2D = [
-            (cornerFrame[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom,
-            (cornerFrame[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
-          ]
-          
-          // Step 3: Transform back to parent world coordinates using base vectors
-          const [originX, originY] = parentFrame.origin
-          const [iX, iY] = parentFrame.baseI
-          const [jX, jY] = parentFrame.baseJ
-          
-          const cornerParentWorldWithViewport: Point2D = [
-            originX + cornerFrameWithViewport[0] * iX + cornerFrameWithViewport[1] * jX,
-            originY + cornerFrameWithViewport[0] * iY + cornerFrameWithViewport[1] * jY
-          ]
-          
-          // Step 4: Transform to screen using root viewport
-          return worldToScreen(cornerParentWorldWithViewport[0], cornerParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
-        })
+        const startFrame = parentToFrame(drawingRect.start, parentFrame)
+        const endFrame = parentToFrame(drawingRect.end, parentFrame)
+        
+        // Create rectangle in frame coordinates
+        const [u1, v1] = startFrame
+        const [u2, v2] = endFrame
+        const minU = Math.min(u1, u2)
+        const maxU = Math.max(u1, u2)
+        const minV = Math.min(v1, v2)
+        const maxV = Math.max(v1, v2)
+        
+        // Transform each corner: frame coordinates -> apply viewport -> screen
+        const cornersScreen: Point2D[] = [
+          frameToScreen([minU, maxV], parentFrame, viewport, canvasWidth, canvasHeight), // top-left
+          frameToScreen([maxU, maxV], parentFrame, viewport, canvasWidth, canvasHeight), // top-right
+          frameToScreen([maxU, minV], parentFrame, viewport, canvasWidth, canvasHeight), // bottom-right
+          frameToScreen([minU, minV], parentFrame, viewport, canvasWidth, canvasHeight), // bottom-left
+        ]
         
         // Draw parallelogram outline using all 4 corners
         ctx.strokeStyle = '#3b82f6' // primary color
@@ -272,44 +266,65 @@ export default function Canvas({
       // Check each frame by converting its bounds to screen coordinates
       // and checking if the click point is inside
       for (const frame of frames) {
-        // Get frame bounds in screen coordinates (accounting for viewport)
-        let frameTopLeft: Point2D
-        let frameBottomRight: Point2D
+        // Get all 4 corners of the frame in screen coordinates
+        let cornersScreen: Point2D[]
         
         if (frame.parentFrameId) {
-          // Nested frame - transform through parent chain
+          // Nested frame - use stored frame coordinates if available, otherwise convert from world bounds
           const parentFrameForCheck = frames.find(f => f.id === frame.parentFrameId)
-          if (parentFrameForCheck) {
-            const bounds = frame.bounds
-            const topLeftWorld: Point2D = [bounds.x, bounds.y + bounds.height]
-            const bottomRightWorld: Point2D = [bounds.x + bounds.width, bounds.y]
-            const topLeftFrame = parentToFrame(topLeftWorld, parentFrameForCheck)
-            const bottomRightFrame = parentToFrame(bottomRightWorld, parentFrameForCheck)
-            frameTopLeft = nestedFrameToScreen(topLeftFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight)
-            frameBottomRight = nestedFrameToScreen(bottomRightFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight)
-          } else {
+          if (!parentFrameForCheck) {
             continue
           }
+          
+          const bounds = frame.bounds
+          
+          if (bounds.frameCoords) {
+            // Use stored frame coordinates (the actual rectangle in frame space)
+            const { minU, maxU, minV, maxV } = bounds.frameCoords
+            cornersScreen = [
+              frameToScreen([minU, maxV], parentFrameForCheck, viewport, canvasWidth, canvasHeight), // top-left
+              frameToScreen([maxU, maxV], parentFrameForCheck, viewport, canvasWidth, canvasHeight), // top-right
+              frameToScreen([maxU, minV], parentFrameForCheck, viewport, canvasWidth, canvasHeight), // bottom-right
+              frameToScreen([minU, minV], parentFrameForCheck, viewport, canvasWidth, canvasHeight), // bottom-left
+            ]
+          } else {
+            // Fallback: convert world bounds corners (may not form perfect rectangle)
+            const topLeftWorld: Point2D = [bounds.x, bounds.y + bounds.height]
+            const topRightWorld: Point2D = [bounds.x + bounds.width, bounds.y + bounds.height]
+            const bottomRightWorld: Point2D = [bounds.x + bounds.width, bounds.y]
+            const bottomLeftWorld: Point2D = [bounds.x, bounds.y]
+            
+            const topLeftFrame = parentToFrame(topLeftWorld, parentFrameForCheck)
+            const topRightFrame = parentToFrame(topRightWorld, parentFrameForCheck)
+            const bottomRightFrame = parentToFrame(bottomRightWorld, parentFrameForCheck)
+            const bottomLeftFrame = parentToFrame(bottomLeftWorld, parentFrameForCheck)
+            
+            cornersScreen = [
+              nestedFrameToScreen(topLeftFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight),
+              nestedFrameToScreen(topRightFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight),
+              nestedFrameToScreen(bottomRightFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight),
+              nestedFrameToScreen(bottomLeftFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight),
+            ]
+          }
         } else {
-          // Top-level frame
-          frameTopLeft = worldToScreen(frame.bounds.x, frame.bounds.y + frame.bounds.height, viewport, canvasWidth, canvasHeight)
-          frameBottomRight = worldToScreen(frame.bounds.x + frame.bounds.width, frame.bounds.y, viewport, canvasWidth, canvasHeight)
+          // Top-level frame - rectangular bounds
+          const topLeft = worldToScreen(frame.bounds.x, frame.bounds.y + frame.bounds.height, viewport, canvasWidth, canvasHeight)
+          const topRight = worldToScreen(frame.bounds.x + frame.bounds.width, frame.bounds.y + frame.bounds.height, viewport, canvasWidth, canvasHeight)
+          const bottomRight = worldToScreen(frame.bounds.x + frame.bounds.width, frame.bounds.y, viewport, canvasWidth, canvasHeight)
+          const bottomLeft = worldToScreen(frame.bounds.x, frame.bounds.y, viewport, canvasWidth, canvasHeight)
+          cornersScreen = [topLeft, topRight, bottomRight, bottomLeft]
         }
         
-        // Check if click point is inside frame bounds in screen coordinates
+        // Check if click point is inside the frame using point-in-polygon test
         const screenPoint: Point2D = [screenX, screenY]
-        const minX = Math.min(frameTopLeft[0], frameBottomRight[0])
-        const maxX = Math.max(frameTopLeft[0], frameBottomRight[0])
-        const minY = Math.min(frameTopLeft[1], frameBottomRight[1])
-        const maxY = Math.max(frameTopLeft[1], frameBottomRight[1])
-        
-        if (
-          screenPoint[0] >= minX &&
-          screenPoint[0] <= maxX &&
-          screenPoint[1] >= minY &&
-          screenPoint[1] <= maxY
-        ) {
+        if (isPointInPolygon(screenPoint, cornersScreen)) {
+          // Calculate approximate area for selecting smallest frame when overlapping
+          const minX = Math.min(...cornersScreen.map(c => c[0]))
+          const maxX = Math.max(...cornersScreen.map(c => c[0]))
+          const minY = Math.min(...cornersScreen.map(c => c[1]))
+          const maxY = Math.max(...cornersScreen.map(c => c[1]))
           const frameArea = (maxX - minX) * (maxY - minY)
+          
           if (frameArea < smallestArea) {
             smallestArea = frameArea
             clickedFrame = frame

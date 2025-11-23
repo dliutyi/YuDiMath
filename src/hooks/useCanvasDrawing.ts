@@ -95,20 +95,10 @@ export function useCanvasDrawing({
     let snappedPoint: Point2D
 
     if (parentFrame) {
-      // Convert screen to frame coordinates (accounts for frame viewport)
-      const framePointWithViewport = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
-      // Undo viewport to get raw frame coordinates
-      const rawFramePoint: Point2D = [
-        framePointWithViewport[0] + parentFrame.viewport.x,
-        framePointWithViewport[1] + parentFrame.viewport.y
-      ]
-      // Apply inverse zoom to get raw coordinates
-      const rawFramePointScaled: Point2D = [
-        rawFramePoint[0] / parentFrame.viewport.zoom,
-        rawFramePoint[1] / parentFrame.viewport.zoom
-      ]
+      // Convert screen to frame coordinates (screenToFrame already returns raw frame coordinates, viewport is undone)
+      const rawFramePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
       // Snap to grid in frame coordinates (integer intervals)
-      const snappedRawFramePoint = snapPointToGrid(rawFramePointScaled, 1.0)
+      const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
       // Convert back to parent world coordinates WITHOUT viewport
       // Bounds should represent the rectangle in parent frame coordinates, not accounting for viewport
       // Use frameCoordsToParentWorld which does NOT apply viewport
@@ -175,52 +165,112 @@ export function useCanvasDrawing({
       ? frames.find(f => f.id === parentFrameRef.id) || parentFrameRef
       : null
 
-    let endPoint: Point2D
+    let newBounds: FrameBounds
+    let snappedRawFramePointStart: Point2D | null = null
+    let snappedRawFramePointEnd: Point2D | null = null
 
     if (parentFrame) {
       // Convert screen to frame coordinates for end point (screenToFrame already returns raw frame coordinates)
       const rawFramePointEnd = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
       // Snap to grid in frame coordinates (integer intervals)
-      const snappedRawFramePointEnd = snapPointToGrid(rawFramePointEnd, 1.0)
+      snappedRawFramePointEnd = snapPointToGrid(rawFramePointEnd, 1.0)
       
       // Convert start point from parent world to frame coordinates (raw, no viewport)
       const rawFramePointStart = parentToFrame(startPoint, parentFrame)
       // Snap to grid in frame coordinates
-      const snappedRawFramePointStart = snapPointToGrid(rawFramePointStart, 1.0)
+      snappedRawFramePointStart = snapPointToGrid(rawFramePointStart, 1.0)
       
-      // Convert both back to parent world coordinates WITHOUT viewport
-      // Bounds should represent the rectangle in parent frame coordinates, not accounting for viewport
-      // Use frameCoordsToParentWorld which does NOT apply viewport
-      startPoint = frameCoordsToParentWorld(snappedRawFramePointStart, parentFrame)
-      endPoint = frameCoordsToParentWorld(snappedRawFramePointEnd, parentFrame)
+      // Create rectangle in frame coordinates (this is the actual rectangle we want)
+      const [u1, v1] = snappedRawFramePointStart
+      const [u2, v2] = snappedRawFramePointEnd
+      const minU = Math.min(u1, u2)
+      const maxU = Math.max(u1, u2)
+      const minV = Math.min(v1, v2)
+      const maxV = Math.max(v1, v2)
+      
+      // Convert all 4 corners of the rectangle (in frame coordinates) to world coordinates
+      // With non-orthogonal base vectors, this rectangle becomes a parallelogram in world space
+      const topLeftWorld = frameCoordsToParentWorld([minU, maxV], parentFrame)
+      const topRightWorld = frameCoordsToParentWorld([maxU, maxV], parentFrame)
+      const bottomRightWorld = frameCoordsToParentWorld([maxU, minV], parentFrame)
+      const bottomLeftWorld = frameCoordsToParentWorld([minU, minV], parentFrame)
+      
+      // Take bounding box of the 4 corners in world coordinates
+      const allWorldX = [topLeftWorld[0], topRightWorld[0], bottomRightWorld[0], bottomLeftWorld[0]]
+      const allWorldY = [topLeftWorld[1], topRightWorld[1], bottomRightWorld[1], bottomLeftWorld[1]]
+      const minX = Math.min(...allWorldX)
+      const maxX = Math.max(...allWorldX)
+      const minY = Math.min(...allWorldY)
+      const maxY = Math.max(...allWorldY)
+      
+      const frameWidth = maxX - minX
+      const frameHeight = maxY - minY
+      
+      if (frameWidth > 0.1 && frameHeight > 0.1) {
+        newBounds = {
+          x: minX,
+          y: minY,
+          width: frameWidth,
+          height: frameHeight,
+          frameCoords: {
+            minU,
+            maxU,
+            minV,
+            maxV,
+          },
+        }
+      } else {
+        return
+      }
     } else {
       const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
-      endPoint = snapPointToGrid(worldPoint, viewport.gridStep)
+      const snappedWorldPoint = snapPointToGrid(worldPoint, viewport.gridStep)
+      
+      const [x1, y1] = startPoint
+      const [x2, y2] = snappedWorldPoint
+
+      const minX = Math.min(x1, x2)
+      const maxX = Math.max(x1, x2)
+      const minY = Math.min(y1, y2)
+      const maxY = Math.max(y1, y2)
+
+      const frameWidth = maxX - minX
+      const frameHeight = maxY - minY
+
+      if (frameWidth > 0.1 && frameHeight > 0.1) {
+        newBounds = {
+          x: minX,
+          y: minY,
+          width: frameWidth,
+          height: frameHeight,
+        }
+      } else {
+        return
+      }
     }
 
-    const [x1, y1] = startPoint
-    const [x2, y2] = endPoint
-
-    let minX = Math.min(x1, x2)
-    let maxX = Math.max(x1, x2)
-    let minY = Math.min(y1, y2)
-    let maxY = Math.max(y1, y2)
-
-    const frameWidth = maxX - minX
-    const frameHeight = maxY - minY
-
-    if (frameWidth > 0.1 && frameHeight > 0.1) {
+    if (newBounds) {
       const frameId = `frame-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      const newBounds: FrameBounds = {
-        x: minX,
-        y: minY,
-        width: frameWidth,
-        height: frameHeight,
-      }
 
       const parentFrameId = parentFrame?.id || null
-      const originX = minX + frameWidth / 2
-      const originY = minY + frameHeight / 2
+      // For nested frames, calculate origin in frame coordinates, then convert to world
+      let originX: number
+      let originY: number
+      
+      if (parentFrame && snappedRawFramePointStart && snappedRawFramePointEnd) {
+        // Calculate origin in frame coordinates (center of rectangle)
+        const [u1, v1] = snappedRawFramePointStart
+        const [u2, v2] = snappedRawFramePointEnd
+        const centerU = (Math.min(u1, u2) + Math.max(u1, u2)) / 2
+        const centerV = (Math.min(v1, v2) + Math.max(v1, v2)) / 2
+        // Convert to world coordinates
+        const originWorld = frameCoordsToParentWorld([centerU, centerV], parentFrame)
+        originX = originWorld[0]
+        originY = originWorld[1]
+      } else {
+        originX = newBounds.x + newBounds.width / 2
+        originY = newBounds.y + newBounds.height / 2
+      }
 
       let baseI: Point2D = [1, 0]
       let baseJ: Point2D = [0, 1]

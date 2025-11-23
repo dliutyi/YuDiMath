@@ -76,6 +76,13 @@ export interface FrameBounds {
   width: number
   /** Height of the frame */
   height: number
+  /** Frame coordinate bounds (for nested frames with non-orthogonal base vectors) */
+  frameCoords?: {
+    minU: number
+    maxU: number
+    minV: number
+    maxV: number
+  }
 }
 
 /**

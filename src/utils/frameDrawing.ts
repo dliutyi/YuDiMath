@@ -39,38 +39,83 @@ export function drawCoordinateFrame(
     // Need to account for parent's viewport (pan/zoom) and base vectors
     const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
     if (parentFrame) {
-      // Get all 4 corners in parent world coordinates
-      const cornersWorld: Point2D[] = [
-        [bounds.x, bounds.y + bounds.height], // top-left
-        [bounds.x + bounds.width, bounds.y + bounds.height], // top-right
-        [bounds.x + bounds.width, bounds.y], // bottom-right
-        [bounds.x, bounds.y], // bottom-left
-      ]
+      // DEBUG: Log parent frame info
+      console.log('[drawCoordinateFrame] Nested frame:', frame.id)
+      console.log('  Parent frame baseI:', parentFrame.baseI, 'baseJ:', parentFrame.baseJ)
+      console.log('  Parent frame viewport:', parentFrame.viewport)
+      console.log('  Bounds (parent world):', bounds)
       
-      // Transform each corner: parent world -> parent frame -> apply viewport -> back to parent world -> screen
-      cornersScreen = cornersWorld.map(cornerWorld => {
-        // Step 1: Convert parent world to parent frame coordinates (accounts for base vectors)
-        const cornerFrame = parentToFrame(cornerWorld, parentFrame)
-        
-        // Step 2: Apply parent frame's viewport pan/zoom
-        const cornerFrameWithViewport: Point2D = [
-          (cornerFrame[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom,
-          (cornerFrame[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
+      // If frameCoords are stored, use them directly (this is the rectangle in frame space)
+      // Otherwise, fall back to converting world bounds (for backwards compatibility)
+      let cornersFrame: Point2D[]
+      
+      if (bounds.frameCoords) {
+        // Use stored frame coordinates directly - this is the actual rectangle
+        const { minU, maxU, minV, maxV } = bounds.frameCoords
+        cornersFrame = [
+          [minU, maxV], // top-left
+          [maxU, maxV], // top-right
+          [maxU, minV], // bottom-right
+          [minU, minV], // bottom-left
         ]
+        console.log('  Using stored frame coordinates:', bounds.frameCoords)
+      } else {
+        // Fallback: Convert world bounds to frame coordinates (may not form perfect rectangle)
+        const topLeftWorld: Point2D = [bounds.x, bounds.y + bounds.height]
+        const topRightWorld: Point2D = [bounds.x + bounds.width, bounds.y + bounds.height]
+        const bottomRightWorld: Point2D = [bounds.x + bounds.width, bounds.y]
+        const bottomLeftWorld: Point2D = [bounds.x, bounds.y]
         
-        // Step 3: Transform back to parent world coordinates using base vectors
+        const topLeftFrame = parentToFrame(topLeftWorld, parentFrame)
+        const topRightFrame = parentToFrame(topRightWorld, parentFrame)
+        const bottomRightFrame = parentToFrame(bottomRightWorld, parentFrame)
+        const bottomLeftFrame = parentToFrame(bottomLeftWorld, parentFrame)
+        
+        cornersFrame = [topLeftFrame, topRightFrame, bottomRightFrame, bottomLeftFrame]
+        console.log('  Frame corners (converted from world, may not be perfect rectangle):')
+        console.log('    topLeftFrame:', topLeftFrame)
+        console.log('    topRightFrame:', topRightFrame)
+        console.log('    bottomRightFrame:', bottomRightFrame)
+        console.log('    bottomLeftFrame:', bottomLeftFrame)
+      }
+      
+      // Transform each corner: parent frame -> apply viewport -> screen
+      // Use frameToScreen which correctly applies viewport and transforms to screen
+      cornersScreen = cornersFrame.map((cornerFrame, idx) => {
+        
+        const cornerNames = ['top-left', 'top-right', 'bottom-right', 'bottom-left']
+        console.log(`  Corner ${idx} (${cornerNames[idx]}):`)
+        console.log('    Frame (raw):', cornerFrame)
+        
+        // Step 2: Use frameToScreen which applies viewport and transforms to screen
+        // This correctly handles: frame coords -> apply viewport -> parent world -> screen
+        const screen = frameToScreen(cornerFrame, parentFrame, viewport, canvasWidth, canvasHeight)
+        
+        // Debug: manually trace the transformation
+        const [u, v] = cornerFrame
+        const frameU = u - parentFrame.viewport.x
+        const frameV = v - parentFrame.viewport.y
+        const scaledU = frameU * parentFrame.viewport.zoom
+        const scaledV = frameV * parentFrame.viewport.zoom
         const [originX, originY] = parentFrame.origin
         const [iX, iY] = parentFrame.baseI
         const [jX, jY] = parentFrame.baseJ
+        const parentX = originX + scaledU * iX + scaledV * jX
+        const parentY = originY + scaledU * iY + scaledV * jY
+        const centerX = canvasWidth / 2
+        const centerY = canvasHeight / 2
+        const screenX = centerX + (parentX - viewport.x) * viewport.zoom
+        const screenY = centerY - (parentY - viewport.y) * viewport.zoom
+        console.log('    After pan:', [frameU, frameV])
+        console.log('    After zoom:', [scaledU, scaledV])
+        console.log('    Parent world:', [parentX, parentY])
+        console.log('    Screen (manual):', [screenX, screenY])
+        console.log('    Screen (frameToScreen):', screen)
         
-        const cornerParentWorldWithViewport: Point2D = [
-          originX + cornerFrameWithViewport[0] * iX + cornerFrameWithViewport[1] * jX,
-          originY + cornerFrameWithViewport[0] * iY + cornerFrameWithViewport[1] * jY
-        ]
-        
-        // Step 4: Transform to screen using root viewport
-        return worldToScreen(cornerParentWorldWithViewport[0], cornerParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
+        return screen
       })
+      
+      console.log('  All corners screen:', cornersScreen)
       
       // Calculate bounding box of transformed corners for clipping
       let minScreenX = Infinity

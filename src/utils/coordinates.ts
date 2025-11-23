@@ -190,3 +190,26 @@ export function isPointInFrame(point: Point2D, bounds: FrameBounds): boolean {
   )
 }
 
+/**
+ * Check if a point is inside a polygon using ray casting algorithm
+ * @param point Point to check [x, y]
+ * @param polygon Array of polygon vertices in order (should form a closed polygon)
+ * @returns true if point is inside the polygon
+ */
+export function isPointInPolygon(point: Point2D, polygon: Point2D[]): boolean {
+  const [x, y] = point
+  let inside = false
+  
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i]
+    const [xj, yj] = polygon[j]
+    
+    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)
+    if (intersect) {
+      inside = !inside
+    }
+  }
+  
+  return inside
+}
+
