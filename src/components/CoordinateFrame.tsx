@@ -262,7 +262,7 @@ function nestedFrameToScreen(
  * Inverse of frameToParent (without viewport pan/zoom)
  * This is used for converting world coordinates to frame coordinates for rendering
  */
-export function parentToFrame(point: Point2D, frame: CoordinateFrame): Point2D {
+export export function parentToFrame(point: Point2D, frame: CoordinateFrame): Point2D {
   const [px, py] = point
   const [originX, originY] = frame.origin
   const [iX, iY] = frame.baseI
@@ -445,12 +445,8 @@ export function drawCoordinateFrame(
   // Draw base j vector (blue) as arrow
   drawArrow(ctx, originScreen, baseJEndScreen, '#3b82f6', 2, 8)
   
-  // Restore context state (removes clip)
-  ctx.restore()
-
-  // Restore context state (removes clip) before drawing children
-  // Children will set up their own clipping
-  ctx.restore()
+  // Note: We don't restore context here - we restore it after drawing children
+  // This ensures children are clipped to this frame's bounds
   
   // Recursively draw child frames with incremented nesting level
   // Each child frame will set up its own clipping (including clipping to this frame's bounds)
