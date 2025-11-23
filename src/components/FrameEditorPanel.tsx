@@ -14,6 +14,7 @@ interface FrameEditorPanelProps {
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
   autoExecuteCode?: string | null
+  onFrameDelete?: (frameId: string) => void
 }
 
 type TabType = 'properties' | 'code'
@@ -29,6 +30,7 @@ export default function FrameEditorPanel({
   onVectorsClear,
   onFunctionsClear,
   autoExecuteCode,
+  onFrameDelete,
 }: FrameEditorPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('properties')
 
@@ -73,6 +75,7 @@ export default function FrameEditorPanel({
             onFrameUpdate={onFrameUpdate}
             onFrameViewportChange={onFrameViewportChange}
             onCodeRun={onCodeRun}
+            onFrameDelete={onFrameDelete}
           />
         ) : (
           <CodePanel

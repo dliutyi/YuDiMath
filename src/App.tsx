@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { flushSync } from 'react-dom'
 import Canvas from './components/Canvas'
 import Toolbar from './components/Toolbar'
@@ -281,6 +281,35 @@ function App() {
     }
   }
 
+  const handleFrameDelete = useCallback((frameId: string) => {
+    workspace.removeFrame(frameId)
+  }, [workspace])
+
+  // Handle Delete key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle Delete key if no input/textarea is focused
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const activeElement = document.activeElement
+        const isInputFocused = 
+          activeElement instanceof HTMLInputElement ||
+          activeElement instanceof HTMLTextAreaElement ||
+          activeElement?.tagName === 'INPUT' ||
+          activeElement?.tagName === 'TEXTAREA'
+        
+        if (!isInputFocused && workspace.selectedFrameId) {
+          e.preventDefault()
+          handleFrameDelete(workspace.selectedFrameId)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [workspace.selectedFrameId, handleFrameDelete])
+
   return (
     <div className="h-full bg-bg-primary text-text-primary relative overflow-hidden">
       <LoadingOverlay />
@@ -349,6 +378,7 @@ function App() {
           onVectorsClear={handleVectorsClear}
           onFunctionsClear={handleFunctionsClear}
           autoExecuteCode={autoExecuteCode}
+          onFrameDelete={handleFrameDelete}
         />
       </div>
       {/* Modal */}

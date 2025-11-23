@@ -878,7 +878,7 @@ For each step:
 
 ---
 
-### [ ] Step 7.2: Implement Frame Deletion
+### [x] Step 7.2: Implement Frame Deletion
 **Task**: Allow users to delete selected frames.
 
 **Implementation**:

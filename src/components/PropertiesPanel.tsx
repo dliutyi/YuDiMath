@@ -8,6 +8,7 @@ interface PropertiesPanelProps {
   onFrameUpdate: (frameId: string, updates: Partial<CoordinateFrame>) => void
   onFrameViewportChange?: (frameId: string, viewport: ViewportState) => void
   onCodeRun?: (frameId: string, code: string) => void
+  onFrameDelete?: (frameId: string) => void
 }
 
 export default function PropertiesPanel({
@@ -15,6 +16,7 @@ export default function PropertiesPanel({
   onFrameUpdate,
   onFrameViewportChange,
   onCodeRun,
+  onFrameDelete,
 }: PropertiesPanelProps) {
   const [originX, setOriginX] = useState<string>('0')
   const [originY, setOriginY] = useState<string>('0')
@@ -207,9 +209,38 @@ export default function PropertiesPanel({
     degenerateColor = 'text-orange-500'
   }
 
+  const handleDelete = () => {
+    if (selectedFrame && onFrameDelete) {
+      onFrameDelete(selectedFrame.id)
+    }
+  }
+
   return (
     <div className="h-full px-4 pt-4 pb-0 flex flex-col min-h-0">
-      <h2 className="text-lg font-semibold text-text-primary mb-4 flex-shrink-0">Frame Properties</h2>
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <h2 className="text-lg font-semibold text-text-primary">Frame Properties</h2>
+        {onFrameDelete && selectedFrame && (
+          <button
+            onClick={handleDelete}
+            className="px-3 py-1.5 text-sm font-medium text-red-500 hover:text-red-600 hover:bg-red-500/20 border border-red-500/50 hover:border-red-500 rounded-lg transition-all duration-200"
+            title="Delete Frame (Delete key)"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-4 h-4"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
+        )}
+      </div>
       
       {degenerateStatus && (
         <div className={`mb-4 p-3 bg-warning/20 border border-warning/50 rounded text-sm font-medium ${degenerateColor} flex-shrink-0`}>
