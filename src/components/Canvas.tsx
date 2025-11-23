@@ -679,11 +679,15 @@ export default function Canvas({
       }
 
       console.log('[Canvas] End point:', endPoint, 'start:', drawingRect.start)
+      console.log('[Canvas] Parent frame:', drawingRect.parentFrame?.id, 'bounds:', drawingRect.parentFrame?.bounds)
+      console.log('[Canvas] Parent frame origin:', drawingRect.parentFrame?.origin)
 
       if (onFrameCreated) {
         // Finalize rectangle and create frame
         const [x1, y1] = drawingRect.start
         const [x2, y2] = endPoint
+        
+        console.log('[Canvas] Creating frame with bounds - x1:', x1, 'y1:', y1, 'x2:', x2, 'y2:', y2)
         
         // Calculate bounds (ensure positive width and height)
         let minX = Math.min(x1, x2)
