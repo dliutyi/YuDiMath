@@ -136,7 +136,7 @@ export default function Canvas({
       
       if (parentFrame) {
         // For nested frames, bounds are in parent world coordinates
-        // Transform all 4 corners directly to screen
+        // Need to account for parent's viewport (pan/zoom) and base vectors
         const cornersWorld: Point2D[] = [
           [minX, maxY], // top-left
           [maxX, maxY], // top-right
@@ -144,10 +144,30 @@ export default function Canvas({
           [minX, minY], // bottom-left
         ]
         
-        // Transform each corner directly from parent world to screen
-        const cornersScreen: Point2D[] = cornersWorld.map(cornerWorld => 
-          worldToScreen(cornerWorld[0], cornerWorld[1], viewport, canvasWidth, canvasHeight)
-        )
+        // Transform each corner: parent world -> parent frame -> apply viewport -> back to parent world -> screen
+        const cornersScreen: Point2D[] = cornersWorld.map(cornerWorld => {
+          // Step 1: Convert parent world to parent frame coordinates (accounts for base vectors)
+          const cornerFrame = parentToFrame(cornerWorld, parentFrame)
+          
+          // Step 2: Apply parent frame's viewport pan/zoom
+          const cornerFrameWithViewport: Point2D = [
+            (cornerFrame[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom,
+            (cornerFrame[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
+          ]
+          
+          // Step 3: Transform back to parent world coordinates using base vectors
+          const [originX, originY] = parentFrame.origin
+          const [iX, iY] = parentFrame.baseI
+          const [jX, jY] = parentFrame.baseJ
+          
+          const cornerParentWorldWithViewport: Point2D = [
+            originX + cornerFrameWithViewport[0] * iX + cornerFrameWithViewport[1] * jX,
+            originY + cornerFrameWithViewport[0] * iY + cornerFrameWithViewport[1] * jY
+          ]
+          
+          // Step 4: Transform to screen using root viewport
+          return worldToScreen(cornerParentWorldWithViewport[0], cornerParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
+        })
         
         // Draw parallelogram outline using all 4 corners
         ctx.strokeStyle = '#3b82f6' // primary color
