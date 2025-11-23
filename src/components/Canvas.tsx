@@ -688,38 +688,14 @@ export default function Canvas({
         const rawFramePointEnd = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
         const snappedRawFramePointEnd = snapPointToGrid(rawFramePointEnd, 1.0)
         
-        // Convert startPoint (which is in parent world coords) to raw frame coords for clamping
+        // Convert startPoint (which is in parent world coords) to raw frame coords
         const rawFramePointStart = parentToFrame(startPoint, parentFrame)
         const snappedRawFramePointStart = snapPointToGrid(rawFramePointStart, 1.0)
         
-        // Clamp raw frame coordinates to parent frame bounds in frame coordinate space
-        const parentBounds = parentFrame.bounds
-        const bottomLeftWorld: Point2D = [parentBounds.x, parentBounds.y]
-        const topRightWorld: Point2D = [parentBounds.x + parentBounds.width, parentBounds.y + parentBounds.height]
-        const bottomLeftFrame = parentToFrame(bottomLeftWorld, parentFrame)
-        const topRightFrame = parentToFrame(topRightWorld, parentFrame)
-        const minU = Math.min(bottomLeftFrame[0], topRightFrame[0])
-        const maxU = Math.max(bottomLeftFrame[0], topRightFrame[0])
-        const minV = Math.min(bottomLeftFrame[1], topRightFrame[1])
-        const maxV = Math.max(bottomLeftFrame[1], topRightFrame[1])
-        
-        // Clamp both start and end points to frame bounds
-        const clampedStart: Point2D = [
-          Math.max(minU, Math.min(maxU, snappedRawFramePointStart[0])),
-          Math.max(minV, Math.min(maxV, snappedRawFramePointStart[1]))
-        ]
-        const clampedEnd: Point2D = [
-          Math.max(minU, Math.min(maxU, snappedRawFramePointEnd[0])),
-          Math.max(minV, Math.min(maxV, snappedRawFramePointEnd[1]))
-        ]
-        
-        // Convert back to parent world coordinates
-        const clampedStartWorld = frameCoordsToParentWorld(clampedStart, parentFrame)
-        const clampedEndWorld = frameCoordsToParentWorld(clampedEnd, parentFrame)
-        
-        // Update both points to use clamped values for consistency
-        startPoint = clampedStartWorld
-        endPoint = clampedEndWorld
+        // Convert back to parent world coordinates (don't clamp here - clamp bounds later)
+        // This ensures we preserve the actual drawing area
+        startPoint = frameCoordsToParentWorld(snappedRawFramePointStart, parentFrame)
+        endPoint = frameCoordsToParentWorld(snappedRawFramePointEnd, parentFrame)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
@@ -741,12 +717,29 @@ export default function Canvas({
         let maxY = Math.max(y1, y2)
         
         // If drawing inside a parent frame, constrain bounds to stay within parent
+        // But ensure we still have valid bounds after clamping
         if (parentFrame) {
           const parentBounds = parentFrame.bounds
+          const originalMinX = minX
+          const originalMaxX = maxX
+          const originalMinY = minY
+          const originalMaxY = maxY
+          
           minX = Math.max(parentBounds.x, minX)
           maxX = Math.min(parentBounds.x + parentBounds.width, maxX)
           minY = Math.max(parentBounds.y, minY)
           maxY = Math.min(parentBounds.y + parentBounds.height, maxY)
+          
+          // If clamping resulted in invalid bounds, use the original bounds
+          // This allows frames to be created even if partially outside parent
+          if (maxX <= minX) {
+            minX = originalMinX
+            maxX = originalMaxX
+          }
+          if (maxY <= minY) {
+            minY = originalMinY
+            maxY = originalMaxY
+          }
         }
         
         const frameWidth = maxX - minX
