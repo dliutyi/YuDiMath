@@ -130,9 +130,11 @@ export default function Canvas({
         // Convert parent world coordinates to parent frame coordinates (raw)
         const topLeftWorld: Point2D = [minX, maxY]
         const bottomRightWorld: Point2D = [maxX, minY]
+        console.error('[Canvas] DRAWING RECT RENDER - bounds (parent world):', {minX, maxX, minY, maxY}, 'topLeftWorld:', topLeftWorld, 'bottomRightWorld:', bottomRightWorld)
         
         const topLeftFrame = parentToFrame(topLeftWorld, drawingRect.parentFrame)
         const bottomRightFrame = parentToFrame(bottomRightWorld, drawingRect.parentFrame)
+        console.error('[Canvas] DRAWING RECT RENDER - parent frame coords - topLeft:', topLeftFrame, 'bottomRight:', bottomRightFrame, 'parent viewport:', drawingRect.parentFrame.viewport)
         
         // Apply parent frame's viewport transformation
         const topLeftFrameWithViewport: Point2D = [
@@ -143,6 +145,7 @@ export default function Canvas({
           (bottomRightFrame[0] - drawingRect.parentFrame.viewport.x) * drawingRect.parentFrame.viewport.zoom,
           (bottomRightFrame[1] - drawingRect.parentFrame.viewport.y) * drawingRect.parentFrame.viewport.zoom
         ]
+        console.error('[Canvas] DRAWING RECT RENDER - after viewport - topLeft:', topLeftFrameWithViewport, 'bottomRight:', bottomRightFrameWithViewport)
         
         // Transform back to parent world coordinates using base vectors
         const [originX, originY] = drawingRect.parentFrame.origin
@@ -157,10 +160,12 @@ export default function Canvas({
           originX + bottomRightFrameWithViewport[0] * iX + bottomRightFrameWithViewport[1] * jX,
           originY + bottomRightFrameWithViewport[0] * iY + bottomRightFrameWithViewport[1] * jY
         ]
+        console.error('[Canvas] DRAWING RECT RENDER - parent world with viewport - topLeft:', topLeftParentWorldWithViewport, 'bottomRight:', bottomRightParentWorldWithViewport)
         
         // Transform to screen using root viewport
         topLeft = worldToScreen(topLeftParentWorldWithViewport[0], topLeftParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
         bottomRight = worldToScreen(bottomRightParentWorldWithViewport[0], bottomRightParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
+        console.error('[Canvas] DRAWING RECT RENDER - screen coords - topLeft:', topLeft, 'bottomRight:', bottomRight)
       } else {
         topLeft = worldToScreen(minX, maxY, viewport, canvasWidth, canvasHeight)
         bottomRight = worldToScreen(maxX, minY, viewport, canvasWidth, canvasHeight)
