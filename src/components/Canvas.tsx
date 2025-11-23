@@ -135,62 +135,73 @@ export default function Canvas({
         : null
       
       if (parentFrame) {
-        // For nested frames, use the same transformation as nested frame bounds rendering
-        // Convert parent world coordinates to parent frame coordinates (raw)
-        const topLeftWorld: Point2D = [minX, maxY]
-        const bottomRightWorld: Point2D = [maxX, minY]
-        
-        const topLeftFrame = parentToFrame(topLeftWorld, parentFrame)
-        const bottomRightFrame = parentToFrame(bottomRightWorld, parentFrame)
-        
-        // Apply parent frame's viewport transformation
-        const topLeftFrameWithViewport: Point2D = [
-          (topLeftFrame[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom,
-          (topLeftFrame[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
-        ]
-        const bottomRightFrameWithViewport: Point2D = [
-          (bottomRightFrame[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom,
-          (bottomRightFrame[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
+        // For nested frames with non-standard base vectors, we need to transform all 4 corners
+        // because the coordinate space is distorted (parallelogram, not rectangle)
+        const cornersWorld: Point2D[] = [
+          [minX, maxY], // top-left
+          [maxX, maxY], // top-right
+          [maxX, minY], // bottom-right
+          [minX, minY], // bottom-left
         ]
         
-        // Transform back to parent world coordinates using base vectors
-        const [originX, originY] = parentFrame.origin
-        const [iX, iY] = parentFrame.baseI
-        const [jX, jY] = parentFrame.baseJ
+        // Transform each corner through parent frame coordinate system
+        const cornersScreen: Point2D[] = cornersWorld.map(cornerWorld => {
+          // Convert parent world coordinates to parent frame coordinates (raw)
+          const cornerFrame = parentToFrame(cornerWorld, parentFrame)
+          
+          // Apply parent frame's viewport transformation
+          const cornerFrameWithViewport: Point2D = [
+            (cornerFrame[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom,
+            (cornerFrame[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
+          ]
+          
+          // Transform back to parent world coordinates using base vectors
+          const [originX, originY] = parentFrame.origin
+          const [iX, iY] = parentFrame.baseI
+          const [jX, jY] = parentFrame.baseJ
+          
+          const cornerParentWorldWithViewport: Point2D = [
+            originX + cornerFrameWithViewport[0] * iX + cornerFrameWithViewport[1] * jX,
+            originY + cornerFrameWithViewport[0] * iY + cornerFrameWithViewport[1] * jY
+          ]
+          
+          // Transform to screen using root viewport
+          return worldToScreen(cornerParentWorldWithViewport[0], cornerParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
+        })
         
-        const topLeftParentWorldWithViewport: Point2D = [
-          originX + topLeftFrameWithViewport[0] * iX + topLeftFrameWithViewport[1] * jX,
-          originY + topLeftFrameWithViewport[0] * iY + topLeftFrameWithViewport[1] * jY
-        ]
-        const bottomRightParentWorldWithViewport: Point2D = [
-          originX + bottomRightFrameWithViewport[0] * iX + bottomRightFrameWithViewport[1] * jX,
-          originY + bottomRightFrameWithViewport[0] * iY + bottomRightFrameWithViewport[1] * jY
-        ]
-        
-        // Transform to screen using root viewport
-        topLeft = worldToScreen(topLeftParentWorldWithViewport[0], topLeftParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
-        bottomRight = worldToScreen(bottomRightParentWorldWithViewport[0], bottomRightParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
+        // Draw parallelogram outline using all 4 corners
+        ctx.strokeStyle = '#3b82f6' // primary color
+        ctx.lineWidth = 2
+        ctx.setLineDash([5, 5]) // Dashed line for drawing state
+        ctx.beginPath()
+        ctx.moveTo(Math.round(cornersScreen[0][0]) + 0.5, Math.round(cornersScreen[0][1]) + 0.5)
+        for (let i = 1; i < cornersScreen.length; i++) {
+          ctx.lineTo(Math.round(cornersScreen[i][0]) + 0.5, Math.round(cornersScreen[i][1]) + 0.5)
+        }
+        ctx.closePath()
+        ctx.stroke()
+        ctx.setLineDash([]) // Reset line dash
       } else {
         topLeft = worldToScreen(minX, maxY, viewport, canvasWidth, canvasHeight)
         bottomRight = worldToScreen(maxX, minY, viewport, canvasWidth, canvasHeight)
+        
+        const screenWidth = bottomRight[0] - topLeft[0]
+        const screenHeight = bottomRight[1] - topLeft[1]
+
+        // Draw rectangle outline
+        ctx.strokeStyle = '#3b82f6' // primary color
+        ctx.lineWidth = 2
+        ctx.setLineDash([5, 5]) // Dashed line for drawing state
+        ctx.beginPath()
+        ctx.rect(
+          Math.round(topLeft[0]) + 0.5,
+          Math.round(topLeft[1]) + 0.5,
+          screenWidth,
+          screenHeight
+        )
+        ctx.stroke()
+        ctx.setLineDash([]) // Reset line dash
       }
-
-      const screenWidth = bottomRight[0] - topLeft[0]
-      const screenHeight = bottomRight[1] - topLeft[1]
-
-      // Draw rectangle outline
-      ctx.strokeStyle = '#3b82f6' // primary color
-      ctx.lineWidth = 2
-      ctx.setLineDash([5, 5]) // Dashed line for drawing state
-      ctx.beginPath()
-      ctx.rect(
-        Math.round(topLeft[0]) + 0.5,
-        Math.round(topLeft[1]) + 0.5,
-        screenWidth,
-        screenHeight
-      )
-      ctx.stroke()
-      ctx.setLineDash([]) // Reset line dash
     }
 
   }, [viewport, width, height, frames, selectedFrameId, drawingRect])

@@ -67,7 +67,10 @@ describe('CoordinateFrame', () => {
     drawCoordinateFrame(mockContext, defaultFrame, defaultViewport, 800, 600, [])
     
     expect(mockContext.beginPath).toHaveBeenCalled()
-    expect(mockContext.rect).toHaveBeenCalled()
+    // For top-level frames, we use moveTo/lineTo to draw the border (even though it's a rectangle)
+    expect(mockContext.moveTo).toHaveBeenCalled()
+    expect(mockContext.lineTo).toHaveBeenCalled()
+    expect(mockContext.closePath).toHaveBeenCalled()
     expect(mockContext.stroke).toHaveBeenCalled()
   })
 
