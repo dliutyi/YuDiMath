@@ -684,18 +684,15 @@ export default function Canvas({
       let endPoint: Point2D
       
       if (parentFrame) {
-        // Recalculate both start and end points to ensure they're both clamped consistently
-        // This ensures the frame is created with correct bounds
+        // Recalculate end point using screenToFrame which correctly accounts for parent viewport
         const rawFramePointEnd = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
         const snappedRawFramePointEnd = snapPointToGrid(rawFramePointEnd, 1.0)
         
-        // Also recalculate start point to ensure consistency
-        // Convert startPoint (which is in parent world coords) back to raw frame coords
+        // Convert startPoint (which is in parent world coords) to raw frame coords for clamping
         const rawFramePointStart = parentToFrame(startPoint, parentFrame)
         const snappedRawFramePointStart = snapPointToGrid(rawFramePointStart, 1.0)
         
         // Clamp raw frame coordinates to parent frame bounds in frame coordinate space
-        // Convert parent bounds corners to frame coordinates
         const parentBounds = parentFrame.bounds
         const bottomLeftWorld: Point2D = [parentBounds.x, parentBounds.y]
         const topRightWorld: Point2D = [parentBounds.x + parentBounds.width, parentBounds.y + parentBounds.height]
@@ -720,7 +717,7 @@ export default function Canvas({
         const clampedStartWorld = frameCoordsToParentWorld(clampedStart, parentFrame)
         const clampedEndWorld = frameCoordsToParentWorld(clampedEnd, parentFrame)
         
-        // Update startPoint and endPoint to use clamped values
+        // Update both points to use clamped values for consistency
         startPoint = clampedStartWorld
         endPoint = clampedEndWorld
       } else {

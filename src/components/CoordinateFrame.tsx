@@ -332,10 +332,6 @@ export function drawCoordinateFrame(
       const topLeftParentWorld: Point2D = [bounds.x, bounds.y + bounds.height]
       const bottomRightParentWorld: Point2D = [bounds.x + bounds.width, bounds.y]
       
-      console.error('[CoordinateFrame] Rendering nested frame - bounds in parent world:', bounds)
-      console.error('[CoordinateFrame] topLeftParentWorld:', topLeftParentWorld, 'bottomRightParentWorld:', bottomRightParentWorld)
-      console.error('[CoordinateFrame] parentFrame origin:', parentFrame.origin, 'viewport:', parentFrame.viewport)
-      
       // Bounds are in parent's world coordinates
       // To render them, we need to account for the parent frame's viewport
       // The parent frame's viewport affects how coordinates inside it are displayed
@@ -374,11 +370,6 @@ export function drawCoordinateFrame(
       // Transform to screen using root viewport
       topLeft = worldToScreen(topLeftParentWorldWithViewport[0], topLeftParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
       bottomRight = worldToScreen(bottomRightParentWorldWithViewport[0], bottomRightParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
-      
-      console.error('[CoordinateFrame] topLeftParentFrame:', topLeftParentFrame, 'bottomRightParentFrame:', bottomRightParentFrame)
-      console.error('[CoordinateFrame] topLeftFrameWithViewport:', topLeftFrameWithViewport, 'bottomRightFrameWithViewport:', bottomRightFrameWithViewport)
-      console.error('[CoordinateFrame] topLeftParentWorldWithViewport:', topLeftParentWorldWithViewport, 'bottomRightParentWorldWithViewport:', bottomRightParentWorldWithViewport)
-      console.error('[CoordinateFrame] topLeft screen:', topLeft, 'bottomRight screen:', bottomRight)
     } else {
       // Parent not found, fall back to direct transformation
       topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
