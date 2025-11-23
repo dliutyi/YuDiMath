@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import Canvas from './components/Canvas'
 import GridStepSelector from './components/GridStepSelector'
@@ -7,12 +7,14 @@ import LoadingOverlay from './components/LoadingOverlay'
 import { generateCode } from './utils/codeGenerator'
 import { usePyScript } from './hooks/usePyScript'
 import { useWorkspace } from './hooks/useWorkspace'
-import type { ViewportState, CoordinateFrame, Vector, FunctionPlot } from './types'
+import { downloadWorkspace, importWorkspaceFromFile } from './utils/exportImport'
+import type { ViewportState, CoordinateFrame, Vector, FunctionPlot, WorkspaceState } from './types'
 
 function App() {
   const workspace = useWorkspace({ persist: true })
   const [isDrawing, setIsDrawing] = useState(false)
   const { isReady, executeCode, isExecuting } = usePyScript()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleGridStepChange = (gridStep: number) => {
     workspace.updateViewport({ gridStep })
@@ -174,6 +176,58 @@ function App() {
     setAutoExecuteFrameId(null)
   }
 
+  const handleExportWorkspace = () => {
+    const workspaceState: WorkspaceState = {
+      viewport: workspace.viewport,
+      frames: workspace.frames,
+      selectedFrameId: workspace.selectedFrameId,
+    }
+    downloadWorkspace(workspaceState)
+  }
+
+  const handleImportWorkspace = async (file: File) => {
+    const imported = await importWorkspaceFromFile(file)
+    if (!imported) {
+      alert('Failed to import workspace. The file may be invalid or corrupted.')
+      return
+    }
+
+    // Ask user if they want to replace or merge
+    const replace = window.confirm(
+      'Import workspace?\n\n' +
+      'OK = Replace current workspace\n' +
+      'Cancel = Merge with current workspace'
+    )
+
+    if (replace) {
+      // Replace: set the entire workspace state
+      workspace.setWorkspace(imported)
+    } else {
+      // Merge: add imported frames to existing ones, update viewport if needed
+      const mergedFrames = [...workspace.frames, ...imported.frames]
+      workspace.setWorkspace({
+        viewport: imported.viewport, // Use imported viewport
+        frames: mergedFrames,
+        selectedFrameId: imported.selectedFrameId || workspace.selectedFrameId,
+      })
+    }
+  }
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      await handleImportWorkspace(file)
+      // Reset input so same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
   return (
     <div className="h-full bg-bg-primary text-text-primary relative overflow-hidden">
       <LoadingOverlay />
@@ -199,12 +253,132 @@ function App() {
           onGridStepChange={handleGridStepChange}
         />
       </div>
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
       {/* Tools panel on middle left */}
       <div className="absolute top-1/2 left-4 -translate-y-1/2 z-10">
         <div className="bg-panel-bg/95 backdrop-blur-md border border-border/50 rounded-xl shadow-2xl p-3 flex flex-col gap-3">
           <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-2 pb-1 border-b border-border/50 mb-1">
             Tools
           </div>
+          <button
+            onClick={(e) => {
+              if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur()
+              }
+              e.currentTarget.blur()
+              handleExportWorkspace()
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.classList.add('active-touch')
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.classList.remove('active-touch')
+              e.currentTarget.blur()
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.classList.remove('active-touch')
+              e.currentTarget.blur()
+            }}
+            onTouchStart={(e) => {
+              e.currentTarget.classList.add('active-touch')
+            }}
+            onTouchEnd={(e) => {
+              e.currentTarget.blur()
+              if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur()
+              }
+              setTimeout(() => {
+                e.currentTarget.classList.remove('active-touch')
+              }, 150)
+            }}
+            className="relative px-4 py-3 rounded-lg transition-all duration-200 group touch-manipulation bg-bg-primary/50 border border-border/50 text-text-primary hover:bg-primary/20 hover:border-primary/50 hover:shadow-md"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+            title="Export Workspace"
+          >
+            {/* Export/Download icon */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-5 h-5"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            {/* Tooltip */}
+            <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900/95 backdrop-blur-sm text-white text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-700/50 z-20">
+              Export Workspace
+              <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900/95"></span>
+            </span>
+          </button>
+          <button
+            onClick={(e) => {
+              if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur()
+              }
+              e.currentTarget.blur()
+              handleImportClick()
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.classList.add('active-touch')
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.classList.remove('active-touch')
+              e.currentTarget.blur()
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.classList.remove('active-touch')
+              e.currentTarget.blur()
+            }}
+            onTouchStart={(e) => {
+              e.currentTarget.classList.add('active-touch')
+            }}
+            onTouchEnd={(e) => {
+              e.currentTarget.blur()
+              if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur()
+              }
+              setTimeout(() => {
+                e.currentTarget.classList.remove('active-touch')
+              }, 150)
+            }}
+            className="relative px-4 py-3 rounded-lg transition-all duration-200 group touch-manipulation bg-bg-primary/50 border border-border/50 text-text-primary hover:bg-primary/20 hover:border-primary/50 hover:shadow-md"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+            title="Import Workspace"
+          >
+            {/* Import/Upload icon */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-5 h-5"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            {/* Tooltip */}
+            <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900/95 backdrop-blur-sm text-white text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-700/50 z-20">
+              Import Workspace
+              <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900/95"></span>
+            </span>
+          </button>
           <button
             onClick={(e) => {
               if (document.activeElement instanceof HTMLElement) {
