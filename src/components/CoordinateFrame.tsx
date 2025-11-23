@@ -328,17 +328,20 @@ export function drawCoordinateFrame(
       console.error('[CoordinateFrame] topLeftParentWorld:', topLeftParentWorld, 'bottomRightParentWorld:', bottomRightParentWorld)
       console.error('[CoordinateFrame] parentFrame origin:', parentFrame.origin, 'viewport:', parentFrame.viewport)
       
-      // Convert to parent frame coordinates, then transform through parent frame to screen
+      // Bounds are in parent's world coordinates
+      // We need to transform them through the parent frame's viewport to screen
+      // The parent frame's viewport affects how the parent world coordinates are displayed
+      // So we convert to parent frame coordinates (accounting for viewport), then to screen
+      
+      // Convert parent world coordinates to parent frame coordinates
+      // This gives us the raw frame coordinates
       const topLeftParentFrame = parentToFrame(topLeftParentWorld, parentFrame)
       const bottomRightParentFrame = parentToFrame(bottomRightParentWorld, parentFrame)
       
-      console.error('[CoordinateFrame] topLeftParentFrame:', topLeftParentFrame, 'bottomRightParentFrame:', bottomRightParentFrame)
-      
-      // Transform through parent frame to screen (applies parent's viewport)
+      // Now transform through parent frame's viewport to screen
+      // frameToScreen applies the parent frame's viewport and transforms to screen
       topLeft = frameToScreen(topLeftParentFrame, parentFrame, viewport, canvasWidth, canvasHeight)
       bottomRight = frameToScreen(bottomRightParentFrame, parentFrame, viewport, canvasWidth, canvasHeight)
-      
-      console.error('[CoordinateFrame] topLeft screen:', topLeft, 'bottomRight screen:', bottomRight)
     } else {
       // Parent not found, fall back to direct transformation
       topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
