@@ -41,18 +41,23 @@ function frameToScreen(
   const frameU = u - frameViewport.x
   const frameV = v - frameViewport.y
   
+  // Apply frame zoom to scale the frame coordinate space
+  // Frame zoom is independent of parent zoom - it only affects the frame's internal coordinate system
+  // Higher zoom = see less space = more detail (1 unit in frame coordinates takes more pixels)
+  const scaledU = frameU * frameViewport.zoom
+  const scaledV = frameV * frameViewport.zoom
+  
   // Transform to parent coordinates using base vectors
   // Base vectors define the coordinate system, so we use them as-is
-  const parentX = originX + frameU * iX + frameV * jX
-  const parentY = originY + frameU * iY + frameV * jY
+  const parentX = originX + scaledU * iX + scaledV * jX
+  const parentY = originY + scaledU * iY + scaledV * jY
   
   // Transform to screen coordinates using parent viewport
-  // Apply frame zoom here: it scales how much of the frame coordinate space is visible
-  // Higher zoom = see less space = more detail (base vectors appear larger on screen)
+  // Parent zoom only affects frame position on screen, not frame content (which is already scaled by frame zoom)
   const centerX = canvasWidth / 2
   const centerY = canvasHeight / 2
-  const screenX = centerX + (parentX - parentViewport.x) * parentViewport.zoom * frameViewport.zoom
-  const screenY = centerY - (parentY - parentViewport.y) * parentViewport.zoom * frameViewport.zoom
+  const screenX = centerX + (parentX - parentViewport.x) * parentViewport.zoom
+  const screenY = centerY - (parentY - parentViewport.y) * parentViewport.zoom
   
   return [screenX, screenY]
 }

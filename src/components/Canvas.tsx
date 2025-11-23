@@ -268,7 +268,7 @@ export default function Canvas({
         // Frame zoom should be independent of parent zoom
         const FRAME_MIN_ZOOM = 0.1  // 10x zoomed out
         const FRAME_MAX_ZOOM = 10.0 // 10x zoomed in
-        const FRAME_ZOOM_SENSITIVITY = 0.01 // More sensitive for relative zoom
+        const FRAME_ZOOM_SENSITIVITY = 0.005 // Lower sensitivity for smoother zoom
         
         // Calculate new zoom level using multiplicative zoom (more natural)
         // Use exponential scaling: zoomDelta = e^(sensitivity * deltaY)
