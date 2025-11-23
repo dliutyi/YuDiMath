@@ -389,26 +389,124 @@ function drawFrameAxes(
   const topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
   const bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
 
-  const frameScreenWidth = bottomRight[0] - topLeft[0]
-  const frameScreenHeight = bottomRight[1] - topLeft[1]
-
   const frameZoom = frameViewport.zoom
   const framePanX = frameViewport.x
   const framePanY = frameViewport.y
-  const parentZoom = viewport.zoom
+
+  // Use the same approach as drawFrameGrid to calculate visible frame coordinate range
+  // Sample multiple points along the frame bounds and transform them to frame coordinates
+  const samplePoints: Point2D[] = [
+    topLeft,
+    [bottomRight[0], topLeft[1]], // top-right
+    bottomRight,
+    [topLeft[0], bottomRight[1]], // bottom-left
+    [(topLeft[0] + bottomRight[0]) / 2, topLeft[1]], // top-mid
+    [(topLeft[0] + bottomRight[0]) / 2, bottomRight[1]], // bottom-mid
+    [topLeft[0], (topLeft[1] + bottomRight[1]) / 2], // left-mid
+    [bottomRight[0], (topLeft[1] + bottomRight[1]) / 2], // right-mid
+  ]
   
-  // Estimate visible frame coordinate range (same approach as grid drawing)
-  const estimatedFrameUnitsWidth = frameScreenWidth / (frameZoom * parentZoom)
-  const estimatedFrameUnitsHeight = frameScreenHeight / (frameZoom * parentZoom)
+  let minU = Infinity
+  let maxU = -Infinity
+  let minV = Infinity
+  let maxV = -Infinity
+
+  // Transform each sample point to frame coordinates
+  for (const screenPoint of samplePoints) {
+    let pointInFrameCoords: Point2D
+    
+    if (frame.parentFrameId) {
+      // For nested frames, transform through parent chain
+      const worldPoint = screenToWorld(screenPoint[0], screenPoint[1], viewport, canvasWidth, canvasHeight)
+      const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
+      
+      if (parentFrame) {
+        // Transform world -> parent frame coords (raw, no viewport)
+        const parentFrameCoordsRaw = parentToFrame(worldPoint, parentFrame)
+        
+        // Apply parent frame viewport to get visible parent frame coords
+        const parentFrameU = (parentFrameCoordsRaw[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom
+        const parentFrameV = (parentFrameCoordsRaw[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
+        
+        // Transform parent frame coords back to parent world
+        const [parentOriginX, parentOriginY] = parentFrame.origin
+        const [parentIX, parentIY] = parentFrame.baseI
+        const [parentJX, parentJY] = parentFrame.baseJ
+        
+        const parentWorldX = parentOriginX + parentFrameU * parentIX + parentFrameV * parentJX
+        const parentWorldY = parentOriginY + parentFrameU * parentIY + parentFrameV * parentJY
+        
+        // Transform to this frame's coordinates (raw, no viewport)
+        const [originX, originY] = frame.origin
+        const dx = parentWorldX - originX
+        const dy = parentWorldY - originY
+        const [iX, iY] = frame.baseI
+        const [jX, jY] = frame.baseJ
+        
+        const det = iX * jY - iY * jX
+        if (Math.abs(det) > 1e-10) {
+          const u = (dx * jY - dy * jX) / det
+          const v = (dy * iX - dx * iY) / det
+          // Account for frame viewport to get visible frame coordinates
+          pointInFrameCoords = [
+            (u / frameZoom) + framePanX,
+            (v / frameZoom) + framePanY
+          ]
+        } else {
+          pointInFrameCoords = [0, 0]
+        }
+      } else {
+        pointInFrameCoords = [0, 0]
+      }
+    } else {
+      // For top-level frames, use screenToFrame which handles all transformations
+      pointInFrameCoords = screenToFrame(screenPoint, frame, viewport, canvasWidth, canvasHeight)
+    }
+    
+    minU = Math.min(minU, pointInFrameCoords[0])
+    maxU = Math.max(maxU, pointInFrameCoords[0])
+    minV = Math.min(minV, pointInFrameCoords[1])
+    maxV = Math.max(maxV, pointInFrameCoords[1])
+  }
   
-  const halfWidth = estimatedFrameUnitsWidth / 2
-  const halfHeight = estimatedFrameUnitsHeight / 2
-  const padding = Math.max(estimatedFrameUnitsWidth, estimatedFrameUnitsHeight) * 0.5
+  // Calculate padding using the same approach as drawFrameGrid
+  const transformToScreen = frame.parentFrameId
+    ? (point: Point2D): Point2D => nestedFrameToScreen(point, frame, allFrames, viewport, canvasWidth, canvasHeight)
+    : (point: Point2D): Point2D => frameToScreen(point, frame, viewport, canvasWidth, canvasHeight)
   
-  const minFrameX = -halfWidth - framePanX - padding
-  const maxFrameX = halfWidth - framePanX + padding
-  const minFrameY = -halfHeight - framePanY - padding
-  const maxFrameY = halfHeight - framePanY + padding
+  const originScreen = transformToScreen([0, 0])
+  const oneUnitUScreen = transformToScreen([1, 0])
+  const oneUnitVScreen = transformToScreen([0, 1])
+  
+  const screenUnitsPerU = Math.abs(oneUnitUScreen[0] - originScreen[0])
+  const screenUnitsPerV = Math.abs(oneUnitVScreen[1] - originScreen[1])
+  const avgScreenUnitsPerFrameUnit = (screenUnitsPerU + screenUnitsPerV) / 2
+  
+  const frameScreenWidth = Math.abs(bottomRight[0] - topLeft[0])
+  const frameScreenHeight = Math.abs(bottomRight[1] - topLeft[1])
+  const maxScreenDimension = Math.max(frameScreenWidth, frameScreenHeight)
+  
+  const frameUnitsForScreen = avgScreenUnitsPerFrameUnit > 0 
+    ? maxScreenDimension / avgScreenUnitsPerFrameUnit 
+    : 10
+  
+  const frameRangeU = maxU - minU
+  const frameRangeV = maxV - minV
+  const maxRange = Math.max(frameRangeU, frameRangeV, frameUnitsForScreen)
+  
+  // Use generous padding: at least 3x the range or 20 units, whichever is larger
+  const padding = Math.max(maxRange * 3, 20)
+  
+  const expandedMinU = minU - padding
+  const expandedMaxU = maxU + padding
+  const expandedMinV = minV - padding
+  const expandedMaxV = maxV + padding
+  
+  // Use expanded range for labels (matching grid range)
+  const minFrameX = expandedMinU
+  const maxFrameX = expandedMaxU
+  const minFrameY = expandedMinV
+  const maxFrameY = expandedMaxV
 
   const topLeftScreen = topLeft
   const topRightScreen: Point2D = [bottomRight[0], topLeft[1]]
@@ -488,13 +586,7 @@ function drawFrameAxes(
   // We need to determine how many frame coordinate units fit in minLabelSpacingPx pixels
   const minLabelSpacingPx = 40
   
-  // Calculate screen spacing for 1 unit in frame coordinates
-  // Transform two points 1 unit apart in frame coordinates to see screen distance
-  const transformToScreen = frame.parentFrameId
-    ? (point: Point2D): Point2D => nestedFrameToScreen(point, frame, allFrames, viewport, canvasWidth, canvasHeight)
-    : (point: Point2D): Point2D => frameToScreen(point, frame, viewport, canvasWidth, canvasHeight)
-  
-  const originScreen = transformToScreen([0, 0])
+  // Reuse transformToScreen and originScreen from padding calculation above
   const oneUnitXScreen = transformToScreen([1, 0])
   const oneUnitYScreen = transformToScreen([0, 1])
   
