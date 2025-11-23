@@ -680,9 +680,13 @@ export default function Canvas({
         // Convert raw frame coordinates to parent world coordinates
         // This ensures bounds are stored correctly regardless of parent's viewport state
         endPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
+        console.log('[Canvas] Nested frame - before clamp - raw:', rawFramePoint, 'snapped:', snappedRawFramePoint, 'world:', endPoint)
         // Constrain to parent frame bounds
+        const endPointBeforeClamp = [...endPoint] as Point2D
         endPoint = clampPointToFrameBounds(endPoint, parentFrame.bounds)
-        console.log('[Canvas] Nested frame - raw:', rawFramePoint, 'snapped:', snappedRawFramePoint, 'world:', endPoint)
+        if (endPoint[0] !== endPointBeforeClamp[0] || endPoint[1] !== endPointBeforeClamp[1]) {
+          console.log('[Canvas] Nested frame - after clamp:', endPoint, 'was:', endPointBeforeClamp)
+        }
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
@@ -698,24 +702,33 @@ export default function Canvas({
         const [x2, y2] = endPoint
         console.log('[Canvas] Frame bounds calculation - startPoint:', startPoint, 'endPoint:', endPoint)
         
-        
         // Calculate bounds (ensure positive width and height)
         let minX = Math.min(x1, x2)
         let maxX = Math.max(x1, x2)
         let minY = Math.min(y1, y2)
         let maxY = Math.max(y1, y2)
         
+        console.log('[Canvas] Before parent clamp - minX:', minX, 'maxX:', maxX, 'minY:', minY, 'maxY:', maxY)
+        
         // If drawing inside a parent frame, constrain bounds to stay within parent
         if (parentFrame) {
           const parentBounds = parentFrame.bounds
+          const minXBefore = minX
+          const maxXBefore = maxX
+          const minYBefore = minY
+          const maxYBefore = maxY
           minX = Math.max(parentBounds.x, minX)
           maxX = Math.min(parentBounds.x + parentBounds.width, maxX)
           minY = Math.max(parentBounds.y, minY)
           maxY = Math.min(parentBounds.y + parentBounds.height, maxY)
+          if (minX !== minXBefore || maxX !== maxXBefore || minY !== minYBefore || maxY !== maxYBefore) {
+            console.log('[Canvas] After parent clamp - minX:', minX, 'maxX:', maxX, 'minY:', minY, 'maxY:', maxY)
+          }
         }
         
         const frameWidth = maxX - minX
         const frameHeight = maxY - minY
+        console.log('[Canvas] Final bounds - width:', frameWidth, 'height:', frameHeight)
         
         // Only create frame if it has minimum size
         if (frameWidth > 0.1 && frameHeight > 0.1) {
