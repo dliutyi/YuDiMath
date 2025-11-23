@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import type { ViewportState, CoordinateFrame, Point2D } from '../types'
 import { worldToScreen, screenToWorld } from '../utils/coordinates'
 import { drawCoordinateFrame, parentToFrame, nestedFrameToScreen } from './CoordinateFrame'
-import { drawGrid, drawAxes } from './canvasDrawing'
+import { drawGrid, drawAxes } from '../utils/canvasDrawing'
 import { useCanvasZoom } from '../hooks/useCanvasZoom'
 import { useCanvasDrawing } from '../hooks/useCanvasDrawing'
 

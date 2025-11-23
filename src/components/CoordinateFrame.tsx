@@ -12,10 +12,10 @@ export {
   parentToFrame,
   nestedFrameToScreen,
   parentWorldToFrameCoords,
-} from './frameTransforms'
+} from '../utils/frameTransforms'
 
 // Re-export drawing functions
-export { drawCoordinateFrame } from './frameDrawing'
+export { drawCoordinateFrame } from '../utils/frameDrawing'
 
 // Re-export utility functions
-export { getGridColorForLevel, getBackgroundColorForLevel } from './frameUtils'
+export { getGridColorForLevel, getBackgroundColorForLevel } from '../utils/frameUtils'

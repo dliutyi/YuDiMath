@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { ViewportState, CoordinateFrame } from '../types'
 import { screenToWorld } from '../utils/coordinates'
-import { parentToFrame } from '../components/frameTransforms'
+import { parentToFrame } from '../utils/frameTransforms'
 
 interface UseCanvasZoomProps {
   canvasRef: React.RefObject<HTMLCanvasElement>

@@ -78,6 +78,19 @@ For each step:
 - ✅ **Modularity over convenience**: Always prefer creating new small files over adding to existing large files
 - ✅ **Break down large files proactively**: Don't wait until files become unmanageable
 
+**IMPORTANT - Code Reuse Rules:**
+- ✅ **ALWAYS check `src/utils/` first** before implementing new functionality
+- ✅ **Search for existing functions** that might already solve the problem
+- ✅ **Extend or amend existing functions** rather than creating duplicates
+- ✅ **If a function is close but not quite right**, consider:
+  - Adding optional parameters to make it more flexible
+  - Creating a wrapper function that uses the existing one
+  - Refactoring the existing function to be more general
+- ✅ **Only create new utility functions** when no existing solution can be adapted
+- ✅ **Document why a new function was created** if similar functionality exists
+- ❌ **DO NOT duplicate functionality** that already exists in utils
+- ❌ **DO NOT create new functions** without first checking if similar ones exist
+
 ---
 
 ## Phase 1: Project Setup and Foundation

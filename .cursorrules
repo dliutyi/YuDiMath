@@ -13,6 +13,16 @@
   - Extract reusable logic into separate utility files
   - Split large components into smaller sub-components
   - Keep functions/classes focused and cohesive
+- **PRIORITY: Code Reuse** - Use existing utility functions instead of reinventing the wheel
+  - **ALWAYS check `src/utils/` first** before implementing new functionality
+  - Search for existing functions that might already solve the problem
+  - If a function exists but needs modification, **extend or amend it** rather than creating a duplicate
+  - If a function is close but not quite right, consider:
+    - Adding optional parameters to make it more flexible
+    - Creating a wrapper function that uses the existing one
+    - Refactoring the existing function to be more general
+  - Only create new utility functions when no existing solution can be adapted
+  - Document why a new function was created if similar functionality exists
 
 ## ReactJS Rules
 
