@@ -412,25 +412,17 @@ export default function Canvas({
       if (parentFrame) {
         // Convert screen coordinates directly to parent frame coordinates
         // This accounts for the parent's viewport pan/zoom
-        const framePointWithViewport = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
-        
-        // Remove viewport pan/zoom to get raw frame coordinates
-        // screenToFrame returns coordinates that account for viewport:
-        //   u = frameU + frameViewport.x, where frameU = scaledU / frameViewport.zoom
-        // In frameToScreen, we do: frameU = u - frameViewport.x, then scaledU = frameU * frameViewport.zoom
-        // So the raw coordinate (what u would be if viewport was at origin with zoom 1.0) is:
-        //   rawU = (u - frameViewport.x) / frameViewport.zoom
-        const rawFramePoint: Point2D = [
-          (framePointWithViewport[0] - parentFrame.viewport.x) / parentFrame.viewport.zoom,
-          (framePointWithViewport[1] - parentFrame.viewport.y) / parentFrame.viewport.zoom
-        ]
+        // screenToFrame returns coordinates in the frame's coordinate system accounting for viewport
+        const framePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
         
         // In frame coordinates, grid step is always 1.0
-        const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
+        // Snap directly in the frame coordinate system (which accounts for viewport)
+        const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
         
-        // Convert back to parent world coordinates using raw transformation (without viewport)
-        // This ensures bounds are stored correctly regardless of parent's viewport state
-        snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
+        // Convert back to parent world coordinates using frameToParent
+        // frameToParent applies the viewport transformation, which matches what screenToFrame did
+        // This ensures the coordinates are correctly transformed back to parent world space
+        snappedPoint = frameToParent(snappedFramePoint, parentFrame)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
