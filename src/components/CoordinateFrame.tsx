@@ -329,19 +329,41 @@ export function drawCoordinateFrame(
       console.error('[CoordinateFrame] parentFrame origin:', parentFrame.origin, 'viewport:', parentFrame.viewport)
       
       // Bounds are in parent's world coordinates
-      // We need to transform them through the parent frame's viewport to screen
-      // The parent frame's viewport affects how the parent world coordinates are displayed
-      // So we convert to parent frame coordinates (accounting for viewport), then to screen
+      // To render them, we need to account for the parent frame's viewport
+      // The parent frame's viewport affects how coordinates inside it are displayed
       
-      // Convert parent world coordinates to parent frame coordinates
-      // This gives us the raw frame coordinates
+      // Convert parent world coordinates to parent frame coordinates (raw, no viewport)
       const topLeftParentFrame = parentToFrame(topLeftParentWorld, parentFrame)
       const bottomRightParentFrame = parentToFrame(bottomRightParentWorld, parentFrame)
       
-      // Now transform through parent frame's viewport to screen
-      // frameToScreen applies the parent frame's viewport and transforms to screen
-      topLeft = frameToScreen(topLeftParentFrame, parentFrame, viewport, canvasWidth, canvasHeight)
-      bottomRight = frameToScreen(bottomRightParentFrame, parentFrame, viewport, canvasWidth, canvasHeight)
+      // Apply parent frame's viewport to get the "visible" frame coordinates
+      // Then transform back to parent world, then to screen
+      const topLeftVisibleFrame: Point2D = [
+        (topLeftParentFrame[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom,
+        (topLeftParentFrame[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
+      ]
+      const bottomRightVisibleFrame: Point2D = [
+        (bottomRightParentFrame[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom,
+        (bottomRightParentFrame[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
+      ]
+      
+      // Transform to parent world coordinates using parent frame's base vectors
+      const [originX, originY] = parentFrame.origin
+      const [iX, iY] = parentFrame.baseI
+      const [jX, jY] = parentFrame.baseJ
+      
+      const topLeftParentWorldVisible: Point2D = [
+        originX + topLeftVisibleFrame[0] * iX + topLeftVisibleFrame[1] * jX,
+        originY + topLeftVisibleFrame[0] * iY + topLeftVisibleFrame[1] * jY
+      ]
+      const bottomRightParentWorldVisible: Point2D = [
+        originX + bottomRightVisibleFrame[0] * iX + bottomRightVisibleFrame[1] * jX,
+        originY + bottomRightVisibleFrame[0] * iY + bottomRightVisibleFrame[1] * jY
+      ]
+      
+      // Transform to screen using root viewport
+      topLeft = worldToScreen(topLeftParentWorldVisible[0], topLeftParentWorldVisible[1], viewport, canvasWidth, canvasHeight)
+      bottomRight = worldToScreen(bottomRightParentWorldVisible[0], bottomRightParentWorldVisible[1], viewport, canvasWidth, canvasHeight)
     } else {
       // Parent not found, fall back to direct transformation
       topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
