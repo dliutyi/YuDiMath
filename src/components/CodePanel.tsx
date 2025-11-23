@@ -167,13 +167,21 @@ export default function CodePanel({
     setIsRunning(true)
     setExecutionResult(null)
 
-    // Clear existing vectors and functions before running new code
+    // Clear existing vectors and functions immediately before running new code
+    // This ensures the frame is purged before execution
     if (onVectorsClear) {
       onVectorsClear(selectedFrame.id)
     }
     if (onFunctionsClear) {
       onFunctionsClear(selectedFrame.id)
     }
+
+    // Use requestAnimationFrame to ensure clearing state updates are processed
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        resolve()
+      })
+    })
 
     // Collect vectors and functions created during execution
     const newVectors: Vector[] = []

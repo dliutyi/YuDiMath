@@ -30,30 +30,34 @@ export function useWorkspace(options: { persist?: boolean } = {}) {
   const { persist = false } = options
 
   // Load initial state from localStorage if persistence is enabled
+  // IMPORTANT: Only access localStorage if persist is true
   const loadInitialState = useCallback((): WorkspaceState => {
     if (!persist) {
       return DEFAULT_WORKSPACE
     }
 
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored) as WorkspaceState
-        // Validate structure
-        if (
-          parsed.viewport &&
-          typeof parsed.viewport.x === 'number' &&
-          typeof parsed.viewport.y === 'number' &&
-          typeof parsed.viewport.zoom === 'number' &&
-          typeof parsed.viewport.gridStep === 'number' &&
-          Array.isArray(parsed.frames) &&
-          (parsed.selectedFrameId === null || typeof parsed.selectedFrameId === 'string')
-        ) {
-          return parsed
+    // Only access localStorage when persist is enabled
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY)
+        if (stored) {
+          const parsed = JSON.parse(stored) as WorkspaceState
+          // Validate structure
+          if (
+            parsed.viewport &&
+            typeof parsed.viewport.x === 'number' &&
+            typeof parsed.viewport.y === 'number' &&
+            typeof parsed.viewport.zoom === 'number' &&
+            typeof parsed.viewport.gridStep === 'number' &&
+            Array.isArray(parsed.frames) &&
+            (parsed.selectedFrameId === null || typeof parsed.selectedFrameId === 'string')
+          ) {
+            return parsed
+          }
         }
+      } catch (error) {
+        console.warn('[useWorkspace] Failed to load state from localStorage:', error)
       }
-    } catch (error) {
-      console.warn('[useWorkspace] Failed to load state from localStorage:', error)
     }
 
     return DEFAULT_WORKSPACE
@@ -62,31 +66,40 @@ export function useWorkspace(options: { persist?: boolean } = {}) {
   const [workspace, setWorkspace] = useState<WorkspaceState>(loadInitialState)
 
   // Persist state to localStorage when it changes
+  // IMPORTANT: Only access localStorage if persist is true
   // Skip persistence if workspace is default (to allow clearWorkspace to work properly)
   useEffect(() => {
-    if (persist) {
-      // Only persist if not default workspace (allows clearWorkspace to remove from storage)
-      const isDefault =
-        workspace.viewport.x === DEFAULT_VIEWPORT.x &&
-        workspace.viewport.y === DEFAULT_VIEWPORT.y &&
-        workspace.viewport.zoom === DEFAULT_VIEWPORT.zoom &&
-        workspace.viewport.gridStep === DEFAULT_VIEWPORT.gridStep &&
-        workspace.frames.length === 0 &&
-        workspace.selectedFrameId === null
+    // Early return if persistence is disabled - don't access localStorage at all
+    if (!persist) {
+      return
+    }
 
-      if (!isDefault) {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace))
-        } catch (error) {
-          console.warn('[useWorkspace] Failed to save state to localStorage:', error)
-        }
-      } else {
-        // If default state, remove from storage
-        try {
-          localStorage.removeItem(STORAGE_KEY)
-        } catch (error) {
-          console.warn('[useWorkspace] Failed to remove from localStorage:', error)
-        }
+    // Only access localStorage when persist is enabled and window is available
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return
+    }
+
+    // Only persist if not default workspace (allows clearWorkspace to remove from storage)
+    const isDefault =
+      workspace.viewport.x === DEFAULT_VIEWPORT.x &&
+      workspace.viewport.y === DEFAULT_VIEWPORT.y &&
+      workspace.viewport.zoom === DEFAULT_VIEWPORT.zoom &&
+      workspace.viewport.gridStep === DEFAULT_VIEWPORT.gridStep &&
+      workspace.frames.length === 0 &&
+      workspace.selectedFrameId === null
+
+    if (!isDefault) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace))
+      } catch (error) {
+        console.warn('[useWorkspace] Failed to save state to localStorage:', error)
+      }
+    } else {
+      // If default state, remove from storage
+      try {
+        localStorage.removeItem(STORAGE_KEY)
+      } catch (error) {
+        console.warn('[useWorkspace] Failed to remove from localStorage:', error)
       }
     }
   }, [workspace, persist])
@@ -201,7 +214,15 @@ export function useWorkspace(options: { persist?: boolean } = {}) {
   const clearWorkspace = useCallback(() => {
     setWorkspace(DEFAULT_WORKSPACE)
     // localStorage will be cleared by the useEffect when workspace becomes default
-  }, [])
+    // But also explicitly clear it if persist is enabled
+    if (persist && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.removeItem(STORAGE_KEY)
+      } catch (error) {
+        console.warn('[useWorkspace] Failed to clear localStorage:', error)
+      }
+    }
+  }, [persist])
 
   const resetViewport = useCallback(() => {
     setWorkspace((prev) => ({

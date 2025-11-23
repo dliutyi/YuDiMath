@@ -104,53 +104,58 @@ function App() {
   useEffect(() => {
     if (autoExecuteCode && autoExecuteFrameId && isReady && !isExecuting) {
       console.log('[App] Auto-executing code for frame:', autoExecuteFrameId)
-      // Clear vectors and functions before running new code
+      
+      // Clear vectors and functions immediately before running new code
+      // This ensures the frame is purged before execution
       handleVectorsClear(autoExecuteFrameId)
       handleFunctionsClear(autoExecuteFrameId)
+      
+      // Use requestAnimationFrame to ensure clearing state updates are processed
+      requestAnimationFrame(() => {
+        // Collect vectors and functions created during execution
+        const newVectors: Vector[] = []
+        const newFunctions: FunctionPlot[] = []
 
-      // Collect vectors and functions created during execution
-      const newVectors: Vector[] = []
-      const newFunctions: FunctionPlot[] = []
+        // Generate unique IDs for vectors and functions
+        const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-      // Generate unique IDs for vectors and functions
-      const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
-      executeCode(
-        autoExecuteCode,
-        autoExecuteFrameId,
-        // onVectorCreated callback
-        (vector) => {
-          newVectors.push({
-            ...vector,
-            id: generateId('vec'),
-          })
-        },
-        // onFunctionCreated callback
-        (func) => {
-          newFunctions.push({
-            ...func,
-            id: generateId('func'),
-          })
-        }
-      ).then((result) => {
-        console.log('[App] Auto-execution result:', result.success)
-        if (result.success) {
-          // Update frame with new vectors and functions
-          if (newVectors.length > 0) {
-            handleVectorsUpdate(autoExecuteFrameId, newVectors)
+        executeCode(
+          autoExecuteCode,
+          autoExecuteFrameId,
+          // onVectorCreated callback
+          (vector) => {
+            newVectors.push({
+              ...vector,
+              id: generateId('vec'),
+            })
+          },
+          // onFunctionCreated callback
+          (func) => {
+            newFunctions.push({
+              ...func,
+              id: generateId('func'),
+            })
           }
-          if (newFunctions.length > 0) {
-            handleFunctionsUpdate(autoExecuteFrameId, newFunctions)
+        ).then((result) => {
+          console.log('[App] Auto-execution result:', result.success)
+          if (result.success) {
+            // Update frame with new vectors and functions
+            if (newVectors.length > 0) {
+              handleVectorsUpdate(autoExecuteFrameId, newVectors)
+            }
+            if (newFunctions.length > 0) {
+              handleFunctionsUpdate(autoExecuteFrameId, newFunctions)
+            }
           }
-        }
-        // Clear auto-execute trigger after execution
-        setAutoExecuteCode(null)
-        setAutoExecuteFrameId(null)
-      }).catch((error) => {
-        console.error('[App] Auto-execution error:', error)
-        // Clear auto-execute trigger even on error
-        setAutoExecuteCode(null)
-        setAutoExecuteFrameId(null)
+          // Clear auto-execute trigger after execution
+          setAutoExecuteCode(null)
+          setAutoExecuteFrameId(null)
+        }).catch((error) => {
+          console.error('[App] Auto-execution error:', error)
+          // Clear auto-execute trigger even on error
+          setAutoExecuteCode(null)
+          setAutoExecuteFrameId(null)
+        })
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,6 +201,64 @@ function App() {
           <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-2 pb-1 border-b border-border/50 mb-1">
             Tools
           </div>
+          <button
+            onClick={(e) => {
+              if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur()
+              }
+              e.currentTarget.blur()
+              if (window.confirm('Are you sure you want to clear the entire workspace? This will remove all frames and reset the viewport.')) {
+                workspace.clearWorkspace()
+              }
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.classList.add('active-touch')
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.classList.remove('active-touch')
+              e.currentTarget.blur()
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.classList.remove('active-touch')
+              e.currentTarget.blur()
+            }}
+            onTouchStart={(e) => {
+              e.currentTarget.classList.add('active-touch')
+            }}
+            onTouchEnd={(e) => {
+              e.currentTarget.blur()
+              if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur()
+              }
+              setTimeout(() => {
+                e.currentTarget.classList.remove('active-touch')
+              }, 150)
+            }}
+            className="relative px-4 py-3 rounded-lg transition-all duration-200 group touch-manipulation bg-bg-primary/50 border border-border/50 text-text-primary hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-md"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+            title="Clear Workspace"
+          >
+            {/* Clear/Trash icon */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-5 h-5"
+            >
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            </svg>
+            {/* Tooltip */}
+            <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900/95 backdrop-blur-sm text-white text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-700/50 z-20">
+              Clear Workspace
+              <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900/95"></span>
+            </span>
+          </button>
           <button
             onClick={(e) => {
               // Immediately blur to remove focus after click
