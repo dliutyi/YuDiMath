@@ -24,7 +24,9 @@ beforeEach(() => {
 describe('App', () => {
   it('renders the application', () => {
     render(<App />)
-    expect(screen.getByText('YuDiMath')).toBeInTheDocument()
+    // There are multiple "YuDiMath" texts (in LoadingOverlay and header), so use getAllByText
+    const yuDiMathElements = screen.getAllByText('YuDiMath')
+    expect(yuDiMathElements.length).toBeGreaterThan(0)
   })
 
   it('renders the subtitle', () => {

@@ -205,7 +205,7 @@ export default function PropertiesPanel({
   }
 
   return (
-    <div className="w-80 p-4 bg-panel-bg border border-border rounded-lg shadow-lg">
+    <div className="p-4">
       <h2 className="text-lg font-semibold text-text-primary mb-4">Frame Properties</h2>
       
       {degenerateStatus && (

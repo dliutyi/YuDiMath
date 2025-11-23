@@ -2,6 +2,195 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+/* Code Editor Styles - Both textarea and pre must have identical styles for selection alignment */
+.code-editor-textarea,
+.code-editor-pre {
+  font-family: 'Fira Code', 'Fira Mono', 'Consolas', 'Monaco', 'Courier New', monospace !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  tab-size: 4 !important;
+  padding: 12px !important;
+  margin: 0 !important;
+  border: none !important;
+  outline: none !important;
+  white-space: pre !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: 100% !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent !important;
+}
+
+/* Webkit scrollbar styling */
+.code-editor-textarea::-webkit-scrollbar,
+.code-editor-pre::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.code-editor-textarea::-webkit-scrollbar-track,
+.code-editor-pre::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.code-editor-textarea::-webkit-scrollbar-thumb,
+.code-editor-pre::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3) !important;
+  border-radius: 4px !important;
+}
+
+.code-editor-textarea::-webkit-scrollbar-thumb:hover,
+.code-editor-pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5) !important;
+}
+
+.code-editor-textarea {
+  background: transparent !important;
+  color: transparent !important; /* Make text transparent so only highlighted version shows */
+  caret-color: #3b82f6 !important;
+  resize: none !important;
+  position: relative !important;
+  z-index: 1 !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+.code-editor-textarea::placeholder {
+  color: #64748b !important;
+  opacity: 0.6 !important;
+}
+
+.code-editor-textarea::selection {
+  background: rgba(59, 130, 246, 0.3) !important;
+}
+
+.code-editor-pre {
+  background: transparent !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  pointer-events: none !important; /* Allow clicks to pass through to textarea */
+  z-index: 0 !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  overflow: hidden !important; /* Pre should not scroll, textarea does */
+}
+
+/* Ensure code inside pre has same styling */
+.code-editor-pre code {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  tab-size: inherit !important;
+}
+
+/* Line numbers */
+.code-editor-line-numbers {
+  background: #1e293b !important;
+  border-right: 1px solid #334155 !important;
+  padding: 12px 8px 12px 12px !important;
+  font-family: 'Fira Code', 'Fira Mono', 'Consolas', 'Monaco', 'Courier New', monospace !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  color: #64748b !important;
+  user-select: none !important;
+  text-align: right !important;
+  min-width: 50px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE and Edge */
+  height: 100% !important;
+}
+
+.code-editor-line-numbers::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Opera */
+}
+
+.code-editor-line-number {
+  height: 21px !important; /* line-height 1.5 * font-size 14 = 21px */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  padding-right: 8px !important;
+}
+
+/* Prism syntax highlighting theme adjustments for dark theme */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #64748b;
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: #cbd5e1;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #60a5fa;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #34d399;
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #fbbf24;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #a78bfa;
+}
+
+.token.function,
+.token.class-name {
+  color: #f472b6;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #fb923c;
+}
+
 @layer base {
   html {
     height: 100%;

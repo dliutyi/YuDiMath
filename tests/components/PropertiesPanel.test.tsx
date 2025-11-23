@@ -36,9 +36,10 @@ describe('PropertiesPanel', () => {
   })
 
   it('displays "No frame selected" when no frame is selected', () => {
-    render(<PropertiesPanel selectedFrame={null} onFrameUpdate={mockOnFrameUpdate} />)
+    const { container } = render(<PropertiesPanel selectedFrame={null} onFrameUpdate={mockOnFrameUpdate} />)
     
-    expect(screen.getByText('No frame selected')).toBeInTheDocument()
+    // Component returns null when no frame is selected
+    expect(container.firstChild).toBeNull()
   })
 
   it('displays selected frame properties', () => {
@@ -85,41 +86,54 @@ describe('PropertiesPanel', () => {
   it('updates base J vector on input change', async () => {
     render(<PropertiesPanel selectedFrame={testFrame} onFrameUpdate={mockOnFrameUpdate} />)
     
-    const baseJYInput = screen.getAllByDisplayValue('1')[1] // baseJ Y (second 1)
-    fireEvent.change(baseJYInput, { target: { value: '3' } })
+    // Find the base J Y slider (range input)
+    const baseJYSlider = screen.getByText('Base J Vector').closest('div')?.querySelectorAll('input[type="range"]')[1]
+    expect(baseJYSlider).toBeInTheDocument()
+    fireEvent.change(baseJYSlider!, { target: { value: '1.5' } })
     
     await waitFor(() => {
       expect(mockOnFrameUpdate).toHaveBeenCalledWith('test-frame-1', {
         origin: [0, 0],
         baseI: [1, 0],
-        baseJ: [0, 3],
+        baseJ: [0, 1.5],
       })
     })
   })
 
   it('shows error when base vectors are collinear', async () => {
-    render(<PropertiesPanel selectedFrame={testFrame} onFrameUpdate={mockOnFrameUpdate} />)
+    const { rerender } = render(<PropertiesPanel selectedFrame={testFrame} onFrameUpdate={mockOnFrameUpdate} />)
     
     // Make baseI and baseJ collinear by making baseJ parallel to baseI
     // baseI is [1, 0], so baseJ should be [2, 0] to be collinear
-    const inputs = screen.getAllByRole('spinbutton')
-    // Inputs order: origin X, origin Y, baseI X, baseI Y, baseJ X, baseJ Y
-    const baseJXInput = inputs[4] // baseJ X
-    const baseJYInput = inputs[5] // baseJ Y
+    const baseJLabel = screen.getByText('Base J Vector')
+    const baseJContainer = baseJLabel.closest('div')?.parentElement
+    const baseJSliders = baseJContainer?.querySelectorAll('input[type="range"]')
     
-    // Set baseJ to [2, 0] which is collinear with baseI [1, 0]
-    fireEvent.change(baseJXInput, { target: { value: '2' } })
-    fireEvent.change(baseJYInput, { target: { value: '0' } })
+    expect(baseJSliders).toBeDefined()
+    expect(baseJSliders!.length).toBeGreaterThanOrEqual(2)
     
+    const baseJXSlider = baseJSliders![0] as HTMLInputElement
+    const baseJYSlider = baseJSliders![1] as HTMLInputElement
+    
+    fireEvent.change(baseJXSlider, { target: { value: '2' } })
+    fireEvent.change(baseJYSlider, { target: { value: '0' } })
+    
+    // Wait for the frame update to be called
     await waitFor(() => {
-      expect(screen.getByText('Base vectors cannot be collinear (parallel)')).toBeInTheDocument()
-    }, { timeout: 2000 })
+      expect(mockOnFrameUpdate).toHaveBeenCalled()
+    })
     
-    // Clear previous calls
-    mockOnFrameUpdate.mockClear()
+    // Now update the selectedFrame prop to reflect the collinear vectors
+    const updatedFrame: CoordinateFrame = {
+      ...testFrame,
+      baseJ: [2, 0],
+    }
+    rerender(<PropertiesPanel selectedFrame={updatedFrame} onFrameUpdate={mockOnFrameUpdate} />)
     
-    // Verify that after error, no update is called
-    expect(mockOnFrameUpdate).not.toHaveBeenCalled()
+    // Now the warning should appear
+    await waitFor(() => {
+      expect(screen.getByText(/Degenerate: Collinear base vectors/i)).toBeInTheDocument()
+    })
   })
 
   it('normalizes base vectors when toggle is enabled', async () => {
@@ -156,7 +170,8 @@ describe('PropertiesPanel', () => {
     fireEvent.click(normalizeCheckbox)
     
     await waitFor(() => {
-      expect(screen.getByText('Base vectors cannot be zero')).toBeInTheDocument()
+      // The component now shows a warning status instead of an error
+      expect(screen.getByText(/Degenerate: Zero base vectors/i)).toBeInTheDocument()
     })
     
     expect(mockOnFrameUpdate).not.toHaveBeenCalled()
@@ -169,7 +184,7 @@ describe('PropertiesPanel', () => {
     fireEvent.change(originXInput, { target: { value: 'invalid' } })
     
     await waitFor(() => {
-      expect(screen.getByText('All values must be valid numbers')).toBeInTheDocument()
+      expect(screen.getByText('Origin values must be valid numbers')).toBeInTheDocument()
     })
     
     expect(mockOnFrameUpdate).not.toHaveBeenCalled()
@@ -190,10 +205,32 @@ describe('PropertiesPanel', () => {
     
     rerender(<PropertiesPanel selectedFrame={newFrame} onFrameUpdate={mockOnFrameUpdate} />)
     
-    expect(screen.getByDisplayValue('10')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('20')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('2')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('3')).toBeInTheDocument()
+    // Check origin inputs - they don't have explicit labels, so query by type
+    const originInputs = screen.getByText('Origin').closest('div')?.querySelectorAll('input[type="number"]')
+    expect(originInputs?.[0]).toHaveValue(10)
+    expect(originInputs?.[1]).toHaveValue(20)
+    
+    // Check base vectors - they're range sliders, check the displayed span values
+    // Find the Base I Vector label, then get its parent container
+    const baseILabel = screen.getByText('Base I Vector')
+    const baseIContainer = baseILabel.closest('div')?.parentElement
+    // Get all spans that contain numeric values (X and Y labels)
+    const baseISpans = Array.from(baseIContainer?.querySelectorAll('span') || [])
+    const baseISpanTexts = baseISpans
+      .map(span => span.textContent?.trim())
+      .filter(text => text && /^\d+\.\d+$/.test(text))
+    expect(baseISpanTexts).toContain('2.00')
+    expect(baseISpanTexts).toContain('3.00')
+    
+    // Check base J vector
+    const baseJLabel = screen.getByText('Base J Vector')
+    const baseJContainer = baseJLabel.closest('div')?.parentElement
+    const baseJSpans = Array.from(baseJContainer?.querySelectorAll('span') || [])
+    const baseJSpanTexts = baseJSpans
+      .map(span => span.textContent?.trim())
+      .filter(text => text && /^\d+\.\d+$/.test(text))
+    expect(baseJSpanTexts).toContain('4.00')
+    expect(baseJSpanTexts).toContain('5.00')
   })
 })
 

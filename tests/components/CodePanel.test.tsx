@@ -43,8 +43,8 @@ describe('CodePanel', () => {
     vi.clearAllMocks()
   })
 
-  it('displays default message when no frame is selected', () => {
-    render(
+  it('displays nothing when no frame is selected', () => {
+    const { container } = render(
       <CodePanel
         selectedFrame={null}
         onCodeChange={mockOnCodeChange}
@@ -52,8 +52,8 @@ describe('CodePanel', () => {
       />
     )
 
-    expect(screen.getByText('Code Editor')).toBeInTheDocument()
-    expect(screen.getByText('Select a frame to edit its Python code')).toBeInTheDocument()
+    // CodePanel returns null when no frame is selected
+    expect(container.firstChild).toBeNull()
   })
 
   it('displays selected frame code', () => {
@@ -146,7 +146,7 @@ describe('CodePanel', () => {
       />
     )
 
-    expect(screen.getByText('PyScript is loading...')).toBeInTheDocument()
+    expect(screen.getByText(/Pyodide is loading/)).toBeInTheDocument()
     const runButton = screen.getByRole('button', { name: /run/i })
     expect(runButton).toBeDisabled()
   })

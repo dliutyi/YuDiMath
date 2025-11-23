@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import Canvas from './components/Canvas'
 import GridStepSelector from './components/GridStepSelector'
-import PropertiesPanel from './components/PropertiesPanel'
-import CodePanel from './components/CodePanel'
+import FrameEditorPanel from './components/FrameEditorPanel'
+import LoadingOverlay from './components/LoadingOverlay'
 import type { ViewportState, CoordinateFrame } from './types'
 
 function App() {
@@ -91,6 +91,7 @@ function App() {
 
   return (
     <div className="h-full bg-bg-primary text-text-primary relative overflow-hidden">
+      <LoadingOverlay />
       <Canvas
         viewport={viewport}
         onViewportChange={setViewport}
@@ -184,14 +185,11 @@ function App() {
           </button>
         </div>
       </div>
-      <div className="absolute top-4 right-4 z-10 flex flex-col gap-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
-        <PropertiesPanel
+      <div className="absolute top-4 right-4 z-10">
+        <FrameEditorPanel
           selectedFrame={selectedFrame}
           onFrameUpdate={handleFrameUpdate}
           onFrameViewportChange={handleFrameViewportChange}
-        />
-        <CodePanel
-          selectedFrame={selectedFrame}
           onCodeChange={handleCodeChange}
           onCodeRun={handleCodeRun}
         />

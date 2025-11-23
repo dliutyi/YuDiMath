@@ -1,4 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import Editor from 'react-simple-code-editor'
+import { highlight, languages } from 'prismjs'
+import 'prismjs/components/prism-python'
+import 'prismjs/themes/prism-tomorrow.css'
 import { usePyScript } from '../hooks/usePyScript'
 import type { CoordinateFrame } from '../types'
 
@@ -29,6 +33,10 @@ export default function CodePanel({
   const [isRunning, setIsRunning] = useState(false)
   const [executionResult, setExecutionResult] = useState<{ success: boolean; error?: string } | null>(null)
   const { isReady, executeCode, isExecuting } = usePyScript()
+  const editorRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const preRef = useRef<HTMLPreElement | null>(null)
+  const lineNumbersRef = useRef<HTMLDivElement | null>(null)
 
   // Update local code when selected frame changes
   useEffect(() => {
@@ -41,11 +49,95 @@ export default function CodePanel({
     }
   }, [selectedFrame])
 
+  // Sync scroll between textarea, pre element, and line numbers
+  useEffect(() => {
+    const editorContainer = editorRef.current
+    if (!editorContainer) return
+
+    const textarea = editorContainer.querySelector('textarea') as HTMLTextAreaElement
+    const pre = editorContainer.querySelector('pre') as HTMLPreElement
+    const lineNumbers = lineNumbersRef.current
+    
+    if (!textarea || !pre) return
+
+    textareaRef.current = textarea
+    preRef.current = pre
+
+    const handleScroll = () => {
+      if (pre && textarea) {
+        pre.scrollTop = textarea.scrollTop
+        pre.scrollLeft = textarea.scrollLeft
+      }
+      if (lineNumbers && textarea) {
+        lineNumbers.scrollTop = textarea.scrollTop
+      }
+    }
+
+    textarea.addEventListener('scroll', handleScroll)
+    return () => {
+      textarea.removeEventListener('scroll', handleScroll)
+    }
+  }, [localCode])
+
   // Sync local code changes back to frame
   const handleCodeChange = (newCode: string) => {
     setLocalCode(newCode)
     if (selectedFrame) {
       onCodeChange(selectedFrame.id, newCode)
+    }
+  }
+
+  // Handle Tab key to insert spaces (Python standard: 4 spaces)
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const target = e.currentTarget as HTMLTextAreaElement
+      const start = target.selectionStart
+      const end = target.selectionEnd
+      const value = localCode
+      
+      // If there's a selection, indent/unindent the selected lines
+      if (start !== end) {
+        const lines = value.split('\n')
+        const startLine = value.substring(0, start).split('\n').length - 1
+        const endLine = value.substring(0, end).split('\n').length - 1
+        
+        if (e.shiftKey) {
+          // Shift+Tab: Unindent (remove 4 spaces or 1 tab)
+          for (let i = startLine; i <= endLine; i++) {
+            if (lines[i].startsWith('    ')) {
+              lines[i] = lines[i].substring(4)
+            } else if (lines[i].startsWith('\t')) {
+              lines[i] = lines[i].substring(1)
+            }
+          }
+        } else {
+          // Tab: Indent (add 4 spaces)
+          for (let i = startLine; i <= endLine; i++) {
+            lines[i] = '    ' + lines[i]
+          }
+        }
+        
+        const newValue = lines.join('\n')
+        const newStart = start + (e.shiftKey ? -4 : 4)
+        const newEnd = end + (endLine - startLine + 1) * (e.shiftKey ? -4 : 4)
+        
+        handleCodeChange(newValue)
+        
+        // Restore selection after state update
+        setTimeout(() => {
+          target.setSelectionRange(newStart, newEnd)
+        }, 0)
+      } else {
+        // No selection: insert 4 spaces at cursor
+        const newValue = value.substring(0, start) + '    ' + value.substring(end)
+        handleCodeChange(newValue)
+        
+        // Move cursor after inserted spaces
+        setTimeout(() => {
+          target.setSelectionRange(start + 4, start + 4)
+        }, 0)
+      }
     }
   }
 
@@ -82,21 +174,14 @@ export default function CodePanel({
   }
 
   if (!selectedFrame) {
-    return (
-      <div className="w-80 p-4 bg-panel-bg border border-border rounded-lg shadow-lg">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Code Editor</h2>
-        <p className="text-sm text-text-secondary">Select a frame to edit its Python code</p>
-      </div>
-    )
+    return null
   }
 
   return (
-    <div className="w-80 p-4 bg-panel-bg border border-border rounded-lg shadow-lg flex flex-col h-full max-h-[calc(100vh-2rem)]">
-      <h2 className="text-lg font-semibold text-text-primary mb-4">Code Editor</h2>
-      
+    <div className="h-full p-4 flex flex-col min-h-0 overflow-hidden">
       {!isReady && (
         <div className="mb-4 p-2 bg-warning/20 border border-warning/50 rounded text-sm text-warning">
-          PyScript is loading...
+          Pyodide is loading... (this may take a few seconds)
         </div>
       )}
 
@@ -117,17 +202,51 @@ export default function CodePanel({
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-h-0">
-        <label className="block text-sm font-medium text-text-secondary mb-2">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <label className="block text-sm font-medium text-text-secondary mb-2 flex-shrink-0">
           Python Code
         </label>
-        <textarea
-          value={localCode}
-          onChange={(e) => handleCodeChange(e.target.value)}
-          className="flex-1 w-full px-3 py-2 bg-bg-primary border border-border rounded text-text-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-          placeholder={DEFAULT_CODE}
-          spellCheck={false}
-        />
+        <div 
+          ref={editorRef}
+          className="flex-1 relative border border-border rounded bg-bg-primary overflow-hidden flex" 
+          style={{ minHeight: 0 }}
+        >
+          {/* Line numbers */}
+          <div 
+            ref={lineNumbersRef}
+            className="code-editor-line-numbers flex-shrink-0"
+          >
+            {localCode.split('\n').map((_, index) => (
+              <div key={index} className="code-editor-line-number">
+                {index + 1}
+              </div>
+            ))}
+          </div>
+          <div className="flex-1 relative overflow-hidden">
+            <Editor
+              value={localCode}
+              onValueChange={handleCodeChange}
+              onKeyDown={handleKeyDown}
+              highlight={(code) => highlight(code, languages.python, 'python')}
+              padding={0}
+              style={{
+                fontFamily: '"Fira Code", "Fira Mono", "Consolas", "Monaco", "Courier New", monospace',
+                fontSize: 14,
+                lineHeight: 1.5,
+                outline: 'none',
+                width: '100%',
+                height: '100%',
+                backgroundColor: '#0f172a',
+                overflow: 'auto',
+              }}
+              textareaClassName="code-editor-textarea"
+              preClassName="code-editor-pre"
+              placeholder={DEFAULT_CODE}
+              tabSize={4}
+              insertSpaces={true}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="mt-4 flex gap-2">
