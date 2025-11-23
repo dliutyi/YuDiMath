@@ -538,8 +538,10 @@ export default function Canvas({
         const framePoint = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
         // In frame coordinates, grid step is always 1.0
         const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
-        // Convert back to world coordinates
-        snappedPoint = frameToParent(snappedFramePoint, drawingRect.parentFrame)
+        // Convert back to parent world coordinates using frameCoordsToParentWorld
+        // This does NOT apply viewport - it's the raw coordinate transformation
+        // Bounds are stored in parent world coordinates, not accounting for parent's viewport
+        snappedPoint = frameCoordsToParentWorld(snappedFramePoint, drawingRect.parentFrame)
         // Constrain to parent frame bounds
         snappedPoint = clampPointToFrameBounds(snappedPoint, drawingRect.parentFrame.bounds)
         console.log('[Canvas] Mouse move - frame point:', framePoint, 'snapped:', snappedFramePoint, 'world:', snappedPoint)
@@ -674,8 +676,10 @@ export default function Canvas({
         const framePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
         // In frame coordinates, grid step is always 1.0
         const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
-        // Convert back to world coordinates
-        endPoint = frameToParent(snappedFramePoint, parentFrame)
+        // Convert back to parent world coordinates using frameCoordsToParentWorld
+        // This does NOT apply viewport - it's the raw coordinate transformation
+        // Bounds are stored in parent world coordinates, not accounting for parent's viewport
+        endPoint = frameCoordsToParentWorld(snappedFramePoint, parentFrame)
         // Constrain to parent frame bounds
         endPoint = clampPointToFrameBounds(endPoint, parentFrame.bounds)
         console.log('[Canvas] Mouse up - frame point:', framePoint, 'snapped:', snappedFramePoint, 'world:', endPoint)
