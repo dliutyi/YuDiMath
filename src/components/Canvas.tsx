@@ -414,24 +414,18 @@ export default function Canvas({
       let snappedPoint: Point2D
       
       if (parentFrame) {
-        // Convert screen coordinates directly to parent frame coordinates
-        // screenToFrame returns coordinates that account for the parent's viewport
-        const framePointWithViewport = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
+        // Convert screen to parent world coordinates first (using main viewport)
+        const parentWorldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
         
-        // Extract raw frame coordinates (without viewport)
-        // screenToFrame returns: u = frameU + frameViewport.x where frameU = scaledU / frameViewport.zoom
-        // To get raw: rawU = (u - frameViewport.x) / frameViewport.zoom
-        const rawFramePoint: Point2D = [
-          (framePointWithViewport[0] - parentFrame.viewport.x) / parentFrame.viewport.zoom,
-          (framePointWithViewport[1] - parentFrame.viewport.y) / parentFrame.viewport.zoom
-        ]
+        // Convert parent world coordinates to parent frame coordinates (without viewport)
+        // This gives us the "raw" frame coordinates, not accounting for parent's viewport pan/zoom
+        const rawFramePoint = parentToFrame(parentWorldPoint, parentFrame)
         
         // In frame coordinates, grid step is always 1.0
         const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
         
         // Convert raw frame coordinates to parent world coordinates
-        // This does NOT apply viewport - it's the raw coordinate transformation
-        // Bounds are stored in parent world coordinates, not accounting for parent's viewport
+        // This ensures bounds are stored correctly regardless of parent's viewport state
         snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
       } else {
         // Snap to background grid
@@ -540,28 +534,22 @@ export default function Canvas({
       let snappedPoint: Point2D
       
       if (drawingRect.parentFrame) {
-        // Convert to parent frame coordinates and snap there
-        // screenToFrame returns coordinates that account for the parent's viewport
-        const framePointWithViewport = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
+        // Convert screen to parent world coordinates first (using main viewport)
+        const parentWorldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
         
-        // Extract raw frame coordinates (without viewport)
-        // screenToFrame returns: u = frameU + frameViewport.x where frameU = scaledU / frameViewport.zoom
-        // To get raw: rawU = (u - frameViewport.x) / frameViewport.zoom
-        const rawFramePoint: Point2D = [
-          (framePointWithViewport[0] - drawingRect.parentFrame.viewport.x) / drawingRect.parentFrame.viewport.zoom,
-          (framePointWithViewport[1] - drawingRect.parentFrame.viewport.y) / drawingRect.parentFrame.viewport.zoom
-        ]
+        // Convert parent world coordinates to parent frame coordinates (without viewport)
+        // This gives us the "raw" frame coordinates, not accounting for parent's viewport pan/zoom
+        const rawFramePoint = parentToFrame(parentWorldPoint, drawingRect.parentFrame)
         
         // In frame coordinates, grid step is always 1.0
         const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
         
         // Convert raw frame coordinates to parent world coordinates
-        // This does NOT apply viewport - it's the raw coordinate transformation
-        // Bounds are stored in parent world coordinates, not accounting for parent's viewport
+        // This ensures bounds are stored correctly regardless of parent's viewport state
         snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, drawingRect.parentFrame)
         // Constrain to parent frame bounds
         snappedPoint = clampPointToFrameBounds(snappedPoint, drawingRect.parentFrame.bounds)
-        console.log('[Canvas] Mouse move - frame point (with viewport):', framePointWithViewport, 'raw:', rawFramePoint, 'snapped raw:', snappedRawFramePoint, 'world:', snappedPoint)
+        console.log('[Canvas] Mouse move - parent world:', parentWorldPoint, 'raw frame:', rawFramePoint, 'snapped raw:', snappedRawFramePoint, 'world:', snappedPoint)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
@@ -689,28 +677,22 @@ export default function Canvas({
       let endPoint: Point2D
       
       if (parentFrame) {
-        // Convert to parent frame coordinates and snap there (same as handleMouseMove)
-        // screenToFrame returns coordinates that account for the parent's viewport
-        const framePointWithViewport = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
+        // Convert screen to parent world coordinates first (using main viewport)
+        const parentWorldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
         
-        // Extract raw frame coordinates (without viewport)
-        // screenToFrame returns: u = frameU + frameViewport.x where frameU = scaledU / frameViewport.zoom
-        // To get raw: rawU = (u - frameViewport.x) / frameViewport.zoom
-        const rawFramePoint: Point2D = [
-          (framePointWithViewport[0] - parentFrame.viewport.x) / parentFrame.viewport.zoom,
-          (framePointWithViewport[1] - parentFrame.viewport.y) / parentFrame.viewport.zoom
-        ]
+        // Convert parent world coordinates to parent frame coordinates (without viewport)
+        // This gives us the "raw" frame coordinates, not accounting for parent's viewport pan/zoom
+        const rawFramePoint = parentToFrame(parentWorldPoint, parentFrame)
         
         // In frame coordinates, grid step is always 1.0
         const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
         
         // Convert raw frame coordinates to parent world coordinates
-        // This does NOT apply viewport - it's the raw coordinate transformation
-        // Bounds are stored in parent world coordinates, not accounting for parent's viewport
+        // This ensures bounds are stored correctly regardless of parent's viewport state
         endPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
         // Constrain to parent frame bounds
         endPoint = clampPointToFrameBounds(endPoint, parentFrame.bounds)
-        console.log('[Canvas] Mouse up - frame point (with viewport):', framePointWithViewport, 'raw:', rawFramePoint, 'snapped raw:', snappedRawFramePoint, 'world:', endPoint)
+        console.log('[Canvas] Mouse up - parent world:', parentWorldPoint, 'raw frame:', rawFramePoint, 'snapped raw:', snappedRawFramePoint, 'world:', endPoint)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
