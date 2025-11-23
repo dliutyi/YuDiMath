@@ -4,7 +4,6 @@ import {
   worldToScreen,
   screenToWorld,
   snapPointToGrid,
-  isFrameInsideFrame,
   clampPointToFrameBounds,
   isPointInFrame,
 } from '../utils/coordinates'
