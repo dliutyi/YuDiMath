@@ -428,9 +428,12 @@ export default function Canvas({
       drawingRectEndRef.current = snappedPoint
       drawingRectParentFrameRef.current = parentFrame
       setDrawingRect({ start: snappedPoint, end: snappedPoint, parentFrame })
+      console.log('[Canvas] ===== MOUSE DOWN =====')
+      console.log('[Canvas] Stored startPoint:', snappedPoint)
       if (parentFrame) {
         const rawFrameCheck = parentToFrame(snappedPoint, parentFrame)
-        console.log('[Canvas] Mouse down - stored startPoint (world):', snappedPoint, 'raw frame coords:', rawFrameCheck, 'parentFrame:', parentFrame.id, 'parent origin:', parentFrame.origin)
+        console.log('[Canvas] Parent frame:', parentFrame.id, 'origin:', parentFrame.origin)
+        console.log('[Canvas] startPoint in raw frame coords:', rawFrameCheck)
       }
     } else {
       // Check if clicking on a frame (for selection)
@@ -655,11 +658,12 @@ export default function Canvas({
       // Use refs to get the latest values to avoid stale closures
       const startPoint: Point2D = drawingRectStartRef.current
       const parentFrame = drawingRectParentFrameRef.current
+      console.log('[Canvas] ===== MOUSE UP =====')
+      console.log('[Canvas] startPoint from ref:', startPoint)
       if (parentFrame) {
         const rawFrameCheck = parentToFrame(startPoint, parentFrame)
-        console.log('[Canvas] Mouse up - startPoint from ref (world):', startPoint, 'raw frame coords:', rawFrameCheck, 'parentFrame:', parentFrame.id, 'parent origin:', parentFrame.origin)
-      } else {
-        console.log('[Canvas] Mouse up - startPoint from ref:', startPoint, 'parentFrame: null')
+        console.log('[Canvas] Parent frame:', parentFrame.id, 'origin:', parentFrame.origin)
+        console.log('[Canvas] startPoint in raw frame coords:', rawFrameCheck)
       }
       
       // Recalculate end point using the same logic as handleMouseMove
