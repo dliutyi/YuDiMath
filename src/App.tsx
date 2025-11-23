@@ -76,6 +76,11 @@ function App() {
           // If origin, base vectors, or parameters changed, regenerate code while preserving user code
           if (updates.origin || updates.baseI || updates.baseJ || updates.parameters) {
             updatedFrame.code = generateCode(updatedFrame, frame.code)
+            
+            // If parameters changed, trigger auto-execution
+            if (updates.parameters) {
+              setAutoExecuteCode(updatedFrame.code)
+            }
           }
           
           return updatedFrame
@@ -89,10 +94,28 @@ function App() {
     handleFrameUpdate(frameId, { code })
   }
 
-  const handleCodeRun = (frameId: string, _code: string) => {
+  const [autoExecuteCode, setAutoExecuteCode] = useState<string | null>(null)
+
+  const handleCodeRun = (frameId: string, code: string) => {
     // Code execution is handled by CodePanel, this is just a callback
     // Future: Could add logging or other side effects here
     console.log('[App] Code executed for frame:', frameId)
+    // Clear auto-execute trigger after execution
+    setAutoExecuteCode(null)
+  }
+
+  const handleParameterChange = (frameId: string, parameters: Record<string, number>) => {
+    // Update frame with new parameters
+    handleFrameUpdate(frameId, { parameters })
+    
+    // Find the frame to get its updated code
+    const frame = frames.find(f => f.id === frameId)
+    if (frame) {
+      const updatedFrame = { ...frame, parameters }
+      const updatedCode = generateCode(updatedFrame, frame.code)
+      // Trigger auto-execution
+      setAutoExecuteCode(updatedCode)
+    }
   }
 
   const handleVectorsUpdate = (frameId: string, vectors: Vector[]) => {
@@ -260,6 +283,7 @@ function App() {
           onFunctionsUpdate={handleFunctionsUpdate}
           onVectorsClear={handleVectorsClear}
           onFunctionsClear={handleFunctionsClear}
+          autoExecuteCode={autoExecuteCode}
         />
       </div>
     </div>

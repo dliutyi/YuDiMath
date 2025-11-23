@@ -7,12 +7,14 @@ interface PropertiesPanelProps {
   selectedFrame: CoordinateFrame | null
   onFrameUpdate: (frameId: string, updates: Partial<CoordinateFrame>) => void
   onFrameViewportChange?: (frameId: string, viewport: ViewportState) => void
+  onCodeRun?: (frameId: string, code: string) => void
 }
 
 export default function PropertiesPanel({
   selectedFrame,
   onFrameUpdate,
   onFrameViewportChange,
+  onCodeRun,
 }: PropertiesPanelProps) {
   const [originX, setOriginX] = useState<string>('0')
   const [originY, setOriginY] = useState<string>('0')
@@ -500,6 +502,7 @@ export default function PropertiesPanel({
           onParameterChange={(frameId, parameters) => {
             onFrameUpdate(frameId, { parameters })
           }}
+          onCodeRun={onCodeRun}
         />
       </div>
     </div>

@@ -4,6 +4,7 @@ import type { CoordinateFrame } from '../types'
 interface ParameterSlidersProps {
   selectedFrame: CoordinateFrame | null
   onParameterChange: (frameId: string, parameters: Record<string, number>) => void
+  onCodeRun?: (frameId: string, code: string) => void
 }
 
 /**

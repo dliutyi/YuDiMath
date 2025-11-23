@@ -20,7 +20,7 @@ export function generateDefaultCode(frame: CoordinateFrame): string {
     })
     
     parameterCode = sortedKeys
-      .map(key => `  ${key} = ${parameters[key]}  # Parameter slider value`)
+      .map(key => `${key} = ${parameters[key]}  # Parameter slider value`)
       .join('\n')
     
     if (parameterCode) {

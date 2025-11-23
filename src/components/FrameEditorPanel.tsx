@@ -13,6 +13,7 @@ interface FrameEditorPanelProps {
   onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[]) => void
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
+  autoExecuteCode?: string | null
 }
 
 type TabType = 'properties' | 'code'
@@ -27,6 +28,7 @@ export default function FrameEditorPanel({
   onFunctionsUpdate,
   onVectorsClear,
   onFunctionsClear,
+  autoExecuteCode,
 }: FrameEditorPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('properties')
 
@@ -71,6 +73,7 @@ export default function FrameEditorPanel({
               selectedFrame={selectedFrame}
               onFrameUpdate={onFrameUpdate}
               onFrameViewportChange={onFrameViewportChange}
+              onCodeRun={onCodeRun}
             />
           </div>
         ) : (
@@ -82,6 +85,7 @@ export default function FrameEditorPanel({
             onFunctionsUpdate={onFunctionsUpdate}
             onVectorsClear={onVectorsClear}
             onFunctionsClear={onFunctionsClear}
+            autoExecuteCode={autoExecuteCode}
           />
         )}
       </div>
