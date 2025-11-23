@@ -425,6 +425,7 @@ export default function Canvas({
         snappedPoint = frameCoordsToParentWorld(snappedFramePoint, parentFrame)
       } else {
         // Snap to background grid
+        const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
         snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
       }
       
