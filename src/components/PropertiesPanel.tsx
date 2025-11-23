@@ -121,13 +121,19 @@ export default function PropertiesPanel({
       }
     }
 
-    // Validate that base vectors are not collinear
-    if (areVectorsCollinear(baseI, baseJ)) {
-      setError('Base vectors cannot be collinear (parallel)')
-      return
+    // Check for degenerate cases (allow them but show warning)
+    const baseIMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
+    const baseJMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
+    const areZero = baseIMagnitude < 1e-10 && baseJMagnitude < 1e-10
+    const areCollinear = !areZero && areVectorsCollinear(baseI, baseJ)
+    
+    if (areZero) {
+      setError('Warning: Base vectors are zero - grid will collapse to a point')
+    } else if (areCollinear) {
+      setError('Warning: Base vectors are collinear - grid will collapse to a line')
+    } else {
+      setError(null)
     }
-
-    setError(null)
 
     // Update frame
     onFrameUpdate(selectedFrame.id, {
@@ -179,11 +185,34 @@ export default function PropertiesPanel({
     return null
   }
 
+  // Calculate degenerate status for display
+  const baseIMagnitude = Math.sqrt(selectedFrame.baseI[0] ** 2 + selectedFrame.baseI[1] ** 2)
+  const baseJMagnitude = Math.sqrt(selectedFrame.baseJ[0] ** 2 + selectedFrame.baseJ[1] ** 2)
+  const areZero = baseIMagnitude < 1e-10 && baseJMagnitude < 1e-10
+  const areCollinear = !areZero && areVectorsCollinear(selectedFrame.baseI, selectedFrame.baseJ)
+  const isDegenerate = areZero || areCollinear
+  
+  let degenerateStatus: string | null = null
+  let degenerateColor = ''
+  if (areZero) {
+    degenerateStatus = 'Degenerate: Zero base vectors (grid collapsed to a point)'
+    degenerateColor = 'text-red-500'
+  } else if (areCollinear) {
+    degenerateStatus = 'Degenerate: Collinear base vectors (grid collapsed to a line)'
+    degenerateColor = 'text-orange-500'
+  }
+
   return (
     <div className="w-80 p-4 bg-panel-bg border border-border rounded-lg shadow-lg">
       <h2 className="text-lg font-semibold text-text-primary mb-4">Frame Properties</h2>
       
-      {error && (
+      {degenerateStatus && (
+        <div className={`mb-4 p-3 bg-warning/20 border border-warning/50 rounded text-sm font-medium ${degenerateColor}`}>
+          {degenerateStatus}
+        </div>
+      )}
+      
+      {error && !isDegenerate && (
         <div className="mb-4 p-2 bg-error/20 border border-error/50 rounded text-sm text-error">
           {error}
         </div>
@@ -221,7 +250,7 @@ export default function PropertiesPanel({
 
         {/* Base I Vector */}
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-2">
+          <label className="block text-sm font-medium mb-2" style={{ color: '#f97316' }}>
             Base I Vector
           </label>
           <div className="space-y-2">
@@ -260,7 +289,7 @@ export default function PropertiesPanel({
 
         {/* Base J Vector */}
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-2">
+          <label className="block text-sm font-medium mb-2" style={{ color: '#10b981' }}>
             Base J Vector
           </label>
           <div className="space-y-2">
