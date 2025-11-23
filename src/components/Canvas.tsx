@@ -644,7 +644,7 @@ export default function Canvas({
     e.preventDefault()
   }, [isDrawing, drawingRect, viewport, onViewportChange, onFrameViewportChange, frames, width, height])
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
     const container = containerRef.current
     if (!canvas || !container) return
@@ -652,9 +652,31 @@ export default function Canvas({
     console.log('[Canvas] Mouse up - isDrawing:', isDrawing, 'drawingRect:', drawingRect)
 
     if (isDrawing && drawingRect.start) {
-      // Use the end point from the ref to avoid stale closure issues
-      // This ensures we get the latest value that was set in handleMouseMove
-      const endPoint = drawingRectEndRef.current || drawingRect.end || drawingRect.start
+      // Recalculate end point using the same logic as handleMouseMove
+      // This ensures we use the exact mouse position at mouse up time
+      const rect = container.getBoundingClientRect()
+      const canvasWidth = width || rect.width || 800
+      const canvasHeight = height || rect.height || 600
+      const screenX = e.clientX - rect.left
+      const screenY = e.clientY - rect.top
+      
+      let endPoint: Point2D
+      
+      if (drawingRect.parentFrame) {
+        // Convert to parent frame coordinates and snap there (same as handleMouseMove)
+        const framePoint = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
+        // In frame coordinates, grid step is always 1.0
+        const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
+        // Convert back to world coordinates
+        endPoint = frameToParent(snappedFramePoint, drawingRect.parentFrame)
+        // Constrain to parent frame bounds
+        endPoint = clampPointToFrameBounds(endPoint, drawingRect.parentFrame.bounds)
+        console.log('[Canvas] Mouse up - frame point:', framePoint, 'snapped:', snappedFramePoint, 'world:', endPoint)
+      } else {
+        // Snap to background grid
+        const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+        endPoint = snapPointToGrid(worldPoint, viewport.gridStep)
+      }
 
       console.log('[Canvas] End point:', endPoint, 'start:', drawingRect.start)
 
@@ -770,7 +792,7 @@ export default function Canvas({
     isPanningRef.current = false
     lastPanPointRef.current = null
     panningFrameRef.current = null
-  }, [isDrawing, drawingRect, onFrameCreated, onDrawingModeChange, viewport, width, height, frames, onFrameViewportChange])
+  }, [isDrawing, drawingRect, onFrameCreated, onDrawingModeChange, viewport, width, height, frames, onFrameViewportChange, screenToFrame, frameToParent, screenToWorld, snapPointToGrid, clampPointToFrameBounds])
 
   const handleMouseLeave = useCallback(() => {
     isPanningRef.current = false
