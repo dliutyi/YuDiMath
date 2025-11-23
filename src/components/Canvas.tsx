@@ -410,17 +410,14 @@ export default function Canvas({
       let snappedPoint: Point2D
       
       if (parentFrame) {
-        // Convert screen to parent world coordinates first (using main viewport)
-        const parentWorldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
-        
-        // Convert parent world coordinates to parent frame coordinates (without viewport)
-        // This gives us the "raw" frame coordinates, not accounting for parent's viewport pan/zoom
-        const framePoint = parentToFrame(parentWorldPoint, parentFrame)
+        // Convert screen coordinates directly to parent frame coordinates
+        // This accounts for the parent's viewport pan/zoom
+        const framePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
         
         // In frame coordinates, grid step is always 1.0
         const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
         
-        // Convert back to parent world coordinates using raw transformation
+        // Convert back to parent world coordinates using raw transformation (without viewport)
         // This ensures bounds are stored correctly regardless of parent's viewport state
         snappedPoint = frameCoordsToParentWorld(snappedFramePoint, parentFrame)
       } else {
