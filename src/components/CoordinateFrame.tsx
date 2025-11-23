@@ -445,20 +445,19 @@ export function drawCoordinateFrame(
   // Draw base j vector (blue) as arrow
   drawArrow(ctx, originScreen, baseJEndScreen, '#3b82f6', 2, 8)
   
-  // Note: We don't restore context here - we restore it after drawing children
-  // This ensures children are clipped to this frame's bounds
-  
   // Recursively draw child frames with incremented nesting level
-  // Each child frame will set up its own clipping (including clipping to this frame's bounds)
+  // Children are drawn within the current clipping region (this frame's bounds, and parent's bounds if nested)
+  // Each child will set up additional clipping to its own bounds
   frame.childFrameIds.forEach(childId => {
     const childFrame = allFrames.find(f => f.id === childId)
     if (childFrame) {
-      // Save context before drawing child (child will set up its own clipping)
-      ctx.save()
+      // Child will set up its own clipping (which will be intersection with current clip)
       drawCoordinateFrame(ctx, childFrame, viewport, canvasWidth, canvasHeight, allFrames, selectedFrameId, nestingLevel + 1)
-      ctx.restore()
     }
   })
+  
+  // Restore context state (removes clip) after drawing all children
+  ctx.restore()
 }
 
 /**
