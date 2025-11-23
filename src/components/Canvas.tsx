@@ -8,7 +8,7 @@ import {
   clampPointToFrameBounds,
   isPointInFrame,
 } from '../utils/coordinates'
-import { drawCoordinateFrame, screenToFrame, frameToParent, frameCoordsToParentWorld, parentToFrame } from './CoordinateFrame'
+import { drawCoordinateFrame, screenToFrame, frameToParent, frameCoordsToParentWorld, parentToFrame, nestedFrameToScreen } from './CoordinateFrame'
 
 interface CanvasProps {
   viewport: ViewportState
@@ -355,23 +355,51 @@ export default function Canvas({
     if (isDrawing) {
       // Start drawing rectangle
       // First, find the innermost parent frame that contains the click point
-      const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+      // We need to check in screen space, accounting for each frame's viewport
       let parentFrame: CoordinateFrame | null = null
       let smallestArea = Infinity
       
+      // Check each frame by converting its bounds to screen coordinates
+      // and checking if the click point is inside
       for (const frame of frames) {
-        const { bounds } = frame
-        const pointX = worldPoint[0]
-        const pointY = worldPoint[1]
+        // Get frame bounds in screen coordinates (accounting for viewport)
+        let frameTopLeft: Point2D
+        let frameBottomRight: Point2D
         
-        // Check if point is inside frame bounds
+        if (frame.parentFrameId) {
+          // Nested frame - transform through parent chain
+          const parentFrameForCheck = frames.find(f => f.id === frame.parentFrameId)
+          if (parentFrameForCheck) {
+            const bounds = frame.bounds
+            const topLeftWorld: Point2D = [bounds.x, bounds.y + bounds.height]
+            const bottomRightWorld: Point2D = [bounds.x + bounds.width, bounds.y]
+            const topLeftFrame = parentToFrame(topLeftWorld, parentFrameForCheck)
+            const bottomRightFrame = parentToFrame(bottomRightWorld, parentFrameForCheck)
+            frameTopLeft = nestedFrameToScreen(topLeftFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight)
+            frameBottomRight = nestedFrameToScreen(bottomRightFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight)
+          } else {
+            continue
+          }
+        } else {
+          // Top-level frame
+          frameTopLeft = worldToScreen(frame.bounds.x, frame.bounds.y + frame.bounds.height, viewport, canvasWidth, canvasHeight)
+          frameBottomRight = worldToScreen(frame.bounds.x + frame.bounds.width, frame.bounds.y, viewport, canvasWidth, canvasHeight)
+        }
+        
+        // Check if click point is inside frame bounds in screen coordinates
+        const screenPoint: Point2D = [screenX, screenY]
+        const minX = Math.min(frameTopLeft[0], frameBottomRight[0])
+        const maxX = Math.max(frameTopLeft[0], frameBottomRight[0])
+        const minY = Math.min(frameTopLeft[1], frameBottomRight[1])
+        const maxY = Math.max(frameTopLeft[1], frameBottomRight[1])
+        
         if (
-          pointX >= bounds.x &&
-          pointX <= bounds.x + bounds.width &&
-          pointY >= bounds.y &&
-          pointY <= bounds.y + bounds.height
+          screenPoint[0] >= minX &&
+          screenPoint[0] <= maxX &&
+          screenPoint[1] >= minY &&
+          screenPoint[1] <= maxY
         ) {
-          const frameArea = bounds.width * bounds.height
+          const frameArea = (maxX - minX) * (maxY - minY)
           if (frameArea < smallestArea) {
             smallestArea = frameArea
             parentFrame = frame
@@ -382,12 +410,18 @@ export default function Canvas({
       let snappedPoint: Point2D
       
       if (parentFrame) {
-        // Convert to parent frame coordinates and snap there
-        const framePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
+        // Convert screen to parent world coordinates first (using main viewport)
+        const parentWorldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+        
+        // Convert parent world coordinates to parent frame coordinates (without viewport)
+        // This gives us the "raw" frame coordinates, not accounting for parent's viewport pan/zoom
+        const framePoint = parentToFrame(parentWorldPoint, parentFrame)
+        
         // In frame coordinates, grid step is always 1.0
         const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
-        // Convert back to parent world coordinates
-        // Use frameCoordsToParentWorld (not frameToParent) because we want raw transformation
+        
+        // Convert back to parent world coordinates using raw transformation
+        // This ensures bounds are stored correctly regardless of parent's viewport state
         snappedPoint = frameCoordsToParentWorld(snappedFramePoint, parentFrame)
       } else {
         // Snap to background grid
@@ -398,10 +432,7 @@ export default function Canvas({
       setDrawingRect({ start: snappedPoint, end: snappedPoint, parentFrame })
     } else {
       // Check if clicking on a frame (for selection)
-      const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
-      
-      // Find the innermost frame that contains the click point
-      // We want the most nested frame (smallest area) that contains the point
+      // We need to check in screen space, accounting for each frame's viewport
       let clickedFrame: CoordinateFrame | null = null
       let smallestArea = Infinity
       

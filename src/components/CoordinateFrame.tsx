@@ -226,7 +226,7 @@ function getBackgroundColorForLevel(level: number): string {
  * Transform a point from a nested frame's coordinate system to screen coordinates
  * Recursively transforms through all parent frames
  */
-function nestedFrameToScreen(
+export function nestedFrameToScreen(
   point: Point2D,
   frame: CoordinateFrame,
   allFrames: CoordinateFrame[],
