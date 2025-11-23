@@ -132,6 +132,11 @@ export function screenToFrame(
  * @param frame The coordinate frame
  * @returns Point in parent (world) coordinates [x, y]
  */
+/**
+ * Transform a point from frame coordinates to parent (world) coordinates
+ * Applies frame viewport pan/zoom before transforming
+ * This is used when rendering - frame coordinates account for viewport
+ */
 export function frameToParent(point: Point2D, frame: CoordinateFrame): Point2D {
   const [u, v] = point
   const { viewport: frameViewport } = frame
@@ -139,60 +144,33 @@ export function frameToParent(point: Point2D, frame: CoordinateFrame): Point2D {
   const [iX, iY] = frame.baseI
   const [jX, jY] = frame.baseJ
   
-  // Transform to parent coordinates using base vectors
-  // When converting from frame coordinates to parent, we need to account for the frame's viewport
-  // The frame coordinates (u, v) are the "logical" coordinates in the frame's coordinate system
-  // But when we convert screen -> frame, we account for pan/zoom, so we need to reverse that here
-  // Actually wait - if u, v are the logical coordinates (after accounting for pan/zoom in screenToFrame),
-  // then we should transform them directly using base vectors, without applying pan/zoom again.
-  // But the issue is: screenToFrame gives us coordinates that have pan/zoom "baked in" (we undo pan/zoom),
-  // so u, v are the "raw" frame coordinates. These should map directly to parent using base vectors.
-  
-  // However, I think the issue might be that we need to account for frame zoom when transforming.
-  // In frameToScreen, we do: scaledU = (u - framePanX) * frameZoom, then parentX = originX + scaledU * iX
-  // So to reverse: if we have u (which is already after undoing pan/zoom in screenToFrame),
-  // we should transform directly. But wait, that's not right either.
-  
-  // Let me reconsider: In frameToScreen:
-  // 1. frameU = u - framePanX (undo pan)
-  // 2. scaledU = frameU * frameZoom (apply zoom)
-  // 3. parentX = originX + scaledU * iX + scaledV * jX
-  
-  // In screenToFrame (inverse):
-  // 1. parentX from screen
-  // 2. Solve for scaledU, scaledV
-  // 3. frameU = scaledU / frameZoom (undo zoom)
-  // 4. u = frameU + framePanX (undo pan)
-  
-  // So when we have u, v from screenToFrame, they are the "raw" frame coordinates (with pan/zoom already undone).
-  // To convert to parent, we should apply the same transformation as frameToScreen:
-  // But wait, we want the inverse - we want to go from frame coordinates to parent.
-  // If u, v are raw frame coordinates (no pan/zoom), then:
-  // parentX = originX + u * iX + v * jX (without zoom, because zoom affects screen representation)
-  
-  // Actually, I think the correct approach is:
-  // Frame coordinates (u, v) are the logical coordinates. To convert to parent:
-  // We need to apply zoom first (to get the "scaled" coordinates), then transform using base vectors.
-  // But wait, that doesn't match frameToScreen...
-  
-  // Let me re-read frameToScreen more carefully:
-  // frameU = u - framePanX  // u is the frame coordinate, we subtract pan to get "visible" coordinate
-  // scaledU = frameU * frameZoom  // scale by zoom
-  // parentX = originX + scaledU * iX  // transform using base vectors
-  
-  // So if we have a frame coordinate u (which is the "raw" coordinate, not accounting for pan/zoom),
-  // to convert to parent, we should:
-  // 1. Apply pan: frameU = u - framePanX
-  // 2. Apply zoom: scaledU = frameU * frameZoom  
-  // 3. Transform: parentX = originX + scaledU * iX
-  
-  // But when we snap, we snap the "raw" frame coordinates. So we need to apply pan/zoom when converting back.
+  // Apply frame viewport pan/zoom, then transform using base vectors
+  // This matches the inverse of frameToScreen
   const frameU = u - frameViewport.x
   const frameV = v - frameViewport.y
   const scaledU = frameU * frameViewport.zoom
   const scaledV = frameV * frameViewport.zoom
   const parentX = originX + scaledU * iX + scaledV * jX
   const parentY = originY + scaledU * iY + scaledV * jY
+  
+  return [parentX, parentY]
+}
+
+/**
+ * Transform a point from frame coordinates to parent (world) coordinates
+ * WITHOUT applying frame viewport pan/zoom
+ * This is used when creating new frames - we want raw coordinate transformation
+ */
+export function frameCoordsToParentWorld(point: Point2D, frame: CoordinateFrame): Point2D {
+  const [u, v] = point
+  const [originX, originY] = frame.origin
+  const [iX, iY] = frame.baseI
+  const [jX, jY] = frame.baseJ
+  
+  // Direct transformation without viewport pan/zoom
+  // This is used when storing bounds for newly created frames
+  const parentX = originX + u * iX + v * jX
+  const parentY = originY + u * iY + v * jY
   
   return [parentX, parentY]
 }
@@ -261,24 +239,28 @@ function nestedFrameToScreen(
     const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
     if (parentFrame) {
       // Transform point from this frame's coordinate system to parent's coordinate system
-      // First, convert from this frame's coordinates to parent's world coordinates
+      // Step 1: Convert from this frame's coordinates to parent's world coordinates
+      // frameToParent applies this frame's viewport pan/zoom, then transforms using base vectors
       const parentWorldPoint = frameToParent(point, frame)
       
-      // Then, convert from parent's world coordinates to parent's frame coordinates
+      // Step 2: Convert from parent's world coordinates to parent's frame coordinates
+      // parentToFrame does NOT apply viewport - it's just the coordinate transformation
       const parentFramePoint = parentToFrame(parentWorldPoint, parentFrame)
       
-      // Recursively transform through parent
+      // Step 3: Recursively transform through parent (which will apply parent's viewport)
       return nestedFrameToScreen(parentFramePoint, parentFrame, allFrames, rootViewport, canvasWidth, canvasHeight)
     }
   }
   
   // No parent (or parent not found), transform directly using this frame
+  // frameToScreen applies this frame's viewport pan/zoom and transforms to screen
   return frameToScreen(point, frame, rootViewport, canvasWidth, canvasHeight)
 }
 
 /**
  * Transform a point from parent (world) coordinates to frame coordinates
  * Inverse of frameToParent (without viewport pan/zoom)
+ * This is used for converting world coordinates to frame coordinates for rendering
  */
 function parentToFrame(point: Point2D, frame: CoordinateFrame): Point2D {
   const [px, py] = point
@@ -291,6 +273,8 @@ function parentToFrame(point: Point2D, frame: CoordinateFrame): Point2D {
   const relY = py - originY
   
   // Solve for u, v using inverse transformation
+  // We have: relX = u * iX + v * jX
+  //          relY = u * iY + v * jY
   const determinant = iX * jY - iY * jX
   if (Math.abs(determinant) < 1e-10) {
     return [0, 0]
@@ -300,6 +284,15 @@ function parentToFrame(point: Point2D, frame: CoordinateFrame): Point2D {
   const v = (relY * iX - relX * iY) / determinant
   
   return [u, v]
+}
+
+/**
+ * Transform a point from parent (world) coordinates to frame coordinates
+ * WITHOUT applying frame viewport pan/zoom
+ * This is used when creating new frames - we want raw coordinate transformation
+ */
+export function parentWorldToFrameCoords(point: Point2D, frame: CoordinateFrame): Point2D {
+  return parentToFrame(point, frame)
 }
 
 export function drawCoordinateFrame(
@@ -382,7 +375,44 @@ export function drawCoordinateFrame(
   // Save context state before clipping
   ctx.save()
   
-  // Clip drawing to frame bounds
+  // For nested frames, we need to clip to both the frame bounds AND the parent's bounds
+  // First, clip to parent bounds if this is a nested frame
+  if (frame.parentFrameId) {
+    const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
+    if (parentFrame) {
+      // Get parent frame bounds in screen coordinates
+      // We need to recursively get parent bounds through the parent chain
+      let parentTopLeft: Point2D
+      let parentBottomRight: Point2D
+      
+      if (parentFrame.parentFrameId) {
+        // Parent is also nested - use nested transformation
+        const parentBounds = parentFrame.bounds
+        const parentTopLeftWorld: Point2D = [parentBounds.x, parentBounds.y + parentBounds.height]
+        const parentBottomRightWorld: Point2D = [parentBounds.x + parentBounds.width, parentBounds.y]
+        const parentTopLeftFrame = parentToFrame(parentTopLeftWorld, parentFrame)
+        const parentBottomRightFrame = parentToFrame(parentBottomRightWorld, parentFrame)
+        parentTopLeft = nestedFrameToScreen(parentTopLeftFrame, parentFrame, allFrames, viewport, canvasWidth, canvasHeight)
+        parentBottomRight = nestedFrameToScreen(parentBottomRightFrame, parentFrame, allFrames, viewport, canvasWidth, canvasHeight)
+      } else {
+        // Parent is top-level
+        parentTopLeft = worldToScreen(parentFrame.bounds.x, parentFrame.bounds.y + parentFrame.bounds.height, viewport, canvasWidth, canvasHeight)
+        parentBottomRight = worldToScreen(parentFrame.bounds.x + parentFrame.bounds.width, parentFrame.bounds.y, viewport, canvasWidth, canvasHeight)
+      }
+      
+      // Clip to parent bounds first (intersection)
+      ctx.beginPath()
+      ctx.rect(
+        Math.round(parentTopLeft[0]) + 0.5,
+        Math.round(parentTopLeft[1]) + 0.5,
+        parentBottomRight[0] - parentTopLeft[0],
+        parentBottomRight[1] - parentTopLeft[1]
+      )
+      ctx.clip()
+    }
+  }
+  
+  // Clip drawing to frame bounds (intersection with parent bounds if nested)
   ctx.beginPath()
   ctx.rect(
     Math.round(topLeft[0]) + 0.5,
@@ -393,10 +423,10 @@ export function drawCoordinateFrame(
   ctx.clip()
   
   // Draw grid within clipped region with color based on nesting level
-  drawFrameGrid(ctx, frame, viewport, canvasWidth, canvasHeight, nestingLevel)
+  drawFrameGrid(ctx, frame, viewport, canvasWidth, canvasHeight, nestingLevel, allFrames)
   
   // Draw frame axes with labels
-  drawFrameAxes(ctx, frame, viewport, canvasWidth, canvasHeight)
+  drawFrameAxes(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
   
   // Draw base vectors within clipped region
   // Base vectors are 1 unit in frame coordinates

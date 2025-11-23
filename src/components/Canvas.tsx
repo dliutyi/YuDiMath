@@ -8,7 +8,7 @@ import {
   clampPointToFrameBounds,
   isPointInFrame,
 } from '../utils/coordinates'
-import { drawCoordinateFrame, screenToFrame, frameToParent } from './CoordinateFrame'
+import { drawCoordinateFrame, screenToFrame, frameToParent, frameCoordsToParentWorld } from './CoordinateFrame'
 
 interface CanvasProps {
   viewport: ViewportState
@@ -590,8 +590,9 @@ export default function Canvas({
         const framePoint = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
         // In frame coordinates, grid step is always 1.0
         const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
-        // Convert back to world coordinates
-        endPoint = frameToParent(snappedFramePoint, drawingRect.parentFrame)
+        // Convert back to parent world coordinates
+        // Use frameCoordsToParentWorld (not frameToParent) because we want raw transformation
+        endPoint = frameCoordsToParentWorld(snappedFramePoint, drawingRect.parentFrame)
         // Constrain to parent frame bounds
         endPoint = clampPointToFrameBounds(endPoint, drawingRect.parentFrame.bounds)
       } else {
