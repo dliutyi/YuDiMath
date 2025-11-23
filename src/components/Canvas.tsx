@@ -719,6 +719,7 @@ export default function Canvas({
         // Convert raw frame coordinates to parent world coordinates
         // This ensures bounds are stored correctly regardless of parent's viewport state
         endPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
+        console.error('[Canvas] MOUSE UP - endPoint calculated - raw:', rawFramePoint, 'snapped:', snappedRawFramePoint, 'world:', endPoint)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
