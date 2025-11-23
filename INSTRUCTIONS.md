@@ -657,7 +657,7 @@ For each step:
 
 ---
 
-### [ ] Step 4.6: Add Parameter Sliders to Frame Properties
+### [x] Step 4.6: Add Parameter Sliders to Frame Properties
 **Task**: Add sliders in Frame Properties panel that create corresponding variables in Python code.
 
 **Implementation**:
