@@ -441,36 +441,14 @@ export default function Canvas({
         console.error('[Canvas] MOUSE DOWN - parent frame viewport:', parentFrame.viewport)
         
         // In frame coordinates, grid step is always 1.0
-        let snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
-        console.error('[Canvas] MOUSE DOWN - snapped raw frame point:', snappedRawFramePoint)
+        const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
         
-        // Clamp raw frame coordinates to parent frame bounds in frame coordinate space
-        // Convert parent bounds corners to frame coordinates
-        const parentBounds = parentFrame.bounds
-        const bottomLeftWorld: Point2D = [parentBounds.x, parentBounds.y]
-        const topRightWorld: Point2D = [parentBounds.x + parentBounds.width, parentBounds.y + parentBounds.height]
-        const bottomLeftFrame = parentToFrame(bottomLeftWorld, parentFrame)
-        const topRightFrame = parentToFrame(topRightWorld, parentFrame)
-        const minU = Math.min(bottomLeftFrame[0], topRightFrame[0])
-        const maxU = Math.max(bottomLeftFrame[0], topRightFrame[0])
-        const minV = Math.min(bottomLeftFrame[1], topRightFrame[1])
-        const maxV = Math.max(bottomLeftFrame[1], topRightFrame[1])
-        console.error('[Canvas] MOUSE DOWN - frame bounds in frame coords: minU:', minU, 'maxU:', maxU, 'minV:', minV, 'maxV:', maxV)
-        
-        // Clamp snapped raw frame point to frame bounds
-        const beforeClamp = [...snappedRawFramePoint]
-        snappedRawFramePoint = [
-          Math.max(minU, Math.min(maxU, snappedRawFramePoint[0])),
-          Math.max(minV, Math.min(maxV, snappedRawFramePoint[1]))
-        ]
-        if (beforeClamp[0] !== snappedRawFramePoint[0] || beforeClamp[1] !== snappedRawFramePoint[1]) {
-          console.error('[Canvas] MOUSE DOWN - CLAMPED from:', beforeClamp, 'to:', snappedRawFramePoint)
-        }
+        // Don't clamp during mouse down - allow drawing to start anywhere
+        // Clamping will happen when the frame is created in handleMouseUp
         
         // Convert raw frame coordinates to parent world coordinates
         // This ensures bounds are stored correctly regardless of parent's viewport state
         snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
-        console.error('[Canvas] MOUSE DOWN - final world point:', snappedPoint)
         
       } else {
         // Snap to background grid
@@ -582,35 +560,14 @@ export default function Canvas({
         console.error('[Canvas] MOUSE MOVE - screen:', [screenX, screenY], 'raw frame:', rawFramePoint, 'parent frame viewport:', drawingRect.parentFrame.viewport)
         
         // In frame coordinates, grid step is always 1.0
-        let snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
-        console.error('[Canvas] MOUSE MOVE - snapped raw frame point:', snappedRawFramePoint)
+        const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
         
-        // Clamp raw frame coordinates to parent frame bounds in frame coordinate space
-        // Convert parent bounds corners to frame coordinates
-        const parentBounds = drawingRect.parentFrame.bounds
-        const bottomLeftWorld: Point2D = [parentBounds.x, parentBounds.y]
-        const topRightWorld: Point2D = [parentBounds.x + parentBounds.width, parentBounds.y + parentBounds.height]
-        const bottomLeftFrame = parentToFrame(bottomLeftWorld, drawingRect.parentFrame)
-        const topRightFrame = parentToFrame(topRightWorld, drawingRect.parentFrame)
-        const minU = Math.min(bottomLeftFrame[0], topRightFrame[0])
-        const maxU = Math.max(bottomLeftFrame[0], topRightFrame[0])
-        const minV = Math.min(bottomLeftFrame[1], topRightFrame[1])
-        const maxV = Math.max(bottomLeftFrame[1], topRightFrame[1])
-        
-        // Clamp snapped raw frame point to frame bounds
-        const beforeClamp = [...snappedRawFramePoint]
-        snappedRawFramePoint = [
-          Math.max(minU, Math.min(maxU, snappedRawFramePoint[0])),
-          Math.max(minV, Math.min(maxV, snappedRawFramePoint[1]))
-        ]
-        if (beforeClamp[0] !== snappedRawFramePoint[0] || beforeClamp[1] !== snappedRawFramePoint[1]) {
-          console.error('[Canvas] MOUSE MOVE - CLAMPED from:', beforeClamp, 'to:', snappedRawFramePoint)
-        }
+        // Don't clamp during drawing - allow drawing rectangle to extend beyond parent bounds
+        // Clamping will happen when the frame is created in handleMouseUp
         
         // Convert raw frame coordinates to parent world coordinates
         // This ensures bounds are stored correctly regardless of parent's viewport state
         snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, drawingRect.parentFrame)
-        console.error('[Canvas] MOUSE MOVE - raw frame coords:', snappedRawFramePoint, '-> parent world:', snappedPoint, 'parent origin:', drawingRect.parentFrame.origin)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
