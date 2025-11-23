@@ -112,37 +112,6 @@ export default function Canvas({
 
     // Draw rectangle being created
     if (drawingRect.start && drawingRect.end) {
-      // If drawing inside a parent frame, draw the parent frame's border as a constraint indicator
-      if (drawingRect.parentFrame) {
-        // Transform parent bounds through parent frame's viewport to screen
-        const parentBounds = drawingRect.parentFrame.bounds
-        const parentTopLeftWorld: Point2D = [parentBounds.x, parentBounds.y + parentBounds.height]
-        const parentBottomRightWorld: Point2D = [parentBounds.x + parentBounds.width, parentBounds.y]
-        
-        // Convert to parent frame coordinates, then transform through viewport to screen
-        const parentTopLeftFrame = parentToFrame(parentTopLeftWorld, drawingRect.parentFrame)
-        const parentBottomRightFrame = parentToFrame(parentBottomRightWorld, drawingRect.parentFrame)
-        
-        const parentTopLeft = frameToScreen(parentTopLeftFrame, drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
-        const parentBottomRight = frameToScreen(parentBottomRightFrame, drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
-        const parentScreenWidth = parentBottomRight[0] - parentTopLeft[0]
-        const parentScreenHeight = parentBottomRight[1] - parentTopLeft[1]
-        
-        // Draw parent frame border as a constraint indicator (darker, thicker)
-        ctx.strokeStyle = '#3b82f6' // primary color
-        ctx.lineWidth = 3
-        ctx.setLineDash([10, 5]) // Longer dashes for constraint
-        ctx.beginPath()
-        ctx.rect(
-          Math.round(parentTopLeft[0]) + 0.5,
-          Math.round(parentTopLeft[1]) + 0.5,
-          parentScreenWidth,
-          parentScreenHeight
-        )
-        ctx.stroke()
-        ctx.setLineDash([]) // Reset line dash
-      }
-      
       const [x1, y1] = drawingRect.start
       const [x2, y2] = drawingRect.end
 
