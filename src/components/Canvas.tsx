@@ -637,7 +637,7 @@ export default function Canvas({
     e.preventDefault()
   }, [isDrawing, drawingRect, viewport, onViewportChange, onFrameViewportChange, frames, width, height])
 
-  const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseUp = useCallback(() => {
     const canvas = canvasRef.current
     const container = containerRef.current
     if (!canvas || !container) return
