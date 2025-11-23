@@ -728,8 +728,10 @@ function drawFrameAxes(
   for (let y = startYLabel; y <= endYLabel; y += labelSpacing) {
     if (Math.abs(y) < 0.001) continue // Skip label at origin
     
-    // Use frameToScreen to account for frame viewport zoom and pan
-    const labelScreen = frameToScreen([0, y], frame, viewport, canvasWidth, canvasHeight)
+    // For nested frames, transform through parent chain
+    const labelScreen = frame.parentFrameId
+      ? nestedFrameToScreen([0, y], frame, allFrames, viewport, canvasWidth, canvasHeight)
+      : frameToScreen([0, y], frame, viewport, canvasWidth, canvasHeight)
     
     // Format label (remove unnecessary decimals)
     const labelText = y % 1 === 0 ? y.toString() : y.toFixed(2).replace(/\.?0+$/, '')
