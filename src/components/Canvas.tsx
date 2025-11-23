@@ -114,9 +114,17 @@ export default function Canvas({
     if (drawingRect.start && drawingRect.end) {
       // If drawing inside a parent frame, draw the parent frame's border as a constraint indicator
       if (drawingRect.parentFrame) {
+        // Transform parent bounds through parent frame's viewport to screen
         const parentBounds = drawingRect.parentFrame.bounds
-        const parentTopLeft = worldToScreen(parentBounds.x, parentBounds.y + parentBounds.height, viewport, canvasWidth, canvasHeight)
-        const parentBottomRight = worldToScreen(parentBounds.x + parentBounds.width, parentBounds.y, viewport, canvasWidth, canvasHeight)
+        const parentTopLeftWorld: Point2D = [parentBounds.x, parentBounds.y + parentBounds.height]
+        const parentBottomRightWorld: Point2D = [parentBounds.x + parentBounds.width, parentBounds.y]
+        
+        // Convert to parent frame coordinates, then transform through viewport to screen
+        const parentTopLeftFrame = parentToFrame(parentTopLeftWorld, drawingRect.parentFrame)
+        const parentBottomRightFrame = parentToFrame(parentBottomRightWorld, drawingRect.parentFrame)
+        
+        const parentTopLeft = frameToScreen(parentTopLeftFrame, drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
+        const parentBottomRight = frameToScreen(parentBottomRightFrame, drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
         const parentScreenWidth = parentBottomRight[0] - parentTopLeft[0]
         const parentScreenHeight = parentBottomRight[1] - parentTopLeft[1]
         
@@ -145,8 +153,24 @@ export default function Canvas({
       const maxY = Math.max(y1, y2)
 
       // Convert corners to screen coordinates
-      const topLeft = worldToScreen(minX, maxY, viewport, canvasWidth, canvasHeight)
-      const bottomRight = worldToScreen(maxX, minY, viewport, canvasWidth, canvasHeight)
+      // For nested frames, we need to transform through parent frame's viewport
+      let topLeft: Point2D
+      let bottomRight: Point2D
+      
+      if (drawingRect.parentFrame) {
+        // Transform through parent frame's viewport
+        const topLeftWorld: Point2D = [minX, maxY]
+        const bottomRightWorld: Point2D = [maxX, minY]
+        
+        const topLeftFrame = parentToFrame(topLeftWorld, drawingRect.parentFrame)
+        const bottomRightFrame = parentToFrame(bottomRightWorld, drawingRect.parentFrame)
+        
+        topLeft = frameToScreen(topLeftFrame, drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
+        bottomRight = frameToScreen(bottomRightFrame, drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
+      } else {
+        topLeft = worldToScreen(minX, maxY, viewport, canvasWidth, canvasHeight)
+        bottomRight = worldToScreen(maxX, minY, viewport, canvasWidth, canvasHeight)
+      }
 
       const screenWidth = bottomRight[0] - topLeft[0]
       const screenHeight = bottomRight[1] - topLeft[1]
