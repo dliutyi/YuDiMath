@@ -73,8 +73,8 @@ function App() {
             ...updates,
           }
           
-          // If origin or base vectors changed, regenerate code while preserving user code
-          if (updates.origin || updates.baseI || updates.baseJ) {
+          // If origin, base vectors, or parameters changed, regenerate code while preserving user code
+          if (updates.origin || updates.baseI || updates.baseJ || updates.parameters) {
             updatedFrame.code = generateCode(updatedFrame, frame.code)
           }
           

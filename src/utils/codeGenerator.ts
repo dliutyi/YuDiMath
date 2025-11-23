@@ -6,7 +6,27 @@ import { CoordinateFrame } from '../types'
  * @returns Python code string with frame properties and examples
  */
 export function generateDefaultCode(frame: CoordinateFrame): string {
-  const { origin, baseI, baseJ } = frame
+  const { origin, baseI, baseJ, parameters } = frame
+  
+  // Generate parameter variables (t1, t2, t3, etc.)
+  let parameterCode = ''
+  if (parameters && Object.keys(parameters).length > 0) {
+    // Sort parameter keys to ensure consistent ordering (t1, t2, t3, etc.)
+    const sortedKeys = Object.keys(parameters).sort((a, b) => {
+      // Extract numbers from keys (e.g., "t1" -> 1, "t2" -> 2)
+      const numA = parseInt(a.replace(/\D/g, '')) || 0
+      const numB = parseInt(b.replace(/\D/g, '')) || 0
+      return numA - numB
+    })
+    
+    parameterCode = sortedKeys
+      .map(key => `  ${key} = ${parameters[key]}  # Parameter slider value`)
+      .join('\n')
+    
+    if (parameterCode) {
+      parameterCode = '\n# Parameter sliders\n' + parameterCode
+    }
+  }
   
   return `import numpy as np
 from scipy import linalg
@@ -17,7 +37,7 @@ base_i = np.array([${baseI[0]}, ${baseI[1]}])  # Base i vector
 base_j = np.array([${baseJ[0]}, ${baseJ[1]}])  # Base j vector
 
 # Base vectors matrix
-basis_matrix = np.column_stack([base_i, base_j])
+basis_matrix = np.column_stack([base_i, base_j])${parameterCode}
 
 # Predefined functions available:
 # - draw(vector, color?) - Draw a vector from origin
@@ -45,7 +65,9 @@ export function extractUserCode(code: string): string[] {
   for (const line of lines) {
     const trimmed = line.trim()
     // Check if line contains draw() or plot() calls (not commented out)
+    // Also exclude parameter variable assignments (t1 = ..., t2 = ..., etc.)
     if (trimmed && !trimmed.startsWith('#') && 
+        !trimmed.match(/^\s*t\d+\s*=\s*-?\d+\.?\d*\s*(?:#.*)?$/i) &&
         (trimmed.includes('draw(') || trimmed.includes('plot('))) {
       userCode.push(line)
     }
@@ -55,14 +77,56 @@ export function extractUserCode(code: string): string[] {
 }
 
 /**
- * Generates Python code for a frame, preserving user-added code
+ * Extracts parameter variables (t1, t2, t3, etc.) from existing code
+ * @param code - Existing Python code
+ * @returns Record of parameter names to values
+ */
+export function extractParameters(code: string): Record<string, number> {
+  const parameters: Record<string, number> = {}
+  const lines = code.split('\n')
+  
+  // Pattern to match parameter assignments: t1 = 5.0 or t1 = 5
+  const parameterPattern = /^\s*(t\d+)\s*=\s*(-?\d+\.?\d*)\s*(?:#.*)?$/i
+  
+  for (const line of lines) {
+    const trimmed = line.trim()
+    // Skip comments and empty lines
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue
+    }
+    
+    const match = trimmed.match(parameterPattern)
+    if (match) {
+      const paramName = match[1]
+      const paramValue = parseFloat(match[2])
+      if (!isNaN(paramValue)) {
+        parameters[paramName] = paramValue
+      }
+    }
+  }
+  
+  return parameters
+}
+
+/**
+ * Generates Python code for a frame, preserving user-added code and parameters
  * @param frame - The coordinate frame to generate code for
  * @param existingCode - Optional existing code to preserve user additions
  * @returns Python code string with frame properties and preserved user code
  */
 export function generateCode(frame: CoordinateFrame, existingCode?: string): string {
-  // Generate the default template
-  const defaultCode = generateDefaultCode(frame)
+  // If existing code is provided, try to extract parameters from it
+  // This preserves parameter values that might have been manually edited
+  let parametersToUse = frame.parameters || {}
+  if (existingCode) {
+    const extractedParams = extractParameters(existingCode)
+    // Merge: use frame.parameters as source of truth, but fill in any missing ones from code
+    parametersToUse = { ...extractedParams, ...parametersToUse }
+  }
+  
+  // Create a temporary frame with merged parameters for code generation
+  const frameWithParams = { ...frame, parameters: parametersToUse }
+  const defaultCode = generateDefaultCode(frameWithParams)
   
   // If no existing code, return default
   if (!existingCode) {

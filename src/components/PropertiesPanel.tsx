@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { CoordinateFrame, Point2D, ViewportState } from '../types'
 import { areVectorsCollinear, normalizeVector, vectorMagnitude, orthogonalVector } from '../utils/vectorUtils'
+import ParameterSliders from './ParameterSliders'
 
 interface PropertiesPanelProps {
   selectedFrame: CoordinateFrame | null
@@ -492,6 +493,14 @@ export default function PropertiesPanel({
             </div>
           </div>
         )}
+
+        {/* Parameter Sliders */}
+        <ParameterSliders
+          selectedFrame={selectedFrame}
+          onParameterChange={(frameId, parameters) => {
+            onFrameUpdate(frameId, { parameters })
+          }}
+        />
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateDefaultCode, extractUserCode, generateCode, shouldRegenerateCode } from '../../src/utils/codeGenerator'
+import { generateDefaultCode, extractUserCode, generateCode, shouldRegenerateCode, extractParameters } from '../../src/utils/codeGenerator'
 import { CoordinateFrame } from '../../src/types'
 
 describe('codeGenerator', () => {
@@ -151,6 +151,82 @@ draw(np.array([1, 2]))
       expect(code).toContain('draw(np.array([1, 2])')
     })
 
+    it('should include parameters in generated code', () => {
+      const frame = {
+        ...mockFrame,
+        parameters: {
+          t1: 5.0,
+          t2: -3.5,
+        },
+      }
+      const code = generateCode(frame)
+      
+      expect(code).toContain('t1 = 5')
+      expect(code).toContain('t2 = -3.5')
+      expect(code).toContain('# Parameter sliders')
+    })
+
+    it('should preserve parameters when regenerating code', () => {
+      const frame = {
+        ...mockFrame,
+        parameters: {
+          t1: 7.5,
+          t2: 2.0,
+        },
+      }
+      const existingCode = `import numpy as np
+origin = np.array([5, 10])
+t1 = 5.0
+t2 = -3.5
+draw(np.array([1, 2]))
+`
+      const code = generateCode(frame, existingCode)
+      
+      // Should use frame.parameters (source of truth) not extracted ones
+      expect(code).toContain('t1 = 7.5')
+      expect(code).toContain('t2 = 2')
+      expect(code).toContain('draw(np.array([1, 2])')
+    })
+
+    it('should merge parameters from code when frame has no parameters', () => {
+      const frame = {
+        ...mockFrame,
+        parameters: undefined,
+      }
+      const existingCode = `import numpy as np
+origin = np.array([5, 10])
+t1 = 5.0
+t2 = -3.5
+draw(np.array([1, 2]))
+`
+      const code = generateCode(frame, existingCode)
+      
+      // Should extract and use parameters from existing code
+      expect(code).toContain('t1 = 5')
+      expect(code).toContain('t2 = -3.5')
+      expect(code).toContain('draw(np.array([1, 2])')
+    })
+
+    it('should sort parameters correctly (t1, t2, t3)', () => {
+      const frame = {
+        ...mockFrame,
+        parameters: {
+          t3: 10,
+          t1: 5.0,
+          t2: -3.5,
+        },
+      }
+      const code = generateCode(frame)
+      
+      // Check that parameters appear in sorted order
+      const t1Index = code.indexOf('t1 = 5')
+      const t2Index = code.indexOf('t2 = -3.5')
+      const t3Index = code.indexOf('t3 = 10')
+      
+      expect(t1Index).toBeLessThan(t2Index)
+      expect(t2Index).toBeLessThan(t3Index)
+    })
+
     it('should not duplicate user code', () => {
       const existingCode = `import numpy as np
 draw(np.array([1, 2]))
@@ -199,6 +275,60 @@ draw(np.array([1, 2]))
       const code = generateDefaultCode(mockFrame)
       // Should not regenerate for tiny differences
       expect(shouldRegenerateCode(frame, code)).toBe(false)
+    })
+  })
+
+  describe('extractParameters', () => {
+    it('should extract parameter variables from code', () => {
+      const code = `import numpy as np
+t1 = 5.0
+t2 = -3.5
+t3 = 10
+draw(np.array([1, 2]))
+`
+      const params = extractParameters(code)
+      
+      expect(params).toEqual({
+        t1: 5.0,
+        t2: -3.5,
+        t3: 10,
+      })
+    })
+
+    it('should ignore commented parameter assignments', () => {
+      const code = `import numpy as np
+# t1 = 5.0
+t2 = -3.5
+t3 = 10
+`
+      const params = extractParameters(code)
+      
+      expect(params).toEqual({
+        t2: -3.5,
+        t3: 10,
+      })
+    })
+
+    it('should handle parameters with comments', () => {
+      const code = `import numpy as np
+t1 = 5.0  # Parameter slider value
+t2 = -3.5
+`
+      const params = extractParameters(code)
+      
+      expect(params).toEqual({
+        t1: 5.0,
+        t2: -3.5,
+      })
+    })
+
+    it('should return empty object when no parameters found', () => {
+      const code = `import numpy as np
+draw(np.array([1, 2]))
+`
+      const params = extractParameters(code)
+      
+      expect(params).toEqual({})
     })
   })
 })

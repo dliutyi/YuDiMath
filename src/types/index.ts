@@ -116,6 +116,8 @@ export interface CoordinateFrame {
   functions: FunctionPlot[]
   /** Python code for this frame */
   code: string
+  /** Parameter slider values (t1, t2, t3, etc.) */
+  parameters?: Record<string, number>
   /** ID of parent frame (null for top-level frames) */
   parentFrameId: string | null
   /** IDs of child frames (nested frames) */
