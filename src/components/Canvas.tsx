@@ -740,11 +740,10 @@ export default function Canvas({
           let baseJ: Point2D = [0, 1]
           
           if (parentFrame) {
-              // Inherit base vectors from parent
-              baseI = [...parentFrame.baseI]
-              baseJ = [...parentFrame.baseJ]
-              console.log('[Canvas] Inheriting base vectors from parent:', { baseI, baseJ })
-            }
+            // Inherit base vectors from parent
+            baseI = [...parentFrame.baseI]
+            baseJ = [...parentFrame.baseJ]
+            console.log('[Canvas] Inheriting base vectors from parent:', { baseI, baseJ })
           }
 
           // Initialize frame with its own viewport state (independent panning and zooming)
