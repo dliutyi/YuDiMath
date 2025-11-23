@@ -338,6 +338,9 @@ export function drawCoordinateFrame(
       // frameToScreen expects frame coordinates and applies: (u - viewport.x) * zoom, then transforms to parent world, then to screen
       topLeft = frameToScreen(topLeftParentFrame, parentFrame, viewport, canvasWidth, canvasHeight)
       bottomRight = frameToScreen(bottomRightParentFrame, parentFrame, viewport, canvasWidth, canvasHeight)
+      
+      console.error('[CoordinateFrame] topLeftParentFrame:', topLeftParentFrame, 'bottomRightParentFrame:', bottomRightParentFrame)
+      console.error('[CoordinateFrame] topLeft screen:', topLeft, 'bottomRight screen:', bottomRight)
     } else {
       // Parent not found, fall back to direct transformation
       topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
