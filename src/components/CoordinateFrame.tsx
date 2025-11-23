@@ -63,6 +63,91 @@ function frameToScreen(
 }
 
 /**
+ * Transform a point from screen coordinates to frame coordinates
+ * Inverse of frameToScreen
+ * @param screenPoint Point in screen coordinates [x, y]
+ * @param frame The coordinate frame
+ * @param parentViewport Parent viewport state
+ * @param canvasWidth Canvas width in pixels
+ * @param canvasHeight Canvas height in pixels
+ * @returns Point in frame coordinates [u, v]
+ */
+export function screenToFrame(
+  screenPoint: Point2D,
+  frame: CoordinateFrame,
+  parentViewport: ViewportState,
+  canvasWidth: number,
+  canvasHeight: number
+): Point2D {
+  const [screenX, screenY] = screenPoint
+  const { viewport: frameViewport } = frame
+  
+  // Transform from screen to parent coordinates
+  const centerX = canvasWidth / 2
+  const centerY = canvasHeight / 2
+  const parentX = parentViewport.x + (screenX - centerX) / parentViewport.zoom
+  const parentY = parentViewport.y - (screenY - centerY) / parentViewport.zoom
+  
+  // Transform from parent coordinates to frame coordinates
+  // We need to solve: parent = origin + scaledU * baseI + scaledV * baseJ
+  // Where scaledU = (u - framePanX) * frameZoom and scaledV = (v - framePanY) * frameZoom
+  
+  const [originX, originY] = frame.origin
+  const [iX, iY] = frame.baseI
+  const [jX, jY] = frame.baseJ
+  
+  // Relative to frame origin
+  const relX = parentX - originX
+  const relY = parentY - originY
+  
+  // Solve for scaledU and scaledV using the inverse transformation
+  // We have: relX = scaledU * iX + scaledV * jX
+  //          relY = scaledU * iY + scaledV * jY
+  // This is a 2x2 system: [iX jX] [scaledU] = [relX]
+  //                      [iY jY] [scaledV]   [relY]
+  
+  const determinant = iX * jY - iY * jX
+  if (Math.abs(determinant) < 1e-10) {
+    // Base vectors are parallel or zero, can't invert
+    return [0, 0]
+  }
+  
+  const scaledU = (relX * jY - relY * jX) / determinant
+  const scaledV = (relY * iX - relX * iY) / determinant
+  
+  // Undo frame zoom
+  const frameU = scaledU / frameViewport.zoom
+  const frameV = scaledV / frameViewport.zoom
+  
+  // Undo frame pan
+  const u = frameU + frameViewport.x
+  const v = frameV + frameViewport.y
+  
+  return [u, v]
+}
+
+/**
+ * Transform a point from frame coordinates to parent (world) coordinates
+ * @param point Point in frame coordinates [u, v]
+ * @param frame The coordinate frame
+ * @returns Point in parent (world) coordinates [x, y]
+ */
+export function frameToParent(point: Point2D, frame: CoordinateFrame): Point2D {
+  const [u, v] = point
+  const [originX, originY] = frame.origin
+  const [iX, iY] = frame.baseI
+  const [jX, jY] = frame.baseJ
+  
+  // Transform to parent coordinates using base vectors
+  // Note: frame coordinates are relative to frame origin, no pan/zoom applied here
+  // (pan/zoom only affects what's visible, not the coordinate transformation itself)
+  const parentX = originX + u * iX + v * jX
+  const parentY = originY + u * iY + v * jY
+  
+  return [parentX, parentY]
+}
+
+/**
  * Draw a coordinate frame on the canvas
  * This function is called from the Canvas component's draw function
  */

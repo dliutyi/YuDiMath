@@ -8,7 +8,7 @@ import {
   clampPointToFrameBounds,
   isPointInFrame,
 } from '../utils/coordinates'
-import { drawCoordinateFrame } from './CoordinateFrame'
+import { drawCoordinateFrame, screenToFrame, frameToParent } from './CoordinateFrame'
 
 interface CanvasProps {
   viewport: ViewportState
@@ -354,18 +354,15 @@ export default function Canvas({
 
     if (isDrawing) {
       // Start drawing rectangle
+      // First, find the innermost parent frame that contains the click point
       const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
-      
-      // Find the innermost parent frame that contains the starting point
-      // Use a temporary snap to background grid to find the parent frame
-      let tempSnappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
       let parentFrame: CoordinateFrame | null = null
       let smallestArea = Infinity
       
       for (const frame of frames) {
         const { bounds } = frame
-        const pointX = tempSnappedPoint[0]
-        const pointY = tempSnappedPoint[1]
+        const pointX = worldPoint[0]
+        const pointY = worldPoint[1]
         
         // Check if point is inside frame bounds
         if (
@@ -382,20 +379,21 @@ export default function Canvas({
         }
       }
       
-      // Calculate grid step: use parent frame's grid step if inside a frame, otherwise use background grid step
-      let gridStep = viewport.gridStep
+      let snappedPoint: Point2D
+      
       if (parentFrame) {
-        // Parent frame's grid step is based on its base vector magnitudes
-        const iMagnitude = Math.sqrt(parentFrame.baseI[0] ** 2 + parentFrame.baseI[1] ** 2)
-        const jMagnitude = Math.sqrt(parentFrame.baseJ[0] ** 2 + parentFrame.baseJ[1] ** 2)
-        const avgMagnitude = (iMagnitude + jMagnitude) / 2
-        gridStep = avgMagnitude > 0 ? avgMagnitude : 1.0
+        // Convert to parent frame coordinates and snap there
+        const framePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
+        // In frame coordinates, grid step is always 1.0
+        const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
+        // Convert back to world coordinates
+        snappedPoint = frameToParent(snappedFramePoint, parentFrame)
+      } else {
+        // Snap to background grid
+        snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
       }
       
-      // Snap to the appropriate grid
-      const snappedPoint = snapPointToGrid(worldPoint, gridStep)
-      
-      console.log('[Canvas] Starting rectangle drawing at:', snappedPoint, 'parent frame:', parentFrame?.id, 'grid step:', gridStep)
+      console.log('[Canvas] Starting rectangle drawing at:', snappedPoint, 'parent frame:', parentFrame?.id)
       setDrawingRect({ start: snappedPoint, end: snappedPoint, parentFrame })
     } else {
       // Check if clicking on a frame (for selection)
@@ -455,23 +453,21 @@ export default function Canvas({
 
     if (isDrawing && drawingRect.start) {
       // Update rectangle drawing
-      const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+      let snappedPoint: Point2D
       
-      // Calculate grid step: use parent frame's grid step if inside a frame, otherwise use background grid step
-      let gridStep = viewport.gridStep
       if (drawingRect.parentFrame) {
-        // Parent frame's grid step is based on its base vector magnitudes
-        const iMagnitude = Math.sqrt(drawingRect.parentFrame.baseI[0] ** 2 + drawingRect.parentFrame.baseI[1] ** 2)
-        const jMagnitude = Math.sqrt(drawingRect.parentFrame.baseJ[0] ** 2 + drawingRect.parentFrame.baseJ[1] ** 2)
-        const avgMagnitude = (iMagnitude + jMagnitude) / 2
-        gridStep = avgMagnitude > 0 ? avgMagnitude : 1.0
-      }
-      
-      let snappedPoint = snapPointToGrid(worldPoint, gridStep)
-      
-      // If drawing inside a parent frame, constrain the point to stay within bounds
-      if (drawingRect.parentFrame) {
+        // Convert to parent frame coordinates and snap there
+        const framePoint = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
+        // In frame coordinates, grid step is always 1.0
+        const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
+        // Convert back to world coordinates
+        snappedPoint = frameToParent(snappedFramePoint, drawingRect.parentFrame)
+        // Constrain to parent frame bounds
         snappedPoint = clampPointToFrameBounds(snappedPoint, drawingRect.parentFrame.bounds)
+      } else {
+        // Snap to background grid
+        const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+        snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
       }
       
       setDrawingRect((prev) => ({ ...prev, end: snappedPoint }))
@@ -583,23 +579,22 @@ export default function Canvas({
       const canvasHeight = height || rect.height || 600
       const screenX = e.clientX - rect.left
       const screenY = e.clientY - rect.top
-      const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+      let endPoint: Point2D
       
-      // Calculate grid step: use parent frame's grid step if inside a frame, otherwise use background grid step
-      let gridStep = viewport.gridStep
       if (drawingRect.parentFrame) {
-        // Parent frame's grid step is based on its base vector magnitudes
-        const iMagnitude = Math.sqrt(drawingRect.parentFrame.baseI[0] ** 2 + drawingRect.parentFrame.baseI[1] ** 2)
-        const jMagnitude = Math.sqrt(drawingRect.parentFrame.baseJ[0] ** 2 + drawingRect.parentFrame.baseJ[1] ** 2)
-        const avgMagnitude = (iMagnitude + jMagnitude) / 2
-        gridStep = avgMagnitude > 0 ? avgMagnitude : 1.0
-      }
-      
-      let endPoint = drawingRect.end || snapPointToGrid(worldPoint, gridStep)
-      
-      // If drawing inside a parent frame, constrain the end point to stay within bounds
-      if (drawingRect.parentFrame) {
+        // Convert to parent frame coordinates and snap there
+        const framePoint = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
+        // In frame coordinates, grid step is always 1.0
+        const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
+        // Convert back to world coordinates
+        endPoint = frameToParent(snappedFramePoint, drawingRect.parentFrame)
+        // Constrain to parent frame bounds
         endPoint = clampPointToFrameBounds(endPoint, drawingRect.parentFrame.bounds)
+      } else {
+        // Snap to background grid
+        const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+        endPoint = drawingRect.end || snapPointToGrid(worldPoint, viewport.gridStep)
+      }
       }
 
       console.log('[Canvas] End point:', endPoint, 'start:', drawingRect.start)
