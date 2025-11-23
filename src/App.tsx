@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Canvas from './components/Canvas'
 import GridStepSelector from './components/GridStepSelector'
+import PropertiesPanel from './components/PropertiesPanel'
 import type { ViewportState, CoordinateFrame } from './types'
 
 function App() {
@@ -59,6 +60,22 @@ function App() {
     })
   }
 
+  const handleFrameUpdate = (frameId: string, updates: Partial<CoordinateFrame>) => {
+    setFrames((prev) => {
+      return prev.map((frame) => {
+        if (frame.id === frameId) {
+          return {
+            ...frame,
+            ...updates,
+          }
+        }
+        return frame
+      })
+    })
+  }
+
+  const selectedFrame = frames.find(f => f.id === selectedFrameId) || null
+
   return (
     <div className="h-screen bg-bg-primary text-text-primary flex flex-col overflow-hidden">
       <div className="p-4 border-b border-border flex-shrink-0">
@@ -96,6 +113,12 @@ function App() {
           >
             {isDrawing ? 'Cancel Drawing' : 'Draw Frame'}
           </button>
+        </div>
+        <div className="absolute top-4 right-4 z-10">
+          <PropertiesPanel
+            selectedFrame={selectedFrame}
+            onFrameUpdate={handleFrameUpdate}
+          />
         </div>
       </div>
     </div>

@@ -466,7 +466,7 @@ For each step:
 
 ---
 
-### [ ] Step 3.6: Render Vectors as Arrows
+### [x] Step 3.6: Render Vectors as Arrows
 **Task**: Draw vectors as arrows with arrowheads, not just lines.
 
 **Implementation**:
