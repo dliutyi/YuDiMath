@@ -418,6 +418,8 @@ export default function Canvas({
         // Convert raw frame coordinates to parent world coordinates
         // This ensures bounds are stored correctly regardless of parent's viewport state
         snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
+        // Constrain to parent frame bounds
+        snappedPoint = clampPointToFrameBounds(snappedPoint, parentFrame.bounds)
         
         console.error('[Canvas] MOUSE DOWN - raw frame:', rawFramePoint, 'snapped raw:', snappedRawFramePoint, 'world:', snappedPoint)
       } else {
