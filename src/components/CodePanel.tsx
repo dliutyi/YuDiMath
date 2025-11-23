@@ -254,18 +254,60 @@ export default function CodePanel({
         </div>
       )}
 
-      {executionResult && (
-        <div className={`mb-4 p-2 rounded text-sm ${
+      {/* Loading indicator during execution */}
+      {(isRunning || isExecuting) && (
+        <div className="mb-4 p-3 bg-primary/10 border border-primary/30 rounded-lg flex items-center gap-3">
+          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm text-primary font-medium">Executing Python code...</span>
+        </div>
+      )}
+
+      {/* Execution result messages */}
+      {executionResult && !isRunning && !isExecuting && (
+        <div className={`mb-4 p-3 rounded-lg text-sm ${
           executionResult.success
             ? 'bg-success/20 border border-success/50 text-success'
             : 'bg-error/20 border border-error/50 text-error'
         }`}>
           {executionResult.success ? (
-            <span>✓ Code executed successfully</span>
+            <div className="flex items-center gap-2">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-4 h-4"
+              >
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <span>Code executed successfully</span>
+            </div>
           ) : (
             <div>
-              <div className="font-medium">Execution Error:</div>
-              <div className="text-xs mt-1">{executionResult.error}</div>
+              <div className="font-medium mb-2 flex items-center gap-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-4 h-4"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                Execution Error
+              </div>
+              <div className="text-xs mt-1 font-mono bg-error/10 p-2 rounded border border-error/20 break-all">
+                {executionResult.error}
+              </div>
             </div>
           )}
         </div>

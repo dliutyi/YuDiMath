@@ -5,6 +5,7 @@ import Toolbar from './components/Toolbar'
 import FrameEditorPanel from './components/FrameEditorPanel'
 import LoadingOverlay from './components/LoadingOverlay'
 import Modal from './components/Modal'
+import ErrorBoundary from './components/ErrorBoundary'
 import { generateCode } from './utils/codeGenerator'
 import { usePyScript } from './hooks/usePyScript'
 import { useWorkspace } from './hooks/useWorkspace'
@@ -311,9 +312,10 @@ function App() {
   }, [workspace.selectedFrameId, handleFrameDelete])
 
   return (
-    <div className="h-full bg-bg-primary text-text-primary relative overflow-hidden">
-      <LoadingOverlay />
-      <Canvas
+    <ErrorBoundary>
+      <div className="h-full bg-bg-primary text-text-primary relative overflow-hidden">
+        <LoadingOverlay />
+        <Canvas
         viewport={workspace.viewport}
         onViewportChange={workspace.setViewport}
         frames={workspace.frames}
@@ -395,7 +397,8 @@ function App() {
         secondaryText={modalState.secondaryText}
         onSecondary={modalState.onSecondary}
       />
-    </div>
+      </div>
+    </ErrorBoundary>
   )
 }
 
