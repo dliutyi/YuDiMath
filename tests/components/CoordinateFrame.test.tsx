@@ -51,6 +51,12 @@ describe('CoordinateFrame', () => {
       viewport: {
         x: 0,
         y: 0,
+        zoom: 1,
+        gridStep: 1,
+      },
+      viewport: {
+        x: 0,
+        y: 0,
         zoom: 1.0,
         gridStep: 1,
       },
@@ -84,7 +90,8 @@ describe('CoordinateFrame', () => {
   it('draws frame origin label', () => {
     drawCoordinateFrame(mockContext, defaultFrame, defaultViewport, 800, 600, [])
     
-    expect(mockContext.fillText).toHaveBeenCalledWith('O', expect.any(Number), expect.any(Number))
+    // Origin label is now '0' instead of 'O'
+    expect(mockContext.fillText).toHaveBeenCalledWith('0', expect.any(Number), expect.any(Number))
   })
 
   it('draws frame grid', () => {

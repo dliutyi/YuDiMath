@@ -392,6 +392,12 @@ describe('Canvas', () => {
         width: 20,
         height: 20,
       },
+      viewport: {
+        x: 0,
+        y: 0,
+        zoom: 1,
+        gridStep: 1,
+      },
       mode: '2d',
       vectors: [],
       functions: [],
