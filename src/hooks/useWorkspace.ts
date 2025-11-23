@@ -24,10 +24,10 @@ const DEFAULT_WORKSPACE: WorkspaceState = {
 
 /**
  * Hook for managing workspace state (viewport, frames, selected frame)
- * Optionally persists state to localStorage
+ * Persists state to localStorage by default
  */
 export function useWorkspace(options: { persist?: boolean } = {}) {
-  const { persist = false } = options
+  const { persist = true } = options
 
   // Load initial state from localStorage if persistence is enabled
   // IMPORTANT: Only access localStorage if persist is true

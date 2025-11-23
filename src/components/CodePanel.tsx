@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { flushSync } from 'react-dom'
 import Editor from 'react-simple-code-editor'
 import { highlight, languages } from 'prismjs'
 import 'prismjs/components/prism-python'
@@ -167,20 +168,15 @@ export default function CodePanel({
     setIsRunning(true)
     setExecutionResult(null)
 
-    // Clear existing vectors and functions immediately before running new code
-    // This ensures the frame is purged before execution
-    if (onVectorsClear) {
-      onVectorsClear(selectedFrame.id)
-    }
-    if (onFunctionsClear) {
-      onFunctionsClear(selectedFrame.id)
-    }
-
-    // Use requestAnimationFrame to ensure clearing state updates are processed
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => {
-        resolve()
-      })
+    // Clear existing vectors and functions synchronously before running new code
+    // Use flushSync to ensure state updates are applied immediately
+    flushSync(() => {
+      if (onVectorsClear) {
+        onVectorsClear(selectedFrame.id)
+      }
+      if (onFunctionsClear) {
+        onFunctionsClear(selectedFrame.id)
+      }
     })
 
     // Collect vectors and functions created during execution

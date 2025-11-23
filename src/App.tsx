@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import Canvas from './components/Canvas'
 import GridStepSelector from './components/GridStepSelector'
 import FrameEditorPanel from './components/FrameEditorPanel'
@@ -9,7 +10,7 @@ import { useWorkspace } from './hooks/useWorkspace'
 import type { ViewportState, CoordinateFrame, Vector, FunctionPlot } from './types'
 
 function App() {
-  const workspace = useWorkspace({ persist: false })
+  const workspace = useWorkspace({ persist: true })
   const [isDrawing, setIsDrawing] = useState(false)
   const { isReady, executeCode, isExecuting } = usePyScript()
 
@@ -105,57 +106,56 @@ function App() {
     if (autoExecuteCode && autoExecuteFrameId && isReady && !isExecuting) {
       console.log('[App] Auto-executing code for frame:', autoExecuteFrameId)
       
-      // Clear vectors and functions immediately before running new code
-      // This ensures the frame is purged before execution
-      handleVectorsClear(autoExecuteFrameId)
-      handleFunctionsClear(autoExecuteFrameId)
+      // Clear vectors and functions synchronously before running new code
+      // Use flushSync to ensure state updates are applied immediately
+      flushSync(() => {
+        handleVectorsClear(autoExecuteFrameId)
+        handleFunctionsClear(autoExecuteFrameId)
+      })
       
-      // Use requestAnimationFrame to ensure clearing state updates are processed
-      requestAnimationFrame(() => {
-        // Collect vectors and functions created during execution
-        const newVectors: Vector[] = []
-        const newFunctions: FunctionPlot[] = []
+      // Collect vectors and functions created during execution
+      const newVectors: Vector[] = []
+      const newFunctions: FunctionPlot[] = []
 
-        // Generate unique IDs for vectors and functions
-        const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      // Generate unique IDs for vectors and functions
+      const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-        executeCode(
-          autoExecuteCode,
-          autoExecuteFrameId,
-          // onVectorCreated callback
-          (vector) => {
-            newVectors.push({
-              ...vector,
-              id: generateId('vec'),
-            })
-          },
-          // onFunctionCreated callback
-          (func) => {
-            newFunctions.push({
-              ...func,
-              id: generateId('func'),
-            })
+      executeCode(
+        autoExecuteCode,
+        autoExecuteFrameId,
+        // onVectorCreated callback
+        (vector) => {
+          newVectors.push({
+            ...vector,
+            id: generateId('vec'),
+          })
+        },
+        // onFunctionCreated callback
+        (func) => {
+          newFunctions.push({
+            ...func,
+            id: generateId('func'),
+          })
+        }
+      ).then((result) => {
+        console.log('[App] Auto-execution result:', result.success)
+        if (result.success) {
+          // Update frame with new vectors and functions
+          if (newVectors.length > 0) {
+            handleVectorsUpdate(autoExecuteFrameId, newVectors)
           }
-        ).then((result) => {
-          console.log('[App] Auto-execution result:', result.success)
-          if (result.success) {
-            // Update frame with new vectors and functions
-            if (newVectors.length > 0) {
-              handleVectorsUpdate(autoExecuteFrameId, newVectors)
-            }
-            if (newFunctions.length > 0) {
-              handleFunctionsUpdate(autoExecuteFrameId, newFunctions)
-            }
+          if (newFunctions.length > 0) {
+            handleFunctionsUpdate(autoExecuteFrameId, newFunctions)
           }
-          // Clear auto-execute trigger after execution
-          setAutoExecuteCode(null)
-          setAutoExecuteFrameId(null)
-        }).catch((error) => {
-          console.error('[App] Auto-execution error:', error)
-          // Clear auto-execute trigger even on error
-          setAutoExecuteCode(null)
-          setAutoExecuteFrameId(null)
-        })
+        }
+        // Clear auto-execute trigger after execution
+        setAutoExecuteCode(null)
+        setAutoExecuteFrameId(null)
+      }).catch((error) => {
+        console.error('[App] Auto-execution error:', error)
+        // Clear auto-execute trigger even on error
+        setAutoExecuteCode(null)
+        setAutoExecuteFrameId(null)
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
