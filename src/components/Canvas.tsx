@@ -66,13 +66,11 @@ export default function Canvas({
     const canvas = canvasRef.current
     const container = containerRef.current
     if (!canvas || !container) {
-      console.log('[Canvas.draw] Missing canvas or container')
       return
     }
 
     const ctx = canvas.getContext('2d')
     if (!ctx) {
-      console.log('[Canvas.draw] Failed to get 2d context')
       return
     }
 
@@ -81,11 +79,9 @@ export default function Canvas({
     const canvasWidth = width || rect.width || 800
     const canvasHeight = height || rect.height || 600
 
-    console.log('[Canvas.draw] Canvas dimensions:', { canvasWidth, canvasHeight, rectWidth: rect.width, rectHeight: rect.height })
 
     // Skip if dimensions are invalid
     if (canvasWidth <= 0 || canvasHeight <= 0) {
-      console.log('[Canvas.draw] Invalid dimensions, skipping')
       return
     }
 
@@ -98,21 +94,17 @@ export default function Canvas({
     // Enable crisp rendering by aligning to pixel boundaries
     ctx.imageSmoothingEnabled = false
     
-    console.log('[Canvas.draw] Canvas set to:', { width: canvas.width, height: canvas.height, dpr })
 
     // Clear canvas
     ctx.clearRect(0, 0, canvasWidth, canvasHeight)
 
     // Draw grid first (so axes appear on top)
-    console.log('[Canvas.draw] Drawing grid...')
     drawGrid(ctx, viewport, canvasWidth, canvasHeight)
 
     // Draw axes on top
-    console.log('[Canvas.draw] Drawing axes...')
     drawAxes(ctx, viewport, canvasWidth, canvasHeight)
 
     // Draw existing frames (only top-level frames, children are drawn recursively)
-    console.log('[Canvas.draw] Drawing frames:', frames.length)
     const topLevelFrames = frames.filter(f => f.parentFrameId === null)
     topLevelFrames.forEach((frame) => {
       drawCoordinateFrame(ctx, frame, viewport, canvasWidth, canvasHeight, frames, selectedFrameId, 0)
@@ -174,7 +166,6 @@ export default function Canvas({
       ctx.setLineDash([]) // Reset line dash
     }
 
-    console.log('[Canvas.draw] Drawing complete')
   }
 
   useEffect(() => {
@@ -433,7 +424,6 @@ export default function Canvas({
         snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
       }
       
-      console.log('[Canvas] Starting rectangle drawing at:', snappedPoint, 'parent frame:', parentFrame?.id)
       drawingRectStartRef.current = snappedPoint
       drawingRectEndRef.current = snappedPoint
       drawingRectParentFrameRef.current = parentFrame
@@ -495,11 +485,9 @@ export default function Canvas({
       // Handle frame selection (but don't prevent panning)
       if (clickedFrame && onFrameSelected) {
         // Select the clicked frame
-        console.log('[Canvas] Frame clicked:', clickedFrame.id)
         onFrameSelected(clickedFrame.id)
       } else if (onFrameSelected) {
         // Clicked on background, deselect
-        console.log('[Canvas] Background clicked, deselecting frame')
         onFrameSelected(null)
       }
       
@@ -549,7 +537,6 @@ export default function Canvas({
         snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, drawingRect.parentFrame)
         // Constrain to parent frame bounds
         snappedPoint = clampPointToFrameBounds(snappedPoint, drawingRect.parentFrame.bounds)
-        console.log('[Canvas] Mouse move - parent world:', parentWorldPoint, 'raw frame:', rawFramePoint, 'snapped raw:', snappedRawFramePoint, 'world:', snappedPoint)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
@@ -659,7 +646,6 @@ export default function Canvas({
     const container = containerRef.current
     if (!canvas || !container) return
 
-    console.log('[Canvas] Mouse up - isDrawing:', isDrawing, 'drawingRect:', drawingRect)
 
     if (isDrawing && drawingRectStartRef.current) {
       // Use refs to get the latest values to avoid stale closures
@@ -692,28 +678,19 @@ export default function Canvas({
         endPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
         // Constrain to parent frame bounds
         endPoint = clampPointToFrameBounds(endPoint, parentFrame.bounds)
-        console.log('[Canvas] Mouse up - parent world:', parentWorldPoint, 'raw frame:', rawFramePoint, 'snapped raw:', snappedRawFramePoint, 'world:', endPoint)
+        console.log('[Canvas] Nested frame - raw:', rawFramePoint, 'snapped:', snappedRawFramePoint, 'world:', endPoint)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
         endPoint = snapPointToGrid(worldPoint, viewport.gridStep)
       }
 
-      console.log('[Canvas] ===== MOUSE UP =====')
-      console.log('[Canvas] End point:', endPoint)
-      console.log('[Canvas] Start point:', startPoint)
-      console.log('[Canvas] Parent frame ID:', parentFrame?.id)
-      console.log('[Canvas] Parent frame bounds:', parentFrame?.bounds)
-      console.log('[Canvas] Parent frame origin:', parentFrame?.origin)
-      console.log('[Canvas] Parent frame viewport:', parentFrame?.viewport)
 
       if (onFrameCreated) {
         // Finalize rectangle and create frame
         const [x1, y1] = startPoint
         const [x2, y2] = endPoint
         
-        console.log('[Canvas] Creating frame with bounds - x1:', x1, 'y1:', y1, 'x2:', x2, 'y2:', y2)
-        console.log('[Canvas] Frame will be at minX:', Math.min(x1, x2), 'minY:', Math.min(y1, y2))
         
         // Calculate bounds (ensure positive width and height)
         let minX = Math.min(x1, x2)
@@ -746,7 +723,6 @@ export default function Canvas({
           // Use the parent frame from the ref (the one we were drawing inside)
           const parentFrameId = parentFrame?.id || null
           
-          console.log('[Canvas] Using parent frame from drawing:', parentFrameId)
 
           // Set origin to the center of the frame viewport
           const originX = minX + frameWidth / 2
@@ -761,7 +737,6 @@ export default function Canvas({
             // Inherit base vectors from parent
             baseI = [...parentFrame.baseI]
             baseJ = [...parentFrame.baseJ]
-            console.log('[Canvas] Inheriting base vectors from parent:', { baseI, baseJ })
           }
 
           // Initialize frame with its own viewport state (independent panning and zooming)
@@ -784,16 +759,9 @@ export default function Canvas({
             parentFrameId,
             childFrameIds: [],
           }
-          console.log('[Canvas] ===== CREATING FRAME =====')
-          console.log('[Canvas] Frame ID:', frameId)
-          console.log('[Canvas] Frame bounds:', newBounds)
-          console.log('[Canvas] Frame origin:', [originX, originY])
-          console.log('[Canvas] Parent frame ID:', parentFrameId)
-          console.log('[Canvas] Parent frame from ref:', parentFrame?.id)
-          console.log('[Canvas] Full frame object:', JSON.stringify(newFrame, null, 2))
+          console.log('[Canvas] Creating frame - bounds:', newBounds, 'parent:', parentFrameId)
           onFrameCreated(newFrame, parentFrameId)
         } else {
-          console.log('[Canvas] Frame too small, not creating:', { frameWidth, frameHeight })
         }
       }
       
