@@ -93,7 +93,8 @@ export default function Modal({
         <p className="text-text-secondary mb-6 whitespace-pre-line">{message}</p>
         
         {/* Buttons */}
-        <div className="flex gap-3 justify-end">
+        <div className="flex gap-3 justify-between items-center">
+          {/* Cancel button - left side, visually separated */}
           {onCancel && (
             <button
               onClick={handleCancel}
@@ -102,24 +103,27 @@ export default function Modal({
               {cancelText}
             </button>
           )}
-          {onSecondary && secondaryText && (
+          {/* Action buttons - right side, grouped together */}
+          <div className="flex gap-3 ml-auto">
+            {onSecondary && secondaryText && (
+              <button
+                onClick={handleSecondary}
+                className="px-4 py-2 rounded-lg transition-all duration-200 font-medium bg-primary text-white hover:bg-blue-600 hover:shadow-lg hover:shadow-primary/50"
+              >
+                {secondaryText}
+              </button>
+            )}
             <button
-              onClick={handleSecondary}
-              className="px-4 py-2 rounded-lg transition-all duration-200 bg-primary/20 border border-primary/50 text-primary hover:bg-primary/30 hover:border-primary hover:shadow-md"
+              onClick={handleConfirm}
+              className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium ${
+                isDanger
+                  ? 'bg-red-500 text-white hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/50'
+                  : 'bg-primary text-white hover:bg-blue-600 hover:shadow-lg hover:shadow-primary/50'
+              }`}
             >
-              {secondaryText}
+              {confirmText}
             </button>
-          )}
-          <button
-            onClick={handleConfirm}
-            className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium ${
-              isDanger
-                ? 'bg-red-500 text-white hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/50'
-                : 'bg-primary text-white hover:bg-blue-600 hover:shadow-lg hover:shadow-primary/50'
-            }`}
-          >
-            {confirmText}
-          </button>
+          </div>
         </div>
       </div>
     </div>
