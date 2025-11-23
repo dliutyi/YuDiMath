@@ -808,7 +808,7 @@ For each step:
 
 ---
 
-### [ ] Step 6.2: Implement Workspace Export
+### [x] Step 6.2: Implement Workspace Export
 **Task**: Export workspace state to JSON file.
 
 **Implementation**:
@@ -829,7 +829,7 @@ For each step:
 
 ---
 
-### [ ] Step 6.3: Implement Workspace Import
+### [x] Step 6.3: Implement Workspace Import
 **Task**: Import workspace state from JSON file.
 
 **Implementation**:
