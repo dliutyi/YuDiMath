@@ -692,7 +692,7 @@ export default function Canvas({
 
       if (onFrameCreated) {
         // Finalize rectangle and create frame
-        const [x1, y1] = drawingRect.start
+        const [x1, y1] = startPoint
         const [x2, y2] = endPoint
         
         console.log('[Canvas] Creating frame with bounds - x1:', x1, 'y1:', y1, 'x2:', x2, 'y2:', y2)
