@@ -706,7 +706,15 @@ export default function Canvas({
         // For nested frames, they're relative to the parent frame's coordinate system
         const [x1, y1] = startPoint
         const [x2, y2] = endPoint
-        console.log('[Canvas] Frame bounds calculation - startPoint:', startPoint, 'endPoint:', endPoint)
+        
+        // Debug: Verify startPoint makes sense
+        if (parentFrame) {
+          const startRaw = parentToFrame(startPoint, parentFrame)
+          const endRaw = parentToFrame(endPoint, parentFrame)
+          console.log('[Canvas] Frame bounds calculation - startPoint (world):', startPoint, 'raw:', startRaw, 'endPoint (world):', endPoint, 'raw:', endRaw)
+        } else {
+          console.log('[Canvas] Frame bounds calculation - startPoint:', startPoint, 'endPoint:', endPoint)
+        }
         
         // Calculate bounds (ensure positive width and height)
         let minX = Math.min(x1, x2)
