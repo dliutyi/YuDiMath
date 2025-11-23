@@ -117,12 +117,18 @@ export function useCanvasDrawing({
   ) => {
     if (!isDrawing || !drawingRect.start) return
 
+    // Look up parent frame from current frames array to ensure we have latest base vectors
+    const parentFrameRef = drawingRect.parentFrame
+    const parentFrame = parentFrameRef 
+      ? frames.find(f => f.id === parentFrameRef.id) || parentFrameRef
+      : null
+
     let snappedPoint: Point2D
 
-    if (drawingRect.parentFrame) {
-      const rawFramePoint = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
+    if (parentFrame) {
+      const rawFramePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
       const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
-      snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, drawingRect.parentFrame)
+      snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
     } else {
       const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
       snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
@@ -132,7 +138,7 @@ export function useCanvasDrawing({
       drawingRectEndRef.current = snappedPoint
       return { ...prev, end: snappedPoint }
     })
-  }, [isDrawing, drawingRect, viewport])
+  }, [isDrawing, drawingRect, viewport, frames])
 
   const handleMouseUp = useCallback((
     screenX: number,
@@ -143,7 +149,11 @@ export function useCanvasDrawing({
     if (!isDrawing || !drawingRectStartRef.current || !onFrameCreated) return
 
     let startPoint: Point2D = drawingRectStartRef.current
-    const parentFrame = drawingRectParentFrameRef.current
+    // Look up parent frame from current frames array to ensure we have latest base vectors
+    const parentFrameRef = drawingRectParentFrameRef.current
+    const parentFrame = parentFrameRef 
+      ? frames.find(f => f.id === parentFrameRef.id) || parentFrameRef
+      : null
 
     let endPoint: Point2D
 
@@ -219,7 +229,7 @@ export function useCanvasDrawing({
     drawingRectStartRef.current = null
     drawingRectEndRef.current = null
     drawingRectParentFrameRef.current = null
-  }, [isDrawing, viewport, onFrameCreated])
+  }, [isDrawing, viewport, onFrameCreated, frames])
 
   return {
     drawingRect,
