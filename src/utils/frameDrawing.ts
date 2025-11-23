@@ -1,10 +1,11 @@
 import type { CoordinateFrame, ViewportState, Point2D, Vector } from '../types'
-import { worldToScreen } from '../utils/coordinates'
+import { worldToScreen, screenToWorld } from '../utils/coordinates'
 import { drawArrow } from '../utils/arrows'
 import {
   frameToScreen,
   nestedFrameToScreen,
   parentToFrame,
+  screenToFrame,
 } from './frameTransforms'
 import { getGridColorForLevel, getBackgroundColorForLevel } from './frameUtils'
 
@@ -217,35 +218,121 @@ function drawFrameGrid(
     ? (point: Point2D): Point2D => nestedFrameToScreen(point, frame, allFrames, viewport, canvasWidth, canvasHeight)
     : (point: Point2D): Point2D => frameToScreen(point, frame, viewport, canvasWidth, canvasHeight)
 
-  // Get frame bounds in screen coordinates
-  const topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
-  const bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
-  const frameScreenWidth = bottomRight[0] - topLeft[0]
-  const frameScreenHeight = bottomRight[1] - topLeft[1]
-
-  // Estimate visible frame coordinate range
-  // We'll use a heuristic based on frame screen size and viewport zoom
-  // The grid spacing is 1.0 in frame coordinates
+  // Grid spacing is 1.0 (integer intervals) in frame coordinates
   const gridStep = 1.0
   const frameZoom = frameViewport.zoom
   const framePanX = frameViewport.x
   const framePanY = frameViewport.y
+
+  // Calculate visible frame coordinate range by sampling points along frame bounds
+  // Transform multiple points from screen to frame coordinates to determine visible range
+  const topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
+  const bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
   
-  // Estimate how many frame coordinate units fit in the visible frame
-  // This is approximate - we'll draw a generous range and let clipping handle the rest
-  const estimatedFrameUnitsWidth = frameScreenWidth / (frameZoom * viewport.zoom)
-  const estimatedFrameUnitsHeight = frameScreenHeight / (frameZoom * viewport.zoom)
+  // Sample points along the frame bounds (corners and midpoints)
+  const samplePoints: Point2D[] = [
+    topLeft,
+    [bottomRight[0], topLeft[1]], // top-right
+    bottomRight,
+    [topLeft[0], bottomRight[1]], // bottom-left
+    [(topLeft[0] + bottomRight[0]) / 2, topLeft[1]], // top-mid
+    [(topLeft[0] + bottomRight[0]) / 2, bottomRight[1]], // bottom-mid
+    [topLeft[0], (topLeft[1] + bottomRight[1]) / 2], // left-mid
+    [bottomRight[0], (topLeft[1] + bottomRight[1]) / 2], // right-mid
+  ]
   
-  // Calculate visible range in frame coordinates (accounting for pan)
-  const halfWidth = estimatedFrameUnitsWidth / 2
-  const halfHeight = estimatedFrameUnitsHeight / 2
-  const minU = -halfWidth - framePanX
-  const maxU = halfWidth - framePanX
-  const minV = -halfHeight - framePanY
-  const maxV = halfHeight - framePanY
+  let minU = Infinity
+  let maxU = -Infinity
+  let minV = Infinity
+  let maxV = -Infinity
+
+  // Transform each sample point to frame coordinates
+  for (const screenPoint of samplePoints) {
+    let pointInFrameCoords: Point2D
+    
+    if (frame.parentFrameId) {
+      // For nested frames, transform through parent chain
+      const worldPoint = screenToWorld(screenPoint[0], screenPoint[1], viewport, canvasWidth, canvasHeight)
+      const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
+      
+      if (parentFrame) {
+        // Transform world -> parent frame coords (raw, no viewport)
+        const parentFrameCoordsRaw = parentToFrame(worldPoint, parentFrame)
+        
+        // Apply parent frame viewport to get visible parent frame coords
+        const parentFrameU = (parentFrameCoordsRaw[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom
+        const parentFrameV = (parentFrameCoordsRaw[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
+        
+        // Transform parent frame coords back to parent world
+        const [parentOriginX, parentOriginY] = parentFrame.origin
+        const [parentIX, parentIY] = parentFrame.baseI
+        const [parentJX, parentJY] = parentFrame.baseJ
+        
+        const parentWorldX = parentOriginX + parentFrameU * parentIX + parentFrameV * parentJX
+        const parentWorldY = parentOriginY + parentFrameU * parentIY + parentFrameV * parentJY
+        
+        // Transform to this frame's coordinates (raw, no viewport)
+        const [originX, originY] = frame.origin
+        const dx = parentWorldX - originX
+        const dy = parentWorldY - originY
+        const [iX, iY] = frame.baseI
+        const [jX, jY] = frame.baseJ
+        
+        const det = iX * jY - iY * jX
+        if (Math.abs(det) > 1e-10) {
+          const u = (dx * jY - dy * jX) / det
+          const v = (dy * iX - dx * iY) / det
+          // Account for frame viewport to get visible frame coordinates
+          pointInFrameCoords = [
+            (u / frameZoom) + framePanX,
+            (v / frameZoom) + framePanY
+          ]
+        } else {
+          pointInFrameCoords = [0, 0]
+        }
+      } else {
+        pointInFrameCoords = [0, 0]
+      }
+    } else {
+      // For top-level frames, use screenToFrame which handles all transformations
+      pointInFrameCoords = screenToFrame(screenPoint, frame, viewport, canvasWidth, canvasHeight)
+    }
+    
+    minU = Math.min(minU, pointInFrameCoords[0])
+    maxU = Math.max(maxU, pointInFrameCoords[0])
+    minV = Math.min(minV, pointInFrameCoords[1])
+    maxV = Math.max(maxV, pointInFrameCoords[1])
+  }
   
-  // Add padding to ensure grid covers visible area
-  const padding = Math.max(estimatedFrameUnitsWidth, estimatedFrameUnitsHeight) * 0.5
+  // Calculate how many frame coordinate units correspond to screen pixels
+  // This helps determine appropriate padding
+  const originScreen = transformToScreen([0, 0])
+  const oneUnitUScreen = transformToScreen([1, 0])
+  const oneUnitVScreen = transformToScreen([0, 1])
+  
+  const screenUnitsPerU = Math.abs(oneUnitUScreen[0] - originScreen[0])
+  const screenUnitsPerV = Math.abs(oneUnitVScreen[1] - originScreen[1])
+  const avgScreenUnitsPerFrameUnit = (screenUnitsPerU + screenUnitsPerV) / 2
+  
+  // Calculate padding: ensure we draw enough grid to cover the frame bounds plus extra
+  // Padding should be based on how much screen space we need to cover
+  const frameScreenWidth = Math.abs(bottomRight[0] - topLeft[0])
+  const frameScreenHeight = Math.abs(bottomRight[1] - topLeft[1])
+  const maxScreenDimension = Math.max(frameScreenWidth, frameScreenHeight)
+  
+  // Convert screen dimension to frame coordinate units, then add generous padding
+  const frameUnitsForScreen = avgScreenUnitsPerFrameUnit > 0 
+    ? maxScreenDimension / avgScreenUnitsPerFrameUnit 
+    : 10
+  
+  const frameRangeU = maxU - minU
+  const frameRangeV = maxV - minV
+  const maxRange = Math.max(frameRangeU, frameRangeV, frameUnitsForScreen)
+  
+  // Use generous padding: at least 3x the range or 20 units, whichever is larger
+  // This ensures grid extends well beyond visible area when panning/zooming
+  const padding = Math.max(maxRange * 3, 20)
+  
   const expandedMinU = minU - padding
   const expandedMaxU = maxU + padding
   const expandedMinV = minV - padding
