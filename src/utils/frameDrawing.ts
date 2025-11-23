@@ -267,8 +267,8 @@ export function drawCoordinateFrame(
     ? nestedFrameToScreen([0, baseVectorScale], frame, allFrames, viewport, canvasWidth, canvasHeight)
     : frameToScreen([0, baseVectorScale], frame, viewport, canvasWidth, canvasHeight)
 
-  drawArrow(ctx, originScreen, baseIEndScreen, '#ef4444', 2, 8)
-  drawArrow(ctx, originScreen, baseJEndScreen, '#3b82f6', 2, 8)
+  drawArrow(ctx, originScreen, baseIEndScreen, '#f97316', 2, 8) // Orange to match X-axis labels
+  drawArrow(ctx, originScreen, baseJEndScreen, '#10b981', 2, 8) // Green to match Y-axis labels
   
   // Draw vectors within clipped region
   drawFrameVectors(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
@@ -300,13 +300,29 @@ function drawFrameGrid(
   allFrames: CoordinateFrame[] = []
 ) {
   const { bounds, viewport: frameViewport } = frame
+  const { baseI, baseJ } = frame
+
+  // Check if base vectors are zero or collinear
+  const baseIMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
+  const baseJMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
+  const areZero = baseIMagnitude < 1e-10 && baseJMagnitude < 1e-10
+  const areCollinear = !areZero && Math.abs(baseI[0] * baseJ[1] - baseI[1] * baseJ[0]) < 1e-10
 
   const gridColor = getGridColorForLevel(nestingLevel)
   
-  ctx.strokeStyle = gridColor
-  ctx.lineWidth = 1
-  ctx.globalAlpha = 0.7
-  ctx.setLineDash([])
+  // Use warning colors for degenerate cases
+  if (areZero) {
+    ctx.strokeStyle = '#ef4444' // red for zero vectors
+    ctx.fillStyle = '#ef4444'
+  } else if (areCollinear) {
+    ctx.strokeStyle = '#f59e0b' // orange for collinear vectors
+  } else {
+    ctx.strokeStyle = gridColor
+  }
+  
+  ctx.lineWidth = areZero ? 2 : (areCollinear ? 1 : 1) // Thicker only for zero, normal for collinear
+  ctx.globalAlpha = areZero || areCollinear ? 0.9 : 0.7 // More opaque for degenerate cases
+  ctx.setLineDash(areCollinear ? [5, 5] : []) // Dashed lines for collinear case
 
   // Transform function for converting frame coordinates to screen coordinates
   const transformToScreen = frame.parentFrameId
@@ -433,32 +449,62 @@ function drawFrameGrid(
   const expandedMinV = minV - padding
   const expandedMaxV = maxV + padding
 
-  // Draw grid lines parallel to baseI (constant u, varying v)
-  // These lines follow the direction of baseJ
-  const startU = Math.floor(expandedMinU / gridStep) * gridStep
-  const endU = Math.ceil(expandedMaxU / gridStep) * gridStep
-  for (let u = startU; u <= endU; u += gridStep) {
-    const startScreen = transformToScreen([u, expandedMinV])
-    const endScreen = transformToScreen([u, expandedMaxV])
-    
+  // Handle degenerate cases
+  if (areZero) {
+    // Zero vectors: draw just a dot at the origin
+    const originScreen = transformToScreen([0, 0])
     ctx.beginPath()
-    ctx.moveTo(Math.round(startScreen[0]) + 0.5, Math.round(startScreen[1]) + 0.5)
-    ctx.lineTo(Math.round(endScreen[0]) + 0.5, Math.round(endScreen[1]) + 0.5)
-    ctx.stroke()
-  }
+    ctx.arc(originScreen[0], originScreen[1], 4, 0, Math.PI * 2)
+    ctx.fill()
+  } else if (areCollinear) {
+    // Collinear vectors: draw grid as lines along the direction of the vectors
+    // All grid lines are parallel (the grid collapses to 1D)
+    // Draw lines at integer intervals along u (they'll all be parallel in screen space)
+    const startU = Math.floor(expandedMinU / gridStep) * gridStep
+    const endU = Math.ceil(expandedMaxU / gridStep) * gridStep
+    
+    // Draw lines along the direction of the vectors
+    // Each line is at a different u value, all parallel
+    for (let u = startU; u <= endU; u += gridStep) {
+      // Draw a long line in the direction of the vectors
+      // Use a large range for v to ensure the line extends far
+      const startScreen = transformToScreen([u, expandedMinV])
+      const endScreen = transformToScreen([u, expandedMaxV])
+      
+      ctx.beginPath()
+      ctx.moveTo(Math.round(startScreen[0]) + 0.5, Math.round(startScreen[1]) + 0.5)
+      ctx.lineTo(Math.round(endScreen[0]) + 0.5, Math.round(endScreen[1]) + 0.5)
+      ctx.stroke()
+    }
+  } else {
+    // Normal case: draw full grid
+    // Draw grid lines parallel to baseI (constant u, varying v)
+    // These lines follow the direction of baseJ
+    const startU = Math.floor(expandedMinU / gridStep) * gridStep
+    const endU = Math.ceil(expandedMaxU / gridStep) * gridStep
+    for (let u = startU; u <= endU; u += gridStep) {
+      const startScreen = transformToScreen([u, expandedMinV])
+      const endScreen = transformToScreen([u, expandedMaxV])
+      
+      ctx.beginPath()
+      ctx.moveTo(Math.round(startScreen[0]) + 0.5, Math.round(startScreen[1]) + 0.5)
+      ctx.lineTo(Math.round(endScreen[0]) + 0.5, Math.round(endScreen[1]) + 0.5)
+      ctx.stroke()
+    }
 
-  // Draw grid lines parallel to baseJ (constant v, varying u)
-  // These lines follow the direction of baseI
-  const startV = Math.floor(expandedMinV / gridStep) * gridStep
-  const endV = Math.ceil(expandedMaxV / gridStep) * gridStep
-  for (let v = startV; v <= endV; v += gridStep) {
-    const startScreen = transformToScreen([expandedMinU, v])
-    const endScreen = transformToScreen([expandedMaxU, v])
-    
-    ctx.beginPath()
-    ctx.moveTo(Math.round(startScreen[0]) + 0.5, Math.round(startScreen[1]) + 0.5)
-    ctx.lineTo(Math.round(endScreen[0]) + 0.5, Math.round(endScreen[1]) + 0.5)
-    ctx.stroke()
+    // Draw grid lines parallel to baseJ (constant v, varying u)
+    // These lines follow the direction of baseI
+    const startV = Math.floor(expandedMinV / gridStep) * gridStep
+    const endV = Math.ceil(expandedMaxV / gridStep) * gridStep
+    for (let v = startV; v <= endV; v += gridStep) {
+      const startScreen = transformToScreen([expandedMinU, v])
+      const endScreen = transformToScreen([expandedMaxU, v])
+      
+      ctx.beginPath()
+      ctx.moveTo(Math.round(startScreen[0]) + 0.5, Math.round(startScreen[1]) + 0.5)
+      ctx.lineTo(Math.round(endScreen[0]) + 0.5, Math.round(endScreen[1]) + 0.5)
+      ctx.stroke()
+    }
   }
 
   ctx.globalAlpha = 1.0
@@ -476,7 +522,14 @@ function drawFrameAxes(
   canvasHeight: number,
   allFrames: CoordinateFrame[] = []
 ) {
-  const { bounds, viewport: frameViewport } = frame
+  const { bounds, viewport: frameViewport, baseI, baseJ } = frame
+  
+  // Check if base vectors are zero - skip labels for zero vectors individually
+  const baseIMag = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
+  const baseJMag = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
+  const baseIIsZero = baseIMag < 1e-10
+  const baseJIsZero = baseJMag < 1e-10
+  const areZero = baseIIsZero && baseJIsZero
 
   // Grid spacing is 1.0 (integer intervals) in frame coordinates, matching the grid
   const gridStep = 1.0
@@ -821,9 +874,14 @@ function drawFrameAxes(
   ctx.lineTo(Math.round(yAxisEndScreen[0]) + 0.5, Math.round(yAxisEndScreen[1]) + 0.5)
   ctx.stroke()
 
-  ctx.fillStyle = '#cbd5e1'
+  // Skip all labels only when both base vectors are zero
+  if (areZero) {
+    ctx.globalAlpha = 1.0
+    return
+  }
+
+  // Set label colors (different from grid/axes) - use contrasting colors for each axis
   ctx.font = '11px sans-serif'
-  ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.globalAlpha = 1.0
 
@@ -855,32 +913,48 @@ function drawFrameAxes(
     return rounded.toString()
   }
 
-  const startXLabel = Math.floor(minFrameX / labelSpacing) * labelSpacing
-  const endXLabel = Math.ceil(maxFrameX / labelSpacing) * labelSpacing
-  for (let x = startXLabel; x <= endXLabel; x += labelSpacing) {
-    if (Math.abs(x) < 0.001) continue
-    
-    const labelScreen = transformToScreen([x, 0])
-    
-    const labelText = formatNumber(x)
-    ctx.fillText(labelText, labelScreen[0], labelScreen[1] + 15)
+  // Draw X-axis labels (baseI direction) only if baseI is not zero
+  // Use orange/red color for X-axis labels (more contrasting)
+  if (!baseIIsZero) {
+    ctx.fillStyle = '#f97316' // Orange-500 for X-axis labels (more contrasting than blue)
+    ctx.textAlign = 'center'
+    const startXLabel = Math.floor(minFrameX / labelSpacing) * labelSpacing
+    const endXLabel = Math.ceil(maxFrameX / labelSpacing) * labelSpacing
+    for (let x = startXLabel; x <= endXLabel; x += labelSpacing) {
+      if (Math.abs(x) < 0.001) continue
+      
+      const labelScreen = transformToScreen([x, 0])
+      
+      const labelText = formatNumber(x)
+      ctx.fillText(labelText, labelScreen[0], labelScreen[1] + 15)
+    }
   }
 
-  const startYLabel = Math.floor(minFrameY / labelSpacing) * labelSpacing
-  const endYLabel = Math.ceil(maxFrameY / labelSpacing) * labelSpacing
-  for (let y = startYLabel; y <= endYLabel; y += labelSpacing) {
-    if (Math.abs(y) < 0.001) continue
-    
-    const labelScreen = transformToScreen([0, y])
-    
-    const labelText = formatNumber(y)
+  // Draw Y-axis labels (baseJ direction) only if baseJ is not zero
+  // Use green color for Y-axis labels
+  if (!baseJIsZero) {
+    ctx.fillStyle = '#10b981' // Emerald-500 for Y-axis labels
     ctx.textAlign = 'right'
-    ctx.fillText(labelText, labelScreen[0] - 8, labelScreen[1])
+    const startYLabel = Math.floor(minFrameY / labelSpacing) * labelSpacing
+    const endYLabel = Math.ceil(maxFrameY / labelSpacing) * labelSpacing
+    for (let y = startYLabel; y <= endYLabel; y += labelSpacing) {
+      if (Math.abs(y) < 0.001) continue
+      
+      const labelScreen = transformToScreen([0, y])
+      
+      const labelText = formatNumber(y)
+      ctx.fillText(labelText, labelScreen[0] - 8, labelScreen[1])
+    }
   }
 
-  ctx.textAlign = 'right'
-  ctx.textBaseline = 'top'
-  ctx.fillText('0', originScreenAxes[0] - 5, originScreenAxes[1] + 5)
+  // Draw origin label only if at least one base vector is non-zero
+  // Use neutral gray color for origin label
+  if (!baseIIsZero || !baseJIsZero) {
+    ctx.fillStyle = '#64748b' // Slate-500 for origin label (neutral)
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'top'
+    ctx.fillText('0', originScreenAxes[0] - 5, originScreenAxes[1] + 5)
+  }
 
   ctx.globalAlpha = 1.0
 }
