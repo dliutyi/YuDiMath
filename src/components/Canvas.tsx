@@ -437,9 +437,47 @@ export default function Canvas({
       let clickedFrame: CoordinateFrame | null = null
       let smallestArea = Infinity
       
+      // Check each frame by converting its bounds to screen coordinates
+      // and checking if the click point is inside
       for (const frame of frames) {
-        if (isPointInFrame(worldPoint, frame.bounds)) {
-          const frameArea = frame.bounds.width * frame.bounds.height
+        // Get frame bounds in screen coordinates (accounting for viewport)
+        let frameTopLeft: Point2D
+        let frameBottomRight: Point2D
+        
+        if (frame.parentFrameId) {
+          // Nested frame - transform through parent chain
+          const parentFrameForCheck = frames.find(f => f.id === frame.parentFrameId)
+          if (parentFrameForCheck) {
+            const bounds = frame.bounds
+            const topLeftWorld: Point2D = [bounds.x, bounds.y + bounds.height]
+            const bottomRightWorld: Point2D = [bounds.x + bounds.width, bounds.y]
+            const topLeftFrame = parentToFrame(topLeftWorld, parentFrameForCheck)
+            const bottomRightFrame = parentToFrame(bottomRightWorld, parentFrameForCheck)
+            frameTopLeft = nestedFrameToScreen(topLeftFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight)
+            frameBottomRight = nestedFrameToScreen(bottomRightFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight)
+          } else {
+            continue
+          }
+        } else {
+          // Top-level frame
+          frameTopLeft = worldToScreen(frame.bounds.x, frame.bounds.y + frame.bounds.height, viewport, canvasWidth, canvasHeight)
+          frameBottomRight = worldToScreen(frame.bounds.x + frame.bounds.width, frame.bounds.y, viewport, canvasWidth, canvasHeight)
+        }
+        
+        // Check if click point is inside frame bounds in screen coordinates
+        const screenPoint: Point2D = [screenX, screenY]
+        const minX = Math.min(frameTopLeft[0], frameBottomRight[0])
+        const maxX = Math.max(frameTopLeft[0], frameBottomRight[0])
+        const minY = Math.min(frameTopLeft[1], frameBottomRight[1])
+        const maxY = Math.max(frameTopLeft[1], frameBottomRight[1])
+        
+        if (
+          screenPoint[0] >= minX &&
+          screenPoint[0] <= maxX &&
+          screenPoint[1] >= minY &&
+          screenPoint[1] <= maxY
+        ) {
+          const frameArea = (maxX - minX) * (maxY - minY)
           if (frameArea < smallestArea) {
             smallestArea = frameArea
             clickedFrame = frame
