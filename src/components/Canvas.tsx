@@ -130,11 +130,9 @@ export default function Canvas({
         // Convert parent world coordinates to parent frame coordinates (raw)
         const topLeftWorld: Point2D = [minX, maxY]
         const bottomRightWorld: Point2D = [maxX, minY]
-        console.error('[Canvas] DRAWING RECT RENDER - bounds (parent world):', {minX, maxX, minY, maxY}, 'topLeftWorld:', topLeftWorld, 'bottomRightWorld:', bottomRightWorld)
         
         const topLeftFrame = parentToFrame(topLeftWorld, drawingRect.parentFrame)
         const bottomRightFrame = parentToFrame(bottomRightWorld, drawingRect.parentFrame)
-        console.error('[Canvas] DRAWING RECT RENDER - parent frame coords - topLeft:', topLeftFrame, 'bottomRight:', bottomRightFrame, 'parent viewport:', drawingRect.parentFrame.viewport)
         
         // Apply parent frame's viewport transformation
         const topLeftFrameWithViewport: Point2D = [
@@ -145,7 +143,6 @@ export default function Canvas({
           (bottomRightFrame[0] - drawingRect.parentFrame.viewport.x) * drawingRect.parentFrame.viewport.zoom,
           (bottomRightFrame[1] - drawingRect.parentFrame.viewport.y) * drawingRect.parentFrame.viewport.zoom
         ]
-        console.error('[Canvas] DRAWING RECT RENDER - after viewport - topLeft:', topLeftFrameWithViewport, 'bottomRight:', bottomRightFrameWithViewport)
         
         // Transform back to parent world coordinates using base vectors
         const [originX, originY] = drawingRect.parentFrame.origin
@@ -160,12 +157,10 @@ export default function Canvas({
           originX + bottomRightFrameWithViewport[0] * iX + bottomRightFrameWithViewport[1] * jX,
           originY + bottomRightFrameWithViewport[0] * iY + bottomRightFrameWithViewport[1] * jY
         ]
-        console.error('[Canvas] DRAWING RECT RENDER - parent world with viewport - topLeft:', topLeftParentWorldWithViewport, 'bottomRight:', bottomRightParentWorldWithViewport)
         
         // Transform to screen using root viewport
         topLeft = worldToScreen(topLeftParentWorldWithViewport[0], topLeftParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
         bottomRight = worldToScreen(bottomRightParentWorldWithViewport[0], bottomRightParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
-        console.error('[Canvas] DRAWING RECT RENDER - screen coords - topLeft:', topLeft, 'bottomRight:', bottomRight)
       } else {
         topLeft = worldToScreen(minX, maxY, viewport, canvasWidth, canvasHeight)
         bottomRight = worldToScreen(maxX, minY, viewport, canvasWidth, canvasHeight)
@@ -436,10 +431,6 @@ export default function Canvas({
         // So screenToFrame already returns the raw frame coordinate u
         const rawFramePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
         
-        console.error('[Canvas] MOUSE DOWN - screen:', [screenX, screenY], 'root viewport:', viewport)
-        console.error('[Canvas] MOUSE DOWN - raw frame coords from screenToFrame:', rawFramePoint)
-        console.error('[Canvas] MOUSE DOWN - parent frame viewport:', parentFrame.viewport)
-        
         // In frame coordinates, grid step is always 1.0
         const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
         
@@ -557,7 +548,6 @@ export default function Canvas({
         // For nested frames, use screenToFrame which correctly accounts for parent frame's viewport
         // screenToFrame already returns raw frame coordinates
         const rawFramePoint = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
-        console.error('[Canvas] MOUSE MOVE - screen:', [screenX, screenY], 'raw frame:', rawFramePoint, 'parent frame viewport:', drawingRect.parentFrame.viewport)
         
         // In frame coordinates, grid step is always 1.0
         const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
@@ -694,11 +684,15 @@ export default function Canvas({
       let endPoint: Point2D
       
       if (parentFrame) {
-        // Use screenToFrame which correctly accounts for parent frame's viewport
-        const rawFramePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
+        // Recalculate both start and end points to ensure they're both clamped consistently
+        // This ensures the frame is created with correct bounds
+        const rawFramePointEnd = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
+        const snappedRawFramePointEnd = snapPointToGrid(rawFramePointEnd, 1.0)
         
-        // In frame coordinates, grid step is always 1.0
-        const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
+        // Also recalculate start point to ensure consistency
+        // Convert startPoint (which is in parent world coords) back to raw frame coords
+        const rawFramePointStart = parentToFrame(startPoint, parentFrame)
+        const snappedRawFramePointStart = snapPointToGrid(rawFramePointStart, 1.0)
         
         // Clamp raw frame coordinates to parent frame bounds in frame coordinate space
         // Convert parent bounds corners to frame coordinates
@@ -712,16 +706,23 @@ export default function Canvas({
         const minV = Math.min(bottomLeftFrame[1], topRightFrame[1])
         const maxV = Math.max(bottomLeftFrame[1], topRightFrame[1])
         
-        // Clamp snapped raw frame point to frame bounds
-        const clampedSnappedRawFramePoint: Point2D = [
-          Math.max(minU, Math.min(maxU, snappedRawFramePoint[0])),
-          Math.max(minV, Math.min(maxV, snappedRawFramePoint[1]))
+        // Clamp both start and end points to frame bounds
+        const clampedStart: Point2D = [
+          Math.max(minU, Math.min(maxU, snappedRawFramePointStart[0])),
+          Math.max(minV, Math.min(maxV, snappedRawFramePointStart[1]))
+        ]
+        const clampedEnd: Point2D = [
+          Math.max(minU, Math.min(maxU, snappedRawFramePointEnd[0])),
+          Math.max(minV, Math.min(maxV, snappedRawFramePointEnd[1]))
         ]
         
-        // Convert raw frame coordinates to parent world coordinates
-        // This ensures bounds are stored correctly regardless of parent's viewport state
-        endPoint = frameCoordsToParentWorld(clampedSnappedRawFramePoint, parentFrame)
-        console.error('[Canvas] MOUSE UP - startPoint from ref:', startPoint)
+        // Convert back to parent world coordinates
+        const clampedStartWorld = frameCoordsToParentWorld(clampedStart, parentFrame)
+        const clampedEndWorld = frameCoordsToParentWorld(clampedEnd, parentFrame)
+        
+        // Update startPoint and endPoint to use clamped values
+        startPoint = clampedStartWorld
+        endPoint = clampedEndWorld
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
@@ -736,42 +737,23 @@ export default function Canvas({
         const [x1, y1] = startPoint
         const [x2, y2] = endPoint
         
-        console.error('[Canvas] ===== FRAME CREATION =====')
-        console.error('[Canvas] startPoint:', startPoint, 'endPoint:', endPoint)
-        if (parentFrame) {
-          const startRaw = parentToFrame(startPoint, parentFrame)
-          const endRaw = parentToFrame(endPoint, parentFrame)
-          console.error('[Canvas] startPoint raw frame:', startRaw, 'endPoint raw frame:', endRaw)
-          console.error('[Canvas] parent frame origin:', parentFrame.origin, 'bounds:', parentFrame.bounds)
-        }
-        
         // Calculate bounds (ensure positive width and height)
         let minX = Math.min(x1, x2)
         let maxX = Math.max(x1, x2)
         let minY = Math.min(y1, y2)
         let maxY = Math.max(y1, y2)
         
-        console.log('[Canvas] Before parent clamp - minX:', minX, 'maxX:', maxX, 'minY:', minY, 'maxY:', maxY)
-        
         // If drawing inside a parent frame, constrain bounds to stay within parent
         if (parentFrame) {
           const parentBounds = parentFrame.bounds
-          const minXBefore = minX
-          const maxXBefore = maxX
-          const minYBefore = minY
-          const maxYBefore = maxY
           minX = Math.max(parentBounds.x, minX)
           maxX = Math.min(parentBounds.x + parentBounds.width, maxX)
           minY = Math.max(parentBounds.y, minY)
           maxY = Math.min(parentBounds.y + parentBounds.height, maxY)
-          if (minX !== minXBefore || maxX !== maxXBefore || minY !== minYBefore || maxY !== maxYBefore) {
-            console.log('[Canvas] After parent clamp - minX:', minX, 'maxX:', maxX, 'minY:', minY, 'maxY:', maxY)
-          }
         }
         
         const frameWidth = maxX - minX
         const frameHeight = maxY - minY
-        console.log('[Canvas] Final bounds - width:', frameWidth, 'height:', frameHeight)
         
         // Only create frame if it has minimum size
         if (frameWidth > 0.1 && frameHeight > 0.1) {
@@ -822,7 +804,6 @@ export default function Canvas({
             parentFrameId,
             childFrameIds: [],
           }
-          console.log('[Canvas] Creating frame - bounds:', newBounds, 'parent:', parentFrameId)
           onFrameCreated(newFrame, parentFrameId)
         } else {
         }
