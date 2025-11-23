@@ -35,69 +35,36 @@ export function drawCoordinateFrame(
   let bottomRight: Point2D
   
   if (frame.parentFrameId) {
-    // Nested frame: transform bounds through parent coordinate system
-    // Bounds are stored in parent's world coordinates
-    const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
-    if (parentFrame) {
-      // Get all 4 corners in parent world coordinates
-      const cornersWorld: Point2D[] = [
-        [bounds.x, bounds.y + bounds.height], // top-left
-        [bounds.x + bounds.width, bounds.y + bounds.height], // top-right
-        [bounds.x + bounds.width, bounds.y], // bottom-right
-        [bounds.x, bounds.y], // bottom-left
-      ]
-      
-      // Transform each corner through parent frame coordinate system
-      cornersScreen = cornersWorld.map(cornerWorld => {
-        // Convert parent world coordinates to parent frame coordinates (raw, no viewport)
-        const cornerFrame = parentToFrame(cornerWorld, parentFrame)
-        
-        // Apply parent frame's viewport transformation
-        const cornerFrameWithViewport: Point2D = [
-          (cornerFrame[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom,
-          (cornerFrame[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
-        ]
-        
-        // Transform back to parent world coordinates using parent frame's base vectors
-        const [originX, originY] = parentFrame.origin
-        const [iX, iY] = parentFrame.baseI
-        const [jX, jY] = parentFrame.baseJ
-        
-        const cornerParentWorldWithViewport: Point2D = [
-          originX + cornerFrameWithViewport[0] * iX + cornerFrameWithViewport[1] * jX,
-          originY + cornerFrameWithViewport[0] * iY + cornerFrameWithViewport[1] * jY
-        ]
-        
-        // Transform to screen using root viewport
-        return worldToScreen(cornerParentWorldWithViewport[0], cornerParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
-      })
-      
-      // Calculate bounding box of transformed corners for clipping
-      let minScreenX = Infinity
-      let maxScreenX = -Infinity
-      let minScreenY = Infinity
-      let maxScreenY = -Infinity
-      
-      for (const corner of cornersScreen) {
-        minScreenX = Math.min(minScreenX, corner[0])
-        maxScreenX = Math.max(maxScreenX, corner[0])
-        minScreenY = Math.min(minScreenY, corner[1])
-        maxScreenY = Math.max(maxScreenY, corner[1])
-      }
-      
-      topLeft = [minScreenX, minScreenY]
-      bottomRight = [maxScreenX, maxScreenY]
-    } else {
-      // Parent not found, fall back to direct transformation
-      topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
-      bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
-      cornersScreen = [
-        topLeft,
-        [bottomRight[0], topLeft[1]],
-        bottomRight,
-        [topLeft[0], bottomRight[1]],
-      ]
+    // Nested frame: bounds are stored in parent world coordinates
+    // Transform all 4 corners directly to screen - the parent's base vectors
+    // are already accounted for in how the bounds were stored
+    const cornersWorld: Point2D[] = [
+      [bounds.x, bounds.y + bounds.height], // top-left
+      [bounds.x + bounds.width, bounds.y + bounds.height], // top-right
+      [bounds.x + bounds.width, bounds.y], // bottom-right
+      [bounds.x, bounds.y], // bottom-left
+    ]
+    
+    // Transform each corner directly from parent world to screen
+    cornersScreen = cornersWorld.map(cornerWorld => 
+      worldToScreen(cornerWorld[0], cornerWorld[1], viewport, canvasWidth, canvasHeight)
+    )
+    
+    // Calculate bounding box of transformed corners for clipping
+    let minScreenX = Infinity
+    let maxScreenX = -Infinity
+    let minScreenY = Infinity
+    let maxScreenY = -Infinity
+    
+    for (const corner of cornersScreen) {
+      minScreenX = Math.min(minScreenX, corner[0])
+      maxScreenX = Math.max(maxScreenX, corner[0])
+      minScreenY = Math.min(minScreenY, corner[1])
+      maxScreenY = Math.max(maxScreenY, corner[1])
     }
+    
+    topLeft = [minScreenX, minScreenY]
+    bottomRight = [maxScreenX, maxScreenY]
   } else {
     // Top-level frame: use direct world-to-screen transformation
     topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
@@ -140,59 +107,23 @@ export function drawCoordinateFrame(
   // Draw frame grid, axes, and base vectors - all clipped to frame bounds
   ctx.save()
   
-  // For nested frames, clip to parent bounds first (as parallelogram if parent has non-standard base vectors)
+  // For nested frames, clip to parent bounds first
   if (frame.parentFrameId) {
     const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
     if (parentFrame) {
-      // Calculate parent frame corners (parallelogram if parent has non-standard base vectors)
-      let parentCornersScreen: Point2D[]
-      if (parentFrame.parentFrameId) {
-        // Parent is also nested - use nested transformation
-        const parentBounds = parentFrame.bounds
-        const parentCornersWorld: Point2D[] = [
-          [parentBounds.x, parentBounds.y + parentBounds.height],
-          [parentBounds.x + parentBounds.width, parentBounds.y + parentBounds.height],
-          [parentBounds.x + parentBounds.width, parentBounds.y],
-          [parentBounds.x, parentBounds.y],
-        ]
-        const grandParentFrame = allFrames.find(f => f.id === parentFrame.parentFrameId)
-        if (grandParentFrame) {
-          parentCornersScreen = parentCornersWorld.map(cornerWorld => {
-            const cornerFrame = parentToFrame(cornerWorld, grandParentFrame)
-            const cornerFrameWithViewport: Point2D = [
-              (cornerFrame[0] - grandParentFrame.viewport.x) * grandParentFrame.viewport.zoom,
-              (cornerFrame[1] - grandParentFrame.viewport.y) * grandParentFrame.viewport.zoom
-            ]
-            const [originX, originY] = grandParentFrame.origin
-            const [iX, iY] = grandParentFrame.baseI
-            const [jX, jY] = grandParentFrame.baseJ
-            const cornerParentWorldWithViewport: Point2D = [
-              originX + cornerFrameWithViewport[0] * iX + cornerFrameWithViewport[1] * jX,
-              originY + cornerFrameWithViewport[0] * iY + cornerFrameWithViewport[1] * jY
-            ]
-            return worldToScreen(cornerParentWorldWithViewport[0], cornerParentWorldWithViewport[1], viewport, canvasWidth, canvasHeight)
-          })
-        } else {
-          const parentTopLeft = worldToScreen(parentBounds.x, parentBounds.y + parentBounds.height, viewport, canvasWidth, canvasHeight)
-          const parentBottomRight = worldToScreen(parentBounds.x + parentBounds.width, parentBounds.y, viewport, canvasWidth, canvasHeight)
-          parentCornersScreen = [
-            parentTopLeft,
-            [parentBottomRight[0], parentTopLeft[1]],
-            parentBottomRight,
-            [parentTopLeft[0], parentBottomRight[1]],
-          ]
-        }
-      } else {
-        // Parent is top-level - use rectangle
-        const parentTopLeft = worldToScreen(parentFrame.bounds.x, parentFrame.bounds.y + parentFrame.bounds.height, viewport, canvasWidth, canvasHeight)
-        const parentBottomRight = worldToScreen(parentFrame.bounds.x + parentFrame.bounds.width, parentFrame.bounds.y, viewport, canvasWidth, canvasHeight)
-        parentCornersScreen = [
-          parentTopLeft,
-          [parentBottomRight[0], parentTopLeft[1]],
-          parentBottomRight,
-          [parentTopLeft[0], parentBottomRight[1]],
-        ]
-      }
+      // Parent bounds are in its parent's world coordinates (or root world if top-level)
+      // Transform all 4 corners directly to screen
+      const parentBounds = parentFrame.bounds
+      const parentCornersWorld: Point2D[] = [
+        [parentBounds.x, parentBounds.y + parentBounds.height],
+        [parentBounds.x + parentBounds.width, parentBounds.y + parentBounds.height],
+        [parentBounds.x + parentBounds.width, parentBounds.y],
+        [parentBounds.x, parentBounds.y],
+      ]
+      
+      const parentCornersScreen: Point2D[] = parentCornersWorld.map(cornerWorld =>
+        worldToScreen(cornerWorld[0], cornerWorld[1], viewport, canvasWidth, canvasHeight)
+      )
       
       ctx.beginPath()
       ctx.moveTo(Math.round(parentCornersScreen[0][0]) + 0.5, Math.round(parentCornersScreen[0][1]) + 0.5)
