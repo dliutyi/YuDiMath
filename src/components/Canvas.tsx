@@ -428,29 +428,23 @@ export default function Canvas({
       let snappedPoint: Point2D
       
       if (parentFrame) {
-        // For nested frames, use screenToFrame which accounts for parent frame's viewport
-        // screenToFrame converts: screen -> parent world -> frame coords (with viewport)
-        // It returns: u = (scaledU / zoom) + viewport.x where scaledU is the zoomed coordinate
-        // So to get raw frame coordinates, we need to subtract viewport.x
+        // For nested frames, use screenToFrame which correctly accounts for parent frame's viewport
+        // screenToFrame: screen -> parent world (using root viewport) -> frame coords (accounting for frame viewport)
+        // It returns raw frame coordinates: u = (scaledU / zoom) + viewport.x
+        // But we want raw coordinates without viewport, so we subtract viewport.x
         const framePointWithViewport = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
         
-        // screenToFrame returns coordinates that already have viewport.x added
-        // To get raw coordinates, subtract the viewport pan
+        // screenToFrame returns coordinates with viewport pan added back (to be inverse of frameToScreen)
+        // For drawing, we need raw coordinates, so subtract the viewport pan
         const rawFramePoint: Point2D = [
           framePointWithViewport[0] - parentFrame.viewport.x,
           framePointWithViewport[1] - parentFrame.viewport.y
         ]
         
-        // Debug: also compute using the old method for comparison
-        const parentWorldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
-        const rawFramePointOld = parentToFrame(parentWorldPoint, parentFrame)
-        
-        console.error('[Canvas] MOUSE DOWN - screen:', [screenX, screenY])
-        console.error('[Canvas] MOUSE DOWN - parent world (old method):', parentWorldPoint, 'root viewport:', viewport)
-        console.error('[Canvas] MOUSE DOWN - frame with viewport (screenToFrame):', framePointWithViewport)
-        console.error('[Canvas] MOUSE DOWN - raw frame (new method):', rawFramePoint)
-        console.error('[Canvas] MOUSE DOWN - raw frame (old method):', rawFramePointOld)
-        console.error('[Canvas] MOUSE DOWN - parent frame origin:', parentFrame.origin, 'viewport:', parentFrame.viewport)
+        console.error('[Canvas] MOUSE DOWN - screen:', [screenX, screenY], 'root viewport:', viewport)
+        console.error('[Canvas] MOUSE DOWN - frame coords from screenToFrame:', framePointWithViewport)
+        console.error('[Canvas] MOUSE DOWN - raw frame coords (after subtracting viewport pan):', rawFramePoint)
+        console.error('[Canvas] MOUSE DOWN - parent frame viewport:', parentFrame.viewport)
         
         // In frame coordinates, grid step is always 1.0
         let snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)

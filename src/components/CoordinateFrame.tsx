@@ -82,15 +82,22 @@ export function screenToFrame(
   const [screenX, screenY] = screenPoint
   const { viewport: frameViewport } = frame
   
-  // Transform from screen to parent coordinates
+  // Transform from screen to parent world coordinates using root viewport
+  // This accounts for the root canvas pan/zoom
   const centerX = canvasWidth / 2
   const centerY = canvasHeight / 2
   const parentX = parentViewport.x + (screenX - centerX) / parentViewport.zoom
   const parentY = parentViewport.y - (screenY - centerY) / parentViewport.zoom
   
-  // Transform from parent coordinates to frame coordinates
-  // We need to solve: parent = origin + scaledU * baseI + scaledV * baseJ
-  // Where scaledU = (u - framePanX) * frameZoom and scaledV = (v - framePanY) * frameZoom
+  // Transform from parent world coordinates to frame coordinates
+  // frameToScreen does: 
+  //   1. frameU = u - frameViewport.x (apply pan)
+  //   2. scaledU = frameU * frameViewport.zoom (apply zoom)
+  //   3. parent = origin + scaledU * baseI + scaledV * baseJ (transform to parent)
+  // So to invert:
+  //   1. Solve for scaledU, scaledV from parent = origin + scaledU * baseI + scaledV * baseJ
+  //   2. frameU = scaledU / frameViewport.zoom (undo zoom)
+  //   3. u = frameU + frameViewport.x (undo pan to get raw frame coords)
   
   const [originX, originY] = frame.origin
   const [iX, iY] = frame.baseI
@@ -115,11 +122,12 @@ export function screenToFrame(
   const scaledU = (relX * jY - relY * jX) / determinant
   const scaledV = (relY * iX - relX * iY) / determinant
   
-  // Undo frame zoom
+  // Undo frame zoom: frameU = scaledU / zoom
   const frameU = scaledU / frameViewport.zoom
   const frameV = scaledV / frameViewport.zoom
   
-  // Undo frame pan
+  // Undo frame pan: u = frameU + viewport.x
+  // This gives us the raw frame coordinates (inverse of frameToScreen)
   const u = frameU + frameViewport.x
   const v = frameV + frameViewport.y
   
