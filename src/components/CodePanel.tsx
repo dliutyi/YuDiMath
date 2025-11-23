@@ -168,25 +168,8 @@ export default function CodePanel({
     setIsRunning(true)
     setExecutionResult(null)
 
-    // Clear existing vectors and functions synchronously before running new code
-    // Use flushSync to ensure state updates are applied immediately
-    flushSync(() => {
-      if (onVectorsClear) {
-        onVectorsClear(selectedFrame.id)
-      }
-      if (onFunctionsClear) {
-        onFunctionsClear(selectedFrame.id)
-      }
-    })
-
-    // Small delay to ensure clearing is fully processed before execution
-    await new Promise<void>((resolve) => {
-      setTimeout(() => {
-        resolve()
-      }, 0)
-    })
-
     // Collect vectors and functions created during execution
+    // Don't clear first - keep old ones visible for smooth transition
     const newVectors: Vector[] = []
     const newFunctions: FunctionPlot[] = []
 
@@ -216,13 +199,16 @@ export default function CodePanel({
       if (result.success) {
         setExecutionResult({ success: true })
         
-        // Replace vectors and functions (not append) since we cleared them before execution
-        if (onVectorsUpdate) {
-          onVectorsUpdate(selectedFrame.id, newVectors, true)
-        }
-        if (onFunctionsUpdate) {
-          onFunctionsUpdate(selectedFrame.id, newFunctions, true)
-        }
+        // Atomically replace old vectors/functions with new ones
+        // This keeps old ones visible until new ones are ready, eliminating blinking
+        flushSync(() => {
+          if (onVectorsUpdate) {
+            onVectorsUpdate(selectedFrame.id, newVectors, true)
+          }
+          if (onFunctionsUpdate) {
+            onFunctionsUpdate(selectedFrame.id, newFunctions, true)
+          }
+        })
         
         if (onCodeRun) {
           onCodeRun(selectedFrame.id, codeToExecute)
@@ -231,6 +217,15 @@ export default function CodePanel({
         setExecutionResult({
           success: false,
           error: result.error?.message || 'Unknown error occurred',
+        })
+        // On error, clear vectors/functions to show that execution failed
+        flushSync(() => {
+          if (onVectorsClear) {
+            onVectorsClear(selectedFrame.id)
+          }
+          if (onFunctionsClear) {
+            onFunctionsClear(selectedFrame.id)
+          }
         })
       }
     } catch (error: any) {

@@ -106,30 +106,15 @@ function App() {
     if (autoExecuteCode && autoExecuteFrameId && isReady && !isExecuting) {
       console.log('[App] Auto-executing code for frame:', autoExecuteFrameId)
       
-      // Clear vectors and functions synchronously in a single update before running new code
-      // Use flushSync to ensure state updates are applied immediately
-      flushSync(() => {
-        // Clear both in a single update to ensure atomic operation
-        const frame = workspace.frames.find(f => f.id === autoExecuteFrameId)
-        if (frame) {
-          workspace.updateFrame(autoExecuteFrameId, { 
-            vectors: [], 
-            functions: [] 
-          })
-        }
-      })
-      
-      // Small delay to ensure clearing is fully processed before execution
-      // This ensures the frame state is definitely cleared
-      setTimeout(() => {
-        // Collect vectors and functions created during execution
-        const newVectors: Vector[] = []
-        const newFunctions: FunctionPlot[] = []
+      // Collect vectors and functions created during execution
+      // Don't clear first - keep old ones visible for smooth transition
+      const newVectors: Vector[] = []
+      const newFunctions: FunctionPlot[] = []
 
-        // Generate unique IDs for vectors and functions
-        const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      // Generate unique IDs for vectors and functions
+      const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-        executeCode(
+      executeCode(
         autoExecuteCode,
         autoExecuteFrameId,
         // onVectorCreated callback
@@ -149,20 +134,33 @@ function App() {
       ).then((result) => {
         console.log('[App] Auto-execution result:', result.success)
         if (result.success) {
-          // Replace vectors and functions (not append) since we cleared them before execution
-          handleVectorsUpdate(autoExecuteFrameId, newVectors, true)
-          handleFunctionsUpdate(autoExecuteFrameId, newFunctions, true)
+          // Atomically replace old vectors/functions with new ones
+          // This keeps old ones visible until new ones are ready, eliminating blinking
+          flushSync(() => {
+            handleVectorsUpdate(autoExecuteFrameId, newVectors, true)
+            handleFunctionsUpdate(autoExecuteFrameId, newFunctions, true)
+          })
+        } else {
+          // On error, clear vectors/functions to show that execution failed
+          flushSync(() => {
+            handleVectorsClear(autoExecuteFrameId)
+            handleFunctionsClear(autoExecuteFrameId)
+          })
         }
         // Clear auto-execute trigger after execution
         setAutoExecuteCode(null)
         setAutoExecuteFrameId(null)
-        }).catch((error) => {
-          console.error('[App] Auto-execution error:', error)
-          // Clear auto-execute trigger even on error
-          setAutoExecuteCode(null)
-          setAutoExecuteFrameId(null)
+      }).catch((error) => {
+        console.error('[App] Auto-execution error:', error)
+        // On error, clear vectors/functions
+        flushSync(() => {
+          handleVectorsClear(autoExecuteFrameId)
+          handleFunctionsClear(autoExecuteFrameId)
         })
-      }, 0)
+        // Clear auto-execute trigger even on error
+        setAutoExecuteCode(null)
+        setAutoExecuteFrameId(null)
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoExecuteCode, autoExecuteFrameId, isReady, isExecuting])
