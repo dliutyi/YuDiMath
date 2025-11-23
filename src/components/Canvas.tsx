@@ -405,14 +405,32 @@ export default function Canvas({
       let snappedPoint: Point2D
       
       if (parentFrame) {
-        // Convert screen to parent world coordinates first (using main viewport)
-        const parentWorldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
-        console.error('[Canvas] MOUSE DOWN - screen:', [screenX, screenY], 'parent world:', parentWorldPoint)
+        // For nested frames, we need to account for the parent frame's viewport
+        // Use screenToFrame which correctly handles the parent frame's viewport transformation
+        // screenToFrame returns frame coordinates WITH viewport applied, so we need to extract raw coordinates
+        const framePointWithViewport = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
         
-        // Convert parent world coordinates to parent frame coordinates (without viewport)
-        // This gives us the "raw" frame coordinates, not accounting for parent's viewport pan/zoom
-        const rawFramePoint = parentToFrame(parentWorldPoint, parentFrame)
-        console.error('[Canvas] MOUSE DOWN - raw frame point:', rawFramePoint, 'parent origin:', parentFrame.origin)
+        // Extract raw frame coordinates by undoing the viewport transformation
+        // screenToFrame returns: u = frameU + viewport.x, where frameU = (scaledU / zoom)
+        // So raw u = (u - viewport.x) * zoom + viewport.x? No wait...
+        // Actually, screenToFrame does: u = frameU + viewport.x, where frameU = scaledU / zoom
+        // And scaledU is the coordinate after applying zoom
+        // So to get raw coordinate: rawU = (u - viewport.x) / zoom? No...
+        // Let me think: screenToFrame returns the frame coordinate that accounts for viewport
+        // We want the raw coordinate before viewport is applied
+        // If viewport pan is x and zoom is z, and the visible coordinate is u:
+        // u = (rawU - x) * z, so rawU = u / z + x
+        // But screenToFrame returns: u = frameU + x, where frameU = scaledU / z
+        // And scaledU = (rawU - x) * z
+        // So frameU = (rawU - x) * z / z = rawU - x
+        // So u = (rawU - x) + x = rawU
+        // Wait, that means screenToFrame already returns raw coordinates!
+        // Let me check the code again...
+        // Actually, screenToFrame undoes the viewport: u = frameU + viewport.x
+        // Where frameU = scaledU / zoom, and scaledU accounts for the zoom
+        // So the returned u is the raw frame coordinate
+        const rawFramePoint = framePointWithViewport
+        console.error('[Canvas] MOUSE DOWN - screen:', [screenX, screenY], 'raw frame point:', rawFramePoint, 'parent origin:', parentFrame.origin)
         
         // In frame coordinates, grid step is always 1.0
         let snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
@@ -550,12 +568,9 @@ export default function Canvas({
       let snappedPoint: Point2D
       
       if (drawingRect.parentFrame) {
-        // Convert screen to parent world coordinates first (using main viewport)
-        const parentWorldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
-        
-        // Convert parent world coordinates to parent frame coordinates (without viewport)
-        // This gives us the "raw" frame coordinates, not accounting for parent's viewport pan/zoom
-        const rawFramePoint = parentToFrame(parentWorldPoint, drawingRect.parentFrame)
+        // For nested frames, we need to account for the parent frame's viewport
+        // Use screenToFrame which correctly handles the parent frame's viewport transformation
+        const rawFramePoint = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
         
         // In frame coordinates, grid step is always 1.0
         let snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
