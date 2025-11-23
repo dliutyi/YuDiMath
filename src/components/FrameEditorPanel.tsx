@@ -37,7 +37,7 @@ export default function FrameEditorPanel({
   }
 
   const panelWidth = activeTab === 'properties' ? 'w-80' : 'w-[500px]'
-  const panelHeight = activeTab === 'code' ? 'h-[calc(100vh-2rem)] max-h-[calc(100dvh-2rem)]' : 'max-h-[calc(100vh-2rem)] max-h-[calc(100dvh-2rem)]'
+  const panelHeight = activeTab === 'code' ? 'h-[calc(100vh-2rem)] max-h-[calc(100dvh-2rem)]' : 'h-[calc(100vh-2rem)] max-h-[calc(100dvh-2rem)]'
 
   return (
     <div className={`${panelWidth} ${panelHeight} bg-panel-bg border border-border rounded-lg shadow-lg flex flex-col transition-all duration-300`}>
@@ -68,14 +68,12 @@ export default function FrameEditorPanel({
       {/* Tab Content */}
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         {activeTab === 'properties' ? (
-          <div className="flex-1 overflow-y-auto">
-            <PropertiesPanel
-              selectedFrame={selectedFrame}
-              onFrameUpdate={onFrameUpdate}
-              onFrameViewportChange={onFrameViewportChange}
-              onCodeRun={onCodeRun}
-            />
-          </div>
+          <PropertiesPanel
+            selectedFrame={selectedFrame}
+            onFrameUpdate={onFrameUpdate}
+            onFrameViewportChange={onFrameViewportChange}
+            onCodeRun={onCodeRun}
+          />
         ) : (
           <CodePanel
             selectedFrame={selectedFrame}

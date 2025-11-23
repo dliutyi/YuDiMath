@@ -40,25 +40,37 @@
 
 /* Webkit scrollbar styling */
 .code-editor-textarea::-webkit-scrollbar,
-.code-editor-pre::-webkit-scrollbar {
+.code-editor-pre::-webkit-scrollbar,
+.properties-panel-scrollable::-webkit-scrollbar {
   width: 8px !important;
   height: 8px !important;
 }
 
 .code-editor-textarea::-webkit-scrollbar-track,
-.code-editor-pre::-webkit-scrollbar-track {
+.code-editor-pre::-webkit-scrollbar-track,
+.properties-panel-scrollable::-webkit-scrollbar-track {
   background: transparent !important;
 }
 
 .code-editor-textarea::-webkit-scrollbar-thumb,
-.code-editor-pre::-webkit-scrollbar-thumb {
+.code-editor-pre::-webkit-scrollbar-thumb,
+.properties-panel-scrollable::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.3) !important;
   border-radius: 4px !important;
 }
 
 .code-editor-textarea::-webkit-scrollbar-thumb:hover,
-.code-editor-pre::-webkit-scrollbar-thumb:hover {
+.code-editor-pre::-webkit-scrollbar-thumb:hover,
+.properties-panel-scrollable::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.5) !important;
+}
+
+/* Properties panel scrollable container */
+.properties-panel-scrollable {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
 }
 
 .code-editor-textarea {

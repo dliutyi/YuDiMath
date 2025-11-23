@@ -208,22 +208,24 @@ export default function PropertiesPanel({
   }
 
   return (
-    <div className="p-4">
-      <h2 className="text-lg font-semibold text-text-primary mb-4">Frame Properties</h2>
+    <div className="h-full px-4 pt-4 pb-0 flex flex-col min-h-0">
+      <h2 className="text-lg font-semibold text-text-primary mb-4 flex-shrink-0">Frame Properties</h2>
       
       {degenerateStatus && (
-        <div className={`mb-4 p-3 bg-warning/20 border border-warning/50 rounded text-sm font-medium ${degenerateColor}`}>
+        <div className={`mb-4 p-3 bg-warning/20 border border-warning/50 rounded text-sm font-medium ${degenerateColor} flex-shrink-0`}>
           {degenerateStatus}
         </div>
       )}
       
       {error && !isDegenerate && (
-        <div className="mb-4 p-2 bg-error/20 border border-error/50 rounded text-sm text-error">
+        <div className="mb-4 p-2 bg-error/20 border border-error/50 rounded text-sm text-error flex-shrink-0">
           {error}
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto properties-panel-scrollable" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="pb-4">
+        <div className="space-y-4">
         {/* Origin */}
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-2">
@@ -504,6 +506,8 @@ export default function PropertiesPanel({
           }}
           onCodeRun={onCodeRun}
         />
+        </div>
+        </div>
       </div>
     </div>
   )

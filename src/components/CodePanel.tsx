@@ -58,13 +58,11 @@ export default function CodePanel({
     }
   }, [selectedFrame])
 
-  // Auto-execute code when autoExecuteCode is set
+  // Update local code when autoExecuteCode is set (but don't auto-execute here - App.tsx handles that)
   useEffect(() => {
-    if (autoExecuteCode && selectedFrame && isReady && !isExecuting) {
-      // Update local code first
+    if (autoExecuteCode && selectedFrame) {
+      // Update local code to reflect the new code
       setLocalCode(autoExecuteCode)
-      // Then execute it
-      handleRunWithCode(autoExecuteCode)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoExecuteCode])

@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Canvas from './components/Canvas'
 import GridStepSelector from './components/GridStepSelector'
 import FrameEditorPanel from './components/FrameEditorPanel'
 import LoadingOverlay from './components/LoadingOverlay'
 import { generateCode } from './utils/codeGenerator'
+import { usePyScript } from './hooks/usePyScript'
 import type { ViewportState, CoordinateFrame, Vector, FunctionPlot } from './types'
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
   const [frames, setFrames] = useState<CoordinateFrame[]>([])
   const [isDrawing, setIsDrawing] = useState(false)
   const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null)
+  const { isReady, executeCode, isExecuting } = usePyScript()
 
   const handleGridStepChange = (gridStep: number) => {
     setViewport((prev) => ({ ...prev, gridStep }))
@@ -65,6 +67,8 @@ function App() {
   }
 
   const handleFrameUpdate = (frameId: string, updates: Partial<CoordinateFrame>) => {
+    let codeToExecute: string | null = null
+    
     setFrames((prev) => {
       return prev.map((frame) => {
         if (frame.id === frameId) {
@@ -76,11 +80,15 @@ function App() {
           // If origin, base vectors, or parameters changed, regenerate code while preserving user code
           if (updates.origin || updates.baseI || updates.baseJ || updates.parameters) {
             updatedFrame.code = generateCode(updatedFrame, frame.code)
+            codeToExecute = updatedFrame.code
             
-            // If parameters changed, trigger auto-execution
-            if (updates.parameters) {
-              setAutoExecuteCode(updatedFrame.code)
-            }
+            // Trigger auto-execution for any of these changes
+            console.log('[App] Triggering auto-execution for frame:', frameId, 'Reason:', {
+              origin: !!updates.origin,
+              baseI: !!updates.baseI,
+              baseJ: !!updates.baseJ,
+              parameters: !!updates.parameters
+            })
           }
           
           return updatedFrame
@@ -88,6 +96,15 @@ function App() {
         return frame
       })
     })
+    
+    // Trigger auto-execution after state update
+    if (codeToExecute) {
+      // Use setTimeout to ensure state update completes first
+      setTimeout(() => {
+        setAutoExecuteCode(codeToExecute)
+        setAutoExecuteFrameId(frameId)
+      }, 0)
+    }
   }
 
   const handleCodeChange = (frameId: string, code: string) => {
@@ -95,6 +112,63 @@ function App() {
   }
 
   const [autoExecuteCode, setAutoExecuteCode] = useState<string | null>(null)
+  const [autoExecuteFrameId, setAutoExecuteFrameId] = useState<string | null>(null)
+
+  // Auto-execute code when autoExecuteCode changes (works regardless of active tab)
+  useEffect(() => {
+    if (autoExecuteCode && autoExecuteFrameId && isReady && !isExecuting) {
+      console.log('[App] Auto-executing code for frame:', autoExecuteFrameId)
+      // Clear vectors and functions before running new code
+      handleVectorsClear(autoExecuteFrameId)
+      handleFunctionsClear(autoExecuteFrameId)
+
+      // Collect vectors and functions created during execution
+      const newVectors: Vector[] = []
+      const newFunctions: FunctionPlot[] = []
+
+      // Generate unique IDs for vectors and functions
+      const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+      executeCode(
+        autoExecuteCode,
+        autoExecuteFrameId,
+        // onVectorCreated callback
+        (vector) => {
+          newVectors.push({
+            ...vector,
+            id: generateId('vec'),
+          })
+        },
+        // onFunctionCreated callback
+        (func) => {
+          newFunctions.push({
+            ...func,
+            id: generateId('func'),
+          })
+        }
+      ).then((result) => {
+        console.log('[App] Auto-execution result:', result.success)
+        if (result.success) {
+          // Update frame with new vectors and functions
+          if (newVectors.length > 0) {
+            handleVectorsUpdate(autoExecuteFrameId, newVectors)
+          }
+          if (newFunctions.length > 0) {
+            handleFunctionsUpdate(autoExecuteFrameId, newFunctions)
+          }
+        }
+        // Clear auto-execute trigger after execution
+        setAutoExecuteCode(null)
+        setAutoExecuteFrameId(null)
+      }).catch((error) => {
+        console.error('[App] Auto-execution error:', error)
+        // Clear auto-execute trigger even on error
+        setAutoExecuteCode(null)
+        setAutoExecuteFrameId(null)
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoExecuteCode, autoExecuteFrameId, isReady, isExecuting])
 
   const handleCodeRun = (frameId: string, _code: string) => {
     // Code execution is handled by CodePanel, this is just a callback
@@ -102,6 +176,7 @@ function App() {
     console.log('[App] Code executed for frame:', frameId)
     // Clear auto-execute trigger after execution
     setAutoExecuteCode(null)
+    setAutoExecuteFrameId(null)
   }
 
   const handleVectorsUpdate = (frameId: string, vectors: Vector[]) => {
