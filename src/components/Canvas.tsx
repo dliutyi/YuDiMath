@@ -8,7 +8,7 @@ import {
   clampPointToFrameBounds,
   isPointInFrame,
 } from '../utils/coordinates'
-import { drawCoordinateFrame, screenToFrame, frameToParent, frameCoordsToParentWorld } from './CoordinateFrame'
+import { drawCoordinateFrame, screenToFrame, frameToParent, frameCoordsToParentWorld, parentToFrame } from './CoordinateFrame'
 
 interface CanvasProps {
   viewport: ViewportState
