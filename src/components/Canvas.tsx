@@ -5,7 +5,6 @@ import {
   screenToWorld,
   snapPointToGrid,
   clampPointToFrameBounds,
-  isPointInFrame,
 } from '../utils/coordinates'
 import { drawCoordinateFrame, screenToFrame, frameToParent, frameCoordsToParentWorld, parentToFrame, nestedFrameToScreen } from './CoordinateFrame'
 
@@ -242,22 +241,16 @@ export default function Canvas({
       const mouseX = e.clientX - rect.left
       const mouseY = e.clientY - rect.top
 
-      // Check if mouse is inside a frame
-      const worldPoint = screenToWorld(mouseX, mouseY, viewport, canvasWidth, canvasHeight)
-      let zoomingFrame: CoordinateFrame | null = null
-      let smallestArea = Infinity
-      
-      for (const frame of frames) {
-        if (isPointInFrame(worldPoint, frame.bounds)) {
-          const frameArea = frame.bounds.width * frame.bounds.height
-          if (frameArea < smallestArea) {
-            smallestArea = frameArea
-            zoomingFrame = frame
-          }
-        }
-      }
+      // Use selected frame for zooming instead of hovered frame
+      // This avoids confusion with nested frames
+      const zoomingFrame = selectedFrameId 
+        ? frames.find(f => f.id === selectedFrameId) || null
+        : null
 
       if (zoomingFrame && onFrameViewportChange) {
+        // Zooming the selected frame - update frame viewport
+        // Convert mouse position to world coordinates first
+        const worldPoint = screenToWorld(mouseX, mouseY, viewport, canvasWidth, canvasHeight)
         // Zooming inside a frame - update frame viewport
         // Convert mouse position to frame coordinates
         const parentToFrame = (point: Point2D, frame: CoordinateFrame): Point2D => {
@@ -347,7 +340,7 @@ export default function Canvas({
     return () => {
       canvas.removeEventListener('wheel', wheelHandler, { capture: true } as EventListenerOptions)
     }
-  }, [viewport, onViewportChange, onFrameViewportChange, frames, width, height, MIN_ZOOM, MAX_ZOOM, ZOOM_SENSITIVITY])
+  }, [viewport, onViewportChange, onFrameViewportChange, frames, selectedFrameId, width, height, MIN_ZOOM, MAX_ZOOM, ZOOM_SENSITIVITY])
 
   // Pan and drawing handlers
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
