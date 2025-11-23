@@ -717,29 +717,29 @@ export default function Canvas({
         let maxY = Math.max(y1, y2)
         
         // If drawing inside a parent frame, constrain bounds to stay within parent
-        // But ensure we still have valid bounds after clamping
+        // Only clamp if the frame actually intersects the parent bounds
         if (parentFrame) {
           const parentBounds = parentFrame.bounds
-          const originalMinX = minX
-          const originalMaxX = maxX
-          const originalMinY = minY
-          const originalMaxY = maxY
+          const parentMinX = parentBounds.x
+          const parentMaxX = parentBounds.x + parentBounds.width
+          const parentMinY = parentBounds.y
+          const parentMaxY = parentBounds.y + parentBounds.height
           
-          minX = Math.max(parentBounds.x, minX)
-          maxX = Math.min(parentBounds.x + parentBounds.width, maxX)
-          minY = Math.max(parentBounds.y, minY)
-          maxY = Math.min(parentBounds.y + parentBounds.height, maxY)
+          // Check if frame intersects parent bounds
+          const intersectsX = !(maxX <= parentMinX || minX >= parentMaxX)
+          const intersectsY = !(maxY <= parentMinY || minY >= parentMaxY)
           
-          // If clamping resulted in invalid bounds, use the original bounds
-          // This allows frames to be created even if partially outside parent
-          if (maxX <= minX) {
-            minX = originalMinX
-            maxX = originalMaxX
+          // Only clamp if there's an intersection
+          // Clamp to the intersection of frame bounds and parent bounds
+          if (intersectsX) {
+            minX = Math.max(parentMinX, minX)
+            maxX = Math.min(parentMaxX, maxX)
           }
-          if (maxY <= minY) {
-            minY = originalMinY
-            maxY = originalMaxY
+          if (intersectsY) {
+            minY = Math.max(parentMinY, minY)
+            maxY = Math.min(parentMaxY, maxY)
           }
+          // If no intersection, keep original bounds (frame is fully outside parent)
         }
         
         const frameWidth = maxX - minX
