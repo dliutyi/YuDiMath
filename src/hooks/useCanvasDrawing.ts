@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import type { ViewportState, CoordinateFrame, Point2D, FrameBounds } from '../types'
 import { screenToWorld, snapPointToGrid, worldToScreen } from '../utils/coordinates'
-import { screenToFrame, frameCoordsToParentWorld, parentToFrame, nestedFrameToScreen } from '../utils/frameTransforms'
+import { screenToFrame, frameCoordsToParentWorld, parentToFrame, nestedFrameToScreen, frameToParent } from '../utils/frameTransforms'
 
 interface UseCanvasDrawingProps {
   isDrawing: boolean
@@ -95,9 +95,13 @@ export function useCanvasDrawing({
     let snappedPoint: Point2D
 
     if (parentFrame) {
+      // Convert screen to frame coordinates (accounts for frame viewport)
       const rawFramePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
+      // Snap to grid in frame coordinates (integer intervals)
       const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
-      snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
+      // Convert back to parent world coordinates (accounting for frame viewport)
+      // Use frameToParent which accounts for viewport, not frameCoordsToParentWorld
+      snappedPoint = frameToParent(snappedRawFramePoint, parentFrame)
     } else {
       const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
       snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
@@ -126,9 +130,13 @@ export function useCanvasDrawing({
     let snappedPoint: Point2D
 
     if (parentFrame) {
+      // Convert screen to frame coordinates (accounts for frame viewport)
       const rawFramePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
+      // Snap to grid in frame coordinates (integer intervals)
       const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
-      snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
+      // Convert back to parent world coordinates (accounting for frame viewport)
+      // Use frameToParent which accounts for viewport, not frameCoordsToParentWorld
+      snappedPoint = frameToParent(snappedRawFramePoint, parentFrame)
     } else {
       const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
       snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
@@ -158,12 +166,26 @@ export function useCanvasDrawing({
     let endPoint: Point2D
 
     if (parentFrame) {
+      // Convert screen to frame coordinates for end point (accounts for frame viewport)
       const rawFramePointEnd = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
+      // Snap to grid in frame coordinates (integer intervals)
       const snappedRawFramePointEnd = snapPointToGrid(rawFramePointEnd, 1.0)
-      const rawFramePointStart = parentToFrame(startPoint, parentFrame)
+      
+      // Convert start point from parent world to frame coordinates (accounts for frame viewport)
+      const rawFramePointStart = screenToFrame(
+        worldToScreen(startPoint[0], startPoint[1], viewport, canvasWidth, canvasHeight),
+        parentFrame,
+        viewport,
+        canvasWidth,
+        canvasHeight
+      )
+      // Snap to grid in frame coordinates
       const snappedRawFramePointStart = snapPointToGrid(rawFramePointStart, 1.0)
-      startPoint = frameCoordsToParentWorld(snappedRawFramePointStart, parentFrame)
-      endPoint = frameCoordsToParentWorld(snappedRawFramePointEnd, parentFrame)
+      
+      // Convert both back to parent world coordinates (accounting for frame viewport)
+      // Use frameToParent which accounts for viewport, not frameCoordsToParentWorld
+      startPoint = frameToParent(snappedRawFramePointStart, parentFrame)
+      endPoint = frameToParent(snappedRawFramePointEnd, parentFrame)
     } else {
       const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
       endPoint = snapPointToGrid(worldPoint, viewport.gridStep)
