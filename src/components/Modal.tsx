@@ -10,6 +10,9 @@ export interface ModalProps {
   onConfirm: () => void
   onCancel?: () => void
   variant?: 'default' | 'danger'
+  // Optional third button (e.g., for Replace/Merge/Cancel)
+  secondaryText?: string
+  onSecondary?: () => void
 }
 
 export default function Modal({
@@ -22,6 +25,8 @@ export default function Modal({
   onConfirm,
   onCancel,
   variant = 'default',
+  secondaryText,
+  onSecondary,
 }: ModalProps) {
   useEffect(() => {
     if (isOpen) {
@@ -59,6 +64,13 @@ export default function Modal({
     onClose()
   }
 
+  const handleSecondary = () => {
+    if (onSecondary) {
+      onSecondary()
+    }
+    onClose()
+  }
+
   const isDanger = variant === 'danger'
 
   return (
@@ -88,6 +100,14 @@ export default function Modal({
               className="px-4 py-2 rounded-lg transition-all duration-200 bg-bg-primary/50 border border-border/50 text-text-primary hover:bg-hover/50 hover:border-border hover:shadow-md"
             >
               {cancelText}
+            </button>
+          )}
+          {onSecondary && secondaryText && (
+            <button
+              onClick={handleSecondary}
+              className="px-4 py-2 rounded-lg transition-all duration-200 bg-primary/20 border border-primary/50 text-primary hover:bg-primary/30 hover:border-primary hover:shadow-md"
+            >
+              {secondaryText}
             </button>
           )}
           <button

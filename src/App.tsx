@@ -27,6 +27,8 @@ function App() {
     onConfirm: () => void
     onCancel?: () => void
     variant?: 'default' | 'danger'
+    secondaryText?: string
+    onSecondary?: () => void
   }>({
     isOpen: false,
     title: '',
@@ -217,18 +219,19 @@ function App() {
       return
     }
 
-    // Show modal to ask user if they want to replace or merge
+    // Show modal to ask user if they want to replace, merge, or cancel
     setModalState({
       isOpen: true,
       title: 'Import Workspace',
-      message: 'How would you like to import the workspace?\n\n• Replace: Replace current workspace with imported one\n• Merge: Add imported frames to current workspace',
+      message: 'How would you like to import the workspace?\n\n• Replace: Replace current workspace with imported one\n• Merge: Add imported frames to current workspace\n• Cancel: Abort import',
       confirmText: 'Replace',
-      cancelText: 'Merge',
+      secondaryText: 'Merge',
+      cancelText: 'Cancel',
       onConfirm: () => {
         // Replace: set the entire workspace state
         workspace.setWorkspace(imported)
       },
-      onCancel: () => {
+      onSecondary: () => {
         // Merge: add imported frames to existing ones, update viewport if needed
         const mergedFrames = [...workspace.frames, ...imported.frames]
         workspace.setWorkspace({
@@ -236,6 +239,9 @@ function App() {
           frames: mergedFrames,
           selectedFrameId: imported.selectedFrameId || workspace.selectedFrameId,
         })
+      },
+      onCancel: () => {
+        // Cancel: do nothing, just close the modal
       },
     })
   }
@@ -562,6 +568,8 @@ function App() {
         onConfirm={modalState.onConfirm}
         onCancel={modalState.onCancel}
         variant={modalState.variant}
+        secondaryText={modalState.secondaryText}
+        onSecondary={modalState.onSecondary}
       />
     </div>
   )
