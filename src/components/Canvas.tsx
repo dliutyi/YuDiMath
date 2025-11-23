@@ -697,6 +697,7 @@ export default function Canvas({
         if (endPoint[0] !== endPointBeforeClamp[0] || endPoint[1] !== endPointBeforeClamp[1]) {
           console.log('[Canvas] Nested frame - after clamp:', endPoint, 'was:', endPointBeforeClamp)
         }
+        console.log('[Canvas] ===== END POINT CALCULATED ===== endPoint:', endPoint, 'startPoint:', startPoint)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
@@ -712,12 +713,13 @@ export default function Canvas({
         const [x2, y2] = endPoint
         
         // Debug: Verify startPoint makes sense
+        console.log('[Canvas] ===== BOUNDS CALCULATION =====')
+        console.log('[Canvas] startPoint:', startPoint, 'endPoint:', endPoint)
         if (parentFrame) {
           const startRaw = parentToFrame(startPoint, parentFrame)
           const endRaw = parentToFrame(endPoint, parentFrame)
-          console.log('[Canvas] Frame bounds calculation - startPoint (world):', startPoint, 'raw:', startRaw, 'endPoint (world):', endPoint, 'raw:', endRaw)
-        } else {
-          console.log('[Canvas] Frame bounds calculation - startPoint:', startPoint, 'endPoint:', endPoint)
+          console.log('[Canvas] startPoint raw frame coords:', startRaw, 'endPoint raw frame coords:', endRaw)
+          console.log('[Canvas] Parent frame origin:', parentFrame.origin, 'bounds:', parentFrame.bounds)
         }
         
         // Calculate bounds (ensure positive width and height)
