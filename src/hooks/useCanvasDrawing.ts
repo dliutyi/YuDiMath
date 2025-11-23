@@ -141,20 +141,10 @@ export function useCanvasDrawing({
     let snappedPoint: Point2D
 
     if (parentFrame) {
-      // Convert screen to frame coordinates (accounts for frame viewport)
-      const framePointWithViewport = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
-      // Undo viewport to get raw frame coordinates
-      const rawFramePoint: Point2D = [
-        framePointWithViewport[0] + parentFrame.viewport.x,
-        framePointWithViewport[1] + parentFrame.viewport.y
-      ]
-      // Apply inverse zoom to get raw coordinates
-      const rawFramePointScaled: Point2D = [
-        rawFramePoint[0] / parentFrame.viewport.zoom,
-        rawFramePoint[1] / parentFrame.viewport.zoom
-      ]
+      // Convert screen to frame coordinates (screenToFrame already returns raw frame coordinates, viewport is undone)
+      const rawFramePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
       // Snap to grid in frame coordinates (integer intervals)
-      const snappedRawFramePoint = snapPointToGrid(rawFramePointScaled, 1.0)
+      const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
       // Convert back to parent world coordinates WITHOUT viewport
       // Bounds should represent the rectangle in parent frame coordinates, not accounting for viewport
       // Use frameCoordsToParentWorld which does NOT apply viewport
@@ -188,23 +178,12 @@ export function useCanvasDrawing({
     let endPoint: Point2D
 
     if (parentFrame) {
-      // Convert screen to frame coordinates for end point (accounts for frame viewport)
-      const framePointEndWithViewport = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
-      // Undo viewport to get raw frame coordinates
-      const rawFramePointEnd: Point2D = [
-        framePointEndWithViewport[0] + parentFrame.viewport.x,
-        framePointEndWithViewport[1] + parentFrame.viewport.y
-      ]
-      // Apply inverse zoom
-      const rawFramePointEndScaled: Point2D = [
-        rawFramePointEnd[0] / parentFrame.viewport.zoom,
-        rawFramePointEnd[1] / parentFrame.viewport.zoom
-      ]
+      // Convert screen to frame coordinates for end point (screenToFrame already returns raw frame coordinates)
+      const rawFramePointEnd = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
       // Snap to grid in frame coordinates (integer intervals)
-      const snappedRawFramePointEnd = snapPointToGrid(rawFramePointEndScaled, 1.0)
+      const snappedRawFramePointEnd = snapPointToGrid(rawFramePointEnd, 1.0)
       
-      // Convert start point from parent world to frame coordinates
-      // First convert to parent frame coordinates (raw, no viewport)
+      // Convert start point from parent world to frame coordinates (raw, no viewport)
       const rawFramePointStart = parentToFrame(startPoint, parentFrame)
       // Snap to grid in frame coordinates
       const snappedRawFramePointStart = snapPointToGrid(rawFramePointStart, 1.0)
