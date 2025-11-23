@@ -316,9 +316,11 @@ export function drawCoordinateFrame(
   
   if (frame.parentFrameId) {
     // Nested frame: transform bounds through parent coordinate system
-    // Bounds are in parent's world coordinates, convert to parent's frame coordinates first
+    // Bounds are stored in parent's world coordinates
+    // We need to convert them to this frame's coordinate system first, then transform to screen
     const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
     if (parentFrame) {
+      // Bounds are in parent's world coordinates
       // Convert bounds corners from parent world coordinates to parent frame coordinates
       const topLeftParentWorld: Point2D = [bounds.x, bounds.y + bounds.height]
       const bottomRightParentWorld: Point2D = [bounds.x + bounds.width, bounds.y]
@@ -326,9 +328,19 @@ export function drawCoordinateFrame(
       const topLeftParentFrame = parentToFrame(topLeftParentWorld, parentFrame)
       const bottomRightParentFrame = parentToFrame(bottomRightParentWorld, parentFrame)
       
-      // Then transform through parent chain to screen
-      topLeft = nestedFrameToScreen(topLeftParentFrame, parentFrame, allFrames, viewport, canvasWidth, canvasHeight)
-      bottomRight = nestedFrameToScreen(bottomRightParentFrame, parentFrame, allFrames, viewport, canvasWidth, canvasHeight)
+      // Now convert from parent frame coordinates to this frame's coordinates
+      // The bounds corners in parent frame coords need to be converted to this frame's world coords
+      // then to this frame's frame coords
+      const topLeftThisFrameWorld = frameCoordsToParentWorld(topLeftParentFrame, parentFrame)
+      const bottomRightThisFrameWorld = frameCoordsToParentWorld(bottomRightParentFrame, parentFrame)
+      
+      // Convert to this frame's frame coordinates
+      const topLeftThisFrame = parentToFrame(topLeftThisFrameWorld, frame)
+      const bottomRightThisFrame = parentToFrame(bottomRightThisFrameWorld, frame)
+      
+      // Then transform through this frame's chain to screen
+      topLeft = nestedFrameToScreen(topLeftThisFrame, frame, allFrames, viewport, canvasWidth, canvasHeight)
+      bottomRight = nestedFrameToScreen(bottomRightThisFrame, frame, allFrames, viewport, canvasWidth, canvasHeight)
     } else {
       // Parent not found, fall back to direct transformation
       topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
