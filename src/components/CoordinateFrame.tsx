@@ -244,6 +244,64 @@ function getBackgroundColorForLevel(level: number): string {
   return backgroundColors[level % backgroundColors.length]
 }
 
+/**
+ * Transform a point from a nested frame's coordinate system to screen coordinates
+ * Recursively transforms through all parent frames
+ */
+function nestedFrameToScreen(
+  point: Point2D,
+  frame: CoordinateFrame,
+  allFrames: CoordinateFrame[],
+  rootViewport: ViewportState,
+  canvasWidth: number,
+  canvasHeight: number
+): Point2D {
+  // If this frame has a parent, transform through the parent first
+  if (frame.parentFrameId) {
+    const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
+    if (parentFrame) {
+      // Transform point from this frame's coordinate system to parent's coordinate system
+      // First, convert from this frame's coordinates to parent's world coordinates
+      const parentWorldPoint = frameToParent(point, frame)
+      
+      // Then, convert from parent's world coordinates to parent's frame coordinates
+      const parentFramePoint = parentToFrame(parentWorldPoint, parentFrame)
+      
+      // Recursively transform through parent
+      return nestedFrameToScreen(parentFramePoint, parentFrame, allFrames, rootViewport, canvasWidth, canvasHeight)
+    }
+  }
+  
+  // No parent (or parent not found), transform directly using this frame
+  return frameToScreen(point, frame, rootViewport, canvasWidth, canvasHeight)
+}
+
+/**
+ * Transform a point from parent (world) coordinates to frame coordinates
+ * Inverse of frameToParent (without viewport pan/zoom)
+ */
+function parentToFrame(point: Point2D, frame: CoordinateFrame): Point2D {
+  const [px, py] = point
+  const [originX, originY] = frame.origin
+  const [iX, iY] = frame.baseI
+  const [jX, jY] = frame.baseJ
+  
+  // Relative to frame origin
+  const relX = px - originX
+  const relY = py - originY
+  
+  // Solve for u, v using inverse transformation
+  const determinant = iX * jY - iY * jX
+  if (Math.abs(determinant) < 1e-10) {
+    return [0, 0]
+  }
+  
+  const u = (relX * jY - relY * jX) / determinant
+  const v = (relY * iX - relX * iY) / determinant
+  
+  return [u, v]
+}
+
 export function drawCoordinateFrame(
   ctx: CanvasRenderingContext2D,
   frame: CoordinateFrame,
@@ -257,13 +315,43 @@ export function drawCoordinateFrame(
   const { bounds } = frame
   const isSelected = frame.id === selectedFrameId
 
-  // Convert frame bounds to screen coordinates
-  const topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
-  const bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
+  // For nested frames, we need to transform bounds through parent frames
+  // The bounds are stored in world coordinates, but for nested frames, they're relative to the parent
+  // So we need to transform the corner points through the parent chain
+  let topLeft: Point2D
+  let bottomRight: Point2D
+  
+  if (frame.parentFrameId) {
+    // Nested frame: transform bounds through parent coordinate system
+    // Bounds are in parent's world coordinates, convert to parent's frame coordinates first
+    const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
+    if (parentFrame) {
+      // Convert bounds corners from parent world coordinates to parent frame coordinates
+      const topLeftParentWorld: Point2D = [bounds.x, bounds.y + bounds.height]
+      const bottomRightParentWorld: Point2D = [bounds.x + bounds.width, bounds.y]
+      
+      const topLeftParentFrame = parentToFrame(topLeftParentWorld, parentFrame)
+      const bottomRightParentFrame = parentToFrame(bottomRightParentWorld, parentFrame)
+      
+      // Then transform through parent chain to screen
+      topLeft = nestedFrameToScreen(topLeftParentFrame, parentFrame, allFrames, viewport, canvasWidth, canvasHeight)
+      bottomRight = nestedFrameToScreen(bottomRightParentFrame, parentFrame, allFrames, viewport, canvasWidth, canvasHeight)
+    } else {
+      // Parent not found, fall back to direct transformation
+      topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
+      bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
+    }
+  } else {
+    // Top-level frame: use direct world-to-screen transformation
+    topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
+    bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
+  }
   // Calculate origin in screen coordinates
-  // The origin in frame coordinates is (0, 0), which maps to frame.origin in parent coordinates
-  // Use frameToScreen to correctly account for frame panning and zooming
-  const originScreen = frameToScreen([0, 0], frame, viewport, canvasWidth, canvasHeight)
+  // The origin in frame coordinates is (0, 0)
+  // For nested frames, transform through parent chain
+  const originScreen = frame.parentFrameId
+    ? nestedFrameToScreen([0, 0], frame, allFrames, viewport, canvasWidth, canvasHeight)
+    : frameToScreen([0, 0], frame, viewport, canvasWidth, canvasHeight)
 
   // Draw frame background with semi-transparent color
   // This provides visual separation while still showing parent grid
@@ -312,10 +400,14 @@ export function drawCoordinateFrame(
   
   // Draw base vectors within clipped region
   // Base vectors are 1 unit in frame coordinates
-  // Use frameToScreen to account for frame viewport zoom and pan
+  // For nested frames, transform through parent chain
   const baseVectorScale = 1.0 // 1 unit in frame coordinates
-  const baseIEndScreen = frameToScreen([baseVectorScale, 0], frame, viewport, canvasWidth, canvasHeight)
-  const baseJEndScreen = frameToScreen([0, baseVectorScale], frame, viewport, canvasWidth, canvasHeight)
+  const baseIEndScreen = frame.parentFrameId
+    ? nestedFrameToScreen([baseVectorScale, 0], frame, allFrames, viewport, canvasWidth, canvasHeight)
+    : frameToScreen([baseVectorScale, 0], frame, viewport, canvasWidth, canvasHeight)
+  const baseJEndScreen = frame.parentFrameId
+    ? nestedFrameToScreen([0, baseVectorScale], frame, allFrames, viewport, canvasWidth, canvasHeight)
+    : frameToScreen([0, baseVectorScale], frame, viewport, canvasWidth, canvasHeight)
 
   // Draw base i vector (red) as arrow
   drawArrow(ctx, originScreen, baseIEndScreen, '#ef4444', 2, 8)
@@ -345,7 +437,8 @@ function drawFrameGrid(
   viewport: ViewportState,
   canvasWidth: number,
   canvasHeight: number,
-  nestingLevel: number = 0
+  nestingLevel: number = 0,
+  allFrames: CoordinateFrame[] = []
 ) {
   const { bounds, baseI, baseJ, viewport: frameViewport } = frame
 
@@ -410,13 +503,18 @@ function drawFrameGrid(
 
   // Draw grid lines along baseI direction (lines parallel to baseJ)
   // These are lines at constant u values
+  // Helper to transform frame coordinates to screen (accounting for parent chain if nested)
+  const transformToScreen = frame.parentFrameId
+    ? (point: Point2D): Point2D => nestedFrameToScreen(point, frame, allFrames, viewport, canvasWidth, canvasHeight)
+    : (point: Point2D): Point2D => frameToScreen(point, frame, viewport, canvasWidth, canvasHeight)
+  
   const startU = Math.floor(expandedMinU / gridStep) * gridStep
   const endU = Math.ceil(expandedMaxU / gridStep) * gridStep
   for (let u = startU; u <= endU; u += gridStep) {
     // Line endpoints in frame coordinates: (u, expandedMinV) to (u, expandedMaxV)
-    // Use frameToScreen to account for frame viewport zoom and pan
-    const startScreen = frameToScreen([u, expandedMinV], frame, viewport, canvasWidth, canvasHeight)
-    const endScreen = frameToScreen([u, expandedMaxV], frame, viewport, canvasWidth, canvasHeight)
+    // Use transformToScreen to account for frame viewport zoom and pan (and parent chain if nested)
+    const startScreen = transformToScreen([u, expandedMinV])
+    const endScreen = transformToScreen([u, expandedMaxV])
     
     ctx.beginPath()
     ctx.moveTo(Math.round(startScreen[0]) + 0.5, Math.round(startScreen[1]) + 0.5)
@@ -430,9 +528,9 @@ function drawFrameGrid(
   const endV = Math.ceil(expandedMaxV / gridStep) * gridStep
   for (let v = startV; v <= endV; v += gridStep) {
     // Line endpoints in frame coordinates: (expandedMinU, v) to (expandedMaxU, v)
-    // Use frameToScreen to account for frame viewport zoom and pan
-    const startScreen = frameToScreen([expandedMinU, v], frame, viewport, canvasWidth, canvasHeight)
-    const endScreen = frameToScreen([expandedMaxU, v], frame, viewport, canvasWidth, canvasHeight)
+    // Use transformToScreen to account for frame viewport zoom and pan (and parent chain if nested)
+    const startScreen = transformToScreen([expandedMinU, v])
+    const endScreen = transformToScreen([expandedMaxU, v])
     
     ctx.beginPath()
     ctx.moveTo(Math.round(startScreen[0]) + 0.5, Math.round(startScreen[1]) + 0.5)
@@ -453,7 +551,8 @@ function drawFrameAxes(
   frame: CoordinateFrame,
   viewport: ViewportState,
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
+  allFrames: CoordinateFrame[] = []
 ) {
   const { bounds, baseI, baseJ, viewport: frameViewport } = frame
 
@@ -501,8 +600,10 @@ function drawFrameAxes(
   // Origin in screen coordinates
   // The origin in frame coordinates is (0, 0), which maps to frame.origin in parent coordinates
   // When panning within the frame, this screen position changes because we're seeing a different part of the frame
-  // Use frameToScreen to correctly account for frame panning and zooming
-  const originScreenAxes = frameToScreen([0, 0], frame, viewport, canvasWidth, canvasHeight)
+  // For nested frames, transform through parent chain
+  const originScreenAxes = frame.parentFrameId
+    ? nestedFrameToScreen([0, 0], frame, allFrames, viewport, canvasWidth, canvasHeight)
+    : frameToScreen([0, 0], frame, viewport, canvasWidth, canvasHeight)
   
   // Get base vector directions in screen coordinates
   // The axes should always pass through the frame origin (0, 0 in frame coordinates)
@@ -513,8 +614,13 @@ function drawFrameAxes(
   // Transform unit vectors in frame coordinates to screen coordinates
   // (1, 0) in frame coordinates gives us the direction of the i-axis
   // (0, 1) in frame coordinates gives us the direction of the j-axis
-  const iAxisEndScreen = frameToScreen([1, 0], frame, viewport, canvasWidth, canvasHeight)
-  const jAxisEndScreen = frameToScreen([0, 1], frame, viewport, canvasWidth, canvasHeight)
+  // For nested frames, transform through parent chain
+  const iAxisEndScreen = frame.parentFrameId
+    ? nestedFrameToScreen([1, 0], frame, allFrames, viewport, canvasWidth, canvasHeight)
+    : frameToScreen([1, 0], frame, viewport, canvasWidth, canvasHeight)
+  const jAxisEndScreen = frame.parentFrameId
+    ? nestedFrameToScreen([0, 1], frame, allFrames, viewport, canvasWidth, canvasHeight)
+    : frameToScreen([0, 1], frame, viewport, canvasWidth, canvasHeight)
   
   // Calculate direction vectors in screen space (from origin)
   const baseIDirX = iAxisEndScreen[0] - originScreenAxes[0]
