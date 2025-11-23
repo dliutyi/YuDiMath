@@ -561,7 +561,7 @@ export default function Canvas({
         snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, drawingRect.parentFrame)
         // Constrain to parent frame bounds
         snappedPoint = clampPointToFrameBounds(snappedPoint, drawingRect.parentFrame.bounds)
-        console.log('[Canvas] Mouse move - frame point:', framePoint, 'snapped:', snappedFramePoint, 'world:', snappedPoint)
+        console.log('[Canvas] Mouse move - frame point (with viewport):', framePointWithViewport, 'raw:', rawFramePoint, 'snapped raw:', snappedRawFramePoint, 'world:', snappedPoint)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
@@ -710,7 +710,7 @@ export default function Canvas({
         endPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
         // Constrain to parent frame bounds
         endPoint = clampPointToFrameBounds(endPoint, parentFrame.bounds)
-        console.log('[Canvas] Mouse up - frame point:', framePoint, 'snapped:', snappedFramePoint, 'world:', endPoint)
+        console.log('[Canvas] Mouse up - frame point (with viewport):', framePointWithViewport, 'raw:', rawFramePoint, 'snapped raw:', snappedRawFramePoint, 'world:', endPoint)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
