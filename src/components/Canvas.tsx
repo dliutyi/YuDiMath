@@ -656,22 +656,17 @@ export default function Canvas({
       if (drawingRect.parentFrame) {
         // Convert screen coordinates directly to parent frame coordinates
         // This accounts for the parent's viewport pan/zoom
-        const framePointWithViewport = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
-        
-        // Remove viewport pan/zoom to get raw frame coordinates
-        // screenToFrame returns: u = frameU + frameViewport.x where frameU = scaledU / frameViewport.zoom
-        // To get raw: rawU = (framePointWithViewport.u - frameViewport.x) / frameViewport.zoom
-        const rawFramePoint: Point2D = [
-          (framePointWithViewport[0] - drawingRect.parentFrame.viewport.x) / drawingRect.parentFrame.viewport.zoom,
-          (framePointWithViewport[1] - drawingRect.parentFrame.viewport.y) / drawingRect.parentFrame.viewport.zoom
-        ]
+        // screenToFrame returns coordinates in the frame's coordinate system accounting for viewport
+        const framePoint = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
         
         // In frame coordinates, grid step is always 1.0
-        const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
+        // Snap directly in the frame coordinate system (which accounts for viewport)
+        const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
         
-        // Convert back to parent world coordinates using raw transformation (without viewport)
-        // This ensures bounds are stored correctly regardless of parent's viewport state
-        endPoint = frameCoordsToParentWorld(snappedRawFramePoint, drawingRect.parentFrame)
+        // Convert back to parent world coordinates using frameToParent
+        // frameToParent applies the viewport transformation, which matches what screenToFrame did
+        // This ensures the coordinates are correctly transformed back to parent world space
+        endPoint = frameToParent(snappedFramePoint, drawingRect.parentFrame)
         // Constrain to parent frame bounds
         endPoint = clampPointToFrameBounds(endPoint, drawingRect.parentFrame.bounds)
       } else {
