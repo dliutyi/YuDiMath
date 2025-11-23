@@ -66,7 +66,7 @@ export default function Canvas({
     onFrameCreated,
   })
 
-  const draw = () => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current
     const container = containerRef.current
     if (!canvas || !container) {
@@ -129,29 +129,34 @@ export default function Canvas({
       let topLeft: Point2D
       let bottomRight: Point2D
       
-      if (drawingRect.parentFrame) {
+      // Look up parent frame from current frames array to get latest base vectors
+      const parentFrame = drawingRect.parentFrame 
+        ? frames.find(f => f.id === drawingRect.parentFrame!.id) || drawingRect.parentFrame
+        : null
+      
+      if (parentFrame) {
         // For nested frames, use the same transformation as nested frame bounds rendering
         // Convert parent world coordinates to parent frame coordinates (raw)
         const topLeftWorld: Point2D = [minX, maxY]
         const bottomRightWorld: Point2D = [maxX, minY]
         
-        const topLeftFrame = parentToFrame(topLeftWorld, drawingRect.parentFrame)
-        const bottomRightFrame = parentToFrame(bottomRightWorld, drawingRect.parentFrame)
+        const topLeftFrame = parentToFrame(topLeftWorld, parentFrame)
+        const bottomRightFrame = parentToFrame(bottomRightWorld, parentFrame)
         
         // Apply parent frame's viewport transformation
         const topLeftFrameWithViewport: Point2D = [
-          (topLeftFrame[0] - drawingRect.parentFrame.viewport.x) * drawingRect.parentFrame.viewport.zoom,
-          (topLeftFrame[1] - drawingRect.parentFrame.viewport.y) * drawingRect.parentFrame.viewport.zoom
+          (topLeftFrame[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom,
+          (topLeftFrame[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
         ]
         const bottomRightFrameWithViewport: Point2D = [
-          (bottomRightFrame[0] - drawingRect.parentFrame.viewport.x) * drawingRect.parentFrame.viewport.zoom,
-          (bottomRightFrame[1] - drawingRect.parentFrame.viewport.y) * drawingRect.parentFrame.viewport.zoom
+          (bottomRightFrame[0] - parentFrame.viewport.x) * parentFrame.viewport.zoom,
+          (bottomRightFrame[1] - parentFrame.viewport.y) * parentFrame.viewport.zoom
         ]
         
         // Transform back to parent world coordinates using base vectors
-        const [originX, originY] = drawingRect.parentFrame.origin
-        const [iX, iY] = drawingRect.parentFrame.baseI
-        const [jX, jY] = drawingRect.parentFrame.baseJ
+        const [originX, originY] = parentFrame.origin
+        const [iX, iY] = parentFrame.baseI
+        const [jX, jY] = parentFrame.baseJ
         
         const topLeftParentWorldWithViewport: Point2D = [
           originX + topLeftFrameWithViewport[0] * iX + topLeftFrameWithViewport[1] * jX,
@@ -188,7 +193,7 @@ export default function Canvas({
       ctx.setLineDash([]) // Reset line dash
     }
 
-  }
+  }, [viewport, width, height, frames, selectedFrameId, drawingRect])
 
   useEffect(() => {
     // Use requestAnimationFrame to ensure DOM is ready
@@ -196,7 +201,7 @@ export default function Canvas({
       draw()
     })
     return () => cancelAnimationFrame(frameId)
-  }, [viewport, width, height, drawingRect, frames, selectedFrameId])
+  }, [draw])
 
   // Also redraw on window resize
   useEffect(() => {
@@ -205,7 +210,7 @@ export default function Canvas({
     }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [viewport, width, height])
+  }, [draw])
 
   // Handle canvas resize
   useEffect(() => {
