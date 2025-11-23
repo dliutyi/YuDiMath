@@ -490,7 +490,7 @@ For each step:
 
 ---
 
-### [ ] Step 3.7: Add Frame Properties Editor
+### [x] Step 3.7: Add Frame Properties Editor
 **Task**: Create UI panel for editing frame properties (origin, base vectors).
 
 **Implementation**:

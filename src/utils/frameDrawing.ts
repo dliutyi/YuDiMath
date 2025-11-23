@@ -191,6 +191,8 @@ export function drawCoordinateFrame(
 /**
  * Draw the coordinate grid for a frame
  * Grid lines follow the directions of baseI and baseJ
+ * Grid is drawn at integer intervals (1, 2, 3, ...) in frame coordinates
+ * The base vectors themselves determine how these transform to screen space
  */
 function drawFrameGrid(
   ctx: CanvasRenderingContext2D,
@@ -201,13 +203,7 @@ function drawFrameGrid(
   nestingLevel: number = 0,
   allFrames: CoordinateFrame[] = []
 ) {
-  const { bounds, baseI, baseJ, viewport: frameViewport } = frame
-
-  // Calculate grid step based on base vector magnitudes
-  const iMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
-  const jMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
-  const avgMagnitude = (iMagnitude + jMagnitude) / 2
-  const gridStep = avgMagnitude > 0 ? avgMagnitude : 1.0
+  const { bounds, viewport: frameViewport } = frame
 
   const gridColor = getGridColorForLevel(nestingLevel)
   
@@ -216,35 +212,47 @@ function drawFrameGrid(
   ctx.globalAlpha = 0.7
   ctx.setLineDash([])
 
+  // Transform function for converting frame coordinates to screen coordinates
+  const transformToScreen = frame.parentFrameId
+    ? (point: Point2D): Point2D => nestedFrameToScreen(point, frame, allFrames, viewport, canvasWidth, canvasHeight)
+    : (point: Point2D): Point2D => frameToScreen(point, frame, viewport, canvasWidth, canvasHeight)
+
+  // Get frame bounds in screen coordinates
   const topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
   const bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
   const frameScreenWidth = bottomRight[0] - topLeft[0]
   const frameScreenHeight = bottomRight[1] - topLeft[1]
 
+  // Estimate visible frame coordinate range
+  // We'll use a heuristic based on frame screen size and viewport zoom
+  // The grid spacing is 1.0 in frame coordinates
+  const gridStep = 1.0
   const frameZoom = frameViewport.zoom
   const framePanX = frameViewport.x
   const framePanY = frameViewport.y
-  const parentZoom = viewport.zoom
-  const frameToScreenScale = gridStep * frameZoom * parentZoom
   
-  const halfFrameWidth = (frameScreenWidth / frameToScreenScale) / 2
-  const halfFrameHeight = (frameScreenHeight / frameToScreenScale) / 2
-
-  const minU = -halfFrameWidth - framePanX
-  const maxU = halfFrameWidth - framePanX
-  const minV = -halfFrameHeight - framePanY
-  const maxV = halfFrameHeight - framePanY
+  // Estimate how many frame coordinate units fit in the visible frame
+  // This is approximate - we'll draw a generous range and let clipping handle the rest
+  const estimatedFrameUnitsWidth = frameScreenWidth / (frameZoom * viewport.zoom)
+  const estimatedFrameUnitsHeight = frameScreenHeight / (frameZoom * viewport.zoom)
   
-  const padding = Math.max(frameScreenWidth, frameScreenHeight) / frameToScreenScale * 3
+  // Calculate visible range in frame coordinates (accounting for pan)
+  const halfWidth = estimatedFrameUnitsWidth / 2
+  const halfHeight = estimatedFrameUnitsHeight / 2
+  const minU = -halfWidth - framePanX
+  const maxU = halfWidth - framePanX
+  const minV = -halfHeight - framePanY
+  const maxV = halfHeight - framePanY
+  
+  // Add padding to ensure grid covers visible area
+  const padding = Math.max(estimatedFrameUnitsWidth, estimatedFrameUnitsHeight) * 0.5
   const expandedMinU = minU - padding
   const expandedMaxU = maxU + padding
   const expandedMinV = minV - padding
   const expandedMaxV = maxV + padding
 
-  const transformToScreen = frame.parentFrameId
-    ? (point: Point2D): Point2D => nestedFrameToScreen(point, frame, allFrames, viewport, canvasWidth, canvasHeight)
-    : (point: Point2D): Point2D => frameToScreen(point, frame, viewport, canvasWidth, canvasHeight)
-  
+  // Draw grid lines parallel to baseI (constant u, varying v)
+  // These lines follow the direction of baseJ
   const startU = Math.floor(expandedMinU / gridStep) * gridStep
   const endU = Math.ceil(expandedMaxU / gridStep) * gridStep
   for (let u = startU; u <= endU; u += gridStep) {
@@ -257,6 +265,8 @@ function drawFrameGrid(
     ctx.stroke()
   }
 
+  // Draw grid lines parallel to baseJ (constant v, varying u)
+  // These lines follow the direction of baseI
   const startV = Math.floor(expandedMinV / gridStep) * gridStep
   const endV = Math.ceil(expandedMaxV / gridStep) * gridStep
   for (let v = startV; v <= endV; v += gridStep) {
