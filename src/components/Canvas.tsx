@@ -670,7 +670,7 @@ export default function Canvas({
 
     if (isDrawing && drawingRectStartRef.current) {
       // Use refs to get the latest values to avoid stale closures
-      const startPoint: Point2D = drawingRectStartRef.current
+      let startPoint: Point2D = drawingRectStartRef.current
       const parentFrame = drawingRectParentFrameRef.current
       
       // Recalculate end point using the same logic as handleMouseMove
