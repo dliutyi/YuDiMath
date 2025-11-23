@@ -716,31 +716,10 @@ export default function Canvas({
         let minY = Math.min(y1, y2)
         let maxY = Math.max(y1, y2)
         
-        // If drawing inside a parent frame, constrain bounds to stay within parent
-        // Only clamp if the frame actually intersects the parent bounds
-        if (parentFrame) {
-          const parentBounds = parentFrame.bounds
-          const parentMinX = parentBounds.x
-          const parentMaxX = parentBounds.x + parentBounds.width
-          const parentMinY = parentBounds.y
-          const parentMaxY = parentBounds.y + parentBounds.height
-          
-          // Check if frame intersects parent bounds
-          const intersectsX = !(maxX <= parentMinX || minX >= parentMaxX)
-          const intersectsY = !(maxY <= parentMinY || minY >= parentMaxY)
-          
-          // Only clamp if there's an intersection
-          // Clamp to the intersection of frame bounds and parent bounds
-          if (intersectsX) {
-            minX = Math.max(parentMinX, minX)
-            maxX = Math.min(parentMaxX, maxX)
-          }
-          if (intersectsY) {
-            minY = Math.max(parentMinY, minY)
-            maxY = Math.min(parentMaxY, maxY)
-          }
-          // If no intersection, keep original bounds (frame is fully outside parent)
-        }
+        // Don't clamp nested frame bounds during creation
+        // The rendering clipping will handle visual boundaries
+        // This allows frames to be created anywhere within the parent frame,
+        // regardless of the current viewport pan/zoom state
         
         const frameWidth = maxX - minX
         const frameHeight = maxY - minY
