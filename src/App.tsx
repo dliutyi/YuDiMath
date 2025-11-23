@@ -5,97 +5,57 @@ import FrameEditorPanel from './components/FrameEditorPanel'
 import LoadingOverlay from './components/LoadingOverlay'
 import { generateCode } from './utils/codeGenerator'
 import { usePyScript } from './hooks/usePyScript'
+import { useWorkspace } from './hooks/useWorkspace'
 import type { ViewportState, CoordinateFrame, Vector, FunctionPlot } from './types'
 
 function App() {
-  const [viewport, setViewport] = useState<ViewportState>({
-    x: 0,
-    y: 0,
-    zoom: 50.0, // Default: 1 unit = 50px
-    gridStep: 1, // Default to 1 unit - the fundamental coordinate system step
-  })
-
-  const [frames, setFrames] = useState<CoordinateFrame[]>([])
+  const workspace = useWorkspace({ persist: false })
   const [isDrawing, setIsDrawing] = useState(false)
-  const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null)
   const { isReady, executeCode, isExecuting } = usePyScript()
 
   const handleGridStepChange = (gridStep: number) => {
-    setViewport((prev) => ({ ...prev, gridStep }))
+    workspace.updateViewport({ gridStep })
   }
 
   const handleFrameCreated = (frame: CoordinateFrame, parentFrameId: string | null) => {
     console.log('[App] Frame created:', frame)
     console.log('[App] Parent frame ID:', parentFrameId)
-    setFrames((prev) => {
-      // Add the new frame
-      const newFrames = [...prev, frame]
-      
-      // If there's a parent frame, update its childFrameIds
-      if (parentFrameId) {
-        const parentIndex = newFrames.findIndex(f => f.id === parentFrameId)
-        if (parentIndex !== -1) {
-          newFrames[parentIndex] = {
-            ...newFrames[parentIndex],
-            childFrameIds: [...newFrames[parentIndex].childFrameIds, frame.id]
-          }
-          console.log('[App] Updated parent frame childFrameIds:', newFrames[parentIndex].childFrameIds)
-        }
-      }
-      
-      console.log('[App] Current frames count:', prev.length, 'New frames count:', newFrames.length)
-      console.log('[App] All frames:', JSON.stringify(newFrames, null, 2))
-      return newFrames
-    })
-    // Auto-select the newly created frame
-    setSelectedFrameId(frame.id)
+    workspace.addFrame(frame, parentFrameId)
     setIsDrawing(false)
   }
 
   const handleFrameViewportChange = (frameId: string, newViewport: ViewportState) => {
-    setFrames((prev) => {
-      return prev.map((frame) => {
-        if (frame.id === frameId) {
-          return {
-            ...frame,
-            viewport: newViewport,
-          }
-        }
-        return frame
-      })
-    })
+    workspace.updateFrameViewport(frameId, newViewport)
   }
 
   const handleFrameUpdate = (frameId: string, updates: Partial<CoordinateFrame>) => {
     let codeToExecute: string | null = null
     
-    setFrames((prev) => {
-      return prev.map((frame) => {
-        if (frame.id === frameId) {
-          const updatedFrame = {
-            ...frame,
-            ...updates,
-          }
-          
-          // If origin, base vectors, or parameters changed, regenerate code while preserving user code
-          if (updates.origin || updates.baseI || updates.baseJ || updates.parameters) {
-            updatedFrame.code = generateCode(updatedFrame, frame.code)
-            codeToExecute = updatedFrame.code
-            
-            // Trigger auto-execution for any of these changes
-            console.log('[App] Triggering auto-execution for frame:', frameId, 'Reason:', {
-              origin: !!updates.origin,
-              baseI: !!updates.baseI,
-              baseJ: !!updates.baseJ,
-              parameters: !!updates.parameters
-            })
-          }
-          
-          return updatedFrame
-        }
-        return frame
+    // Find the current frame to get its code
+    const currentFrame = workspace.frames.find(f => f.id === frameId)
+    if (!currentFrame) return
+    
+    const updatedFrame = {
+      ...currentFrame,
+      ...updates,
+    }
+    
+    // If origin, base vectors, or parameters changed, regenerate code while preserving user code
+    if (updates.origin || updates.baseI || updates.baseJ || updates.parameters) {
+      updatedFrame.code = generateCode(updatedFrame, currentFrame.code)
+      codeToExecute = updatedFrame.code
+      
+      // Trigger auto-execution for any of these changes
+      console.log('[App] Triggering auto-execution for frame:', frameId, 'Reason:', {
+        origin: !!updates.origin,
+        baseI: !!updates.baseI,
+        baseJ: !!updates.baseJ,
+        parameters: !!updates.parameters
       })
-    })
+    }
+    
+    // Update the frame
+    workspace.updateFrame(frameId, updatedFrame)
     
     // Trigger auto-execution after state update
     if (codeToExecute) {
@@ -109,6 +69,32 @@ function App() {
 
   const handleCodeChange = (frameId: string, code: string) => {
     handleFrameUpdate(frameId, { code })
+  }
+
+  const handleVectorsUpdate = (frameId: string, vectors: Vector[]) => {
+    const frame = workspace.frames.find(f => f.id === frameId)
+    if (frame) {
+      workspace.updateFrame(frameId, {
+        vectors: [...(frame.vectors || []), ...vectors],
+      })
+    }
+  }
+
+  const handleFunctionsUpdate = (frameId: string, functions: FunctionPlot[]) => {
+    const frame = workspace.frames.find(f => f.id === frameId)
+    if (frame) {
+      workspace.updateFrame(frameId, {
+        functions: [...(frame.functions || []), ...functions],
+      })
+    }
+  }
+
+  const handleVectorsClear = (frameId: string) => {
+    workspace.updateFrame(frameId, { vectors: [] })
+  }
+
+  const handleFunctionsClear = (frameId: string) => {
+    workspace.updateFrame(frameId, { functions: [] })
   }
 
   const [autoExecuteCode, setAutoExecuteCode] = useState<string | null>(null)
@@ -179,76 +165,18 @@ function App() {
     setAutoExecuteFrameId(null)
   }
 
-  const handleVectorsUpdate = (frameId: string, vectors: Vector[]) => {
-    setFrames((prev) => {
-      return prev.map((frame) => {
-        if (frame.id === frameId) {
-          return {
-            ...frame,
-            vectors: [...(frame.vectors || []), ...vectors],
-          }
-        }
-        return frame
-      })
-    })
-  }
-
-  const handleFunctionsUpdate = (frameId: string, functions: FunctionPlot[]) => {
-    setFrames((prev) => {
-      return prev.map((frame) => {
-        if (frame.id === frameId) {
-          return {
-            ...frame,
-            functions: [...(frame.functions || []), ...functions],
-          }
-        }
-        return frame
-      })
-    })
-  }
-
-  const handleVectorsClear = (frameId: string) => {
-    setFrames((prev) => {
-      return prev.map((frame) => {
-        if (frame.id === frameId) {
-          return {
-            ...frame,
-            vectors: [],
-          }
-        }
-        return frame
-      })
-    })
-  }
-
-  const handleFunctionsClear = (frameId: string) => {
-    setFrames((prev) => {
-      return prev.map((frame) => {
-        if (frame.id === frameId) {
-          return {
-            ...frame,
-            functions: [],
-          }
-        }
-        return frame
-      })
-    })
-  }
-
-  const selectedFrame = frames.find(f => f.id === selectedFrameId) || null
-
   return (
     <div className="h-full bg-bg-primary text-text-primary relative overflow-hidden">
       <LoadingOverlay />
       <Canvas
-        viewport={viewport}
-        onViewportChange={setViewport}
-        frames={frames}
+        viewport={workspace.viewport}
+        onViewportChange={workspace.setViewport}
+        frames={workspace.frames}
         isDrawing={isDrawing}
         onDrawingModeChange={setIsDrawing}
         onFrameCreated={handleFrameCreated}
-        selectedFrameId={selectedFrameId}
-        onFrameSelected={setSelectedFrameId}
+        selectedFrameId={workspace.selectedFrameId}
+        onFrameSelected={workspace.setSelectedFrameId}
         onFrameViewportChange={handleFrameViewportChange}
       />
       {/* Header overlay in top-left corner */}
@@ -258,7 +186,7 @@ function App() {
       </div>
       <div className="absolute bottom-4 left-4 z-10">
         <GridStepSelector
-          gridStep={viewport.gridStep}
+          gridStep={workspace.viewport.gridStep}
           onGridStepChange={handleGridStepChange}
         />
       </div>
@@ -335,7 +263,7 @@ function App() {
       </div>
       <div className="absolute top-4 right-4 z-10">
         <FrameEditorPanel
-          selectedFrame={selectedFrame}
+          selectedFrame={workspace.selectedFrame}
           onFrameUpdate={handleFrameUpdate}
           onFrameViewportChange={handleFrameViewportChange}
           onCodeChange={handleCodeChange}
