@@ -134,15 +134,65 @@ export function screenToFrame(
  */
 export function frameToParent(point: Point2D, frame: CoordinateFrame): Point2D {
   const [u, v] = point
+  const { viewport: frameViewport } = frame
   const [originX, originY] = frame.origin
   const [iX, iY] = frame.baseI
   const [jX, jY] = frame.baseJ
   
   // Transform to parent coordinates using base vectors
-  // Note: frame coordinates are relative to frame origin, no pan/zoom applied here
-  // (pan/zoom only affects what's visible, not the coordinate transformation itself)
-  const parentX = originX + u * iX + v * jX
-  const parentY = originY + u * iY + v * jY
+  // When converting from frame coordinates to parent, we need to account for the frame's viewport
+  // The frame coordinates (u, v) are the "logical" coordinates in the frame's coordinate system
+  // But when we convert screen -> frame, we account for pan/zoom, so we need to reverse that here
+  // Actually wait - if u, v are the logical coordinates (after accounting for pan/zoom in screenToFrame),
+  // then we should transform them directly using base vectors, without applying pan/zoom again.
+  // But the issue is: screenToFrame gives us coordinates that have pan/zoom "baked in" (we undo pan/zoom),
+  // so u, v are the "raw" frame coordinates. These should map directly to parent using base vectors.
+  
+  // However, I think the issue might be that we need to account for frame zoom when transforming.
+  // In frameToScreen, we do: scaledU = (u - framePanX) * frameZoom, then parentX = originX + scaledU * iX
+  // So to reverse: if we have u (which is already after undoing pan/zoom in screenToFrame),
+  // we should transform directly. But wait, that's not right either.
+  
+  // Let me reconsider: In frameToScreen:
+  // 1. frameU = u - framePanX (undo pan)
+  // 2. scaledU = frameU * frameZoom (apply zoom)
+  // 3. parentX = originX + scaledU * iX + scaledV * jX
+  
+  // In screenToFrame (inverse):
+  // 1. parentX from screen
+  // 2. Solve for scaledU, scaledV
+  // 3. frameU = scaledU / frameZoom (undo zoom)
+  // 4. u = frameU + framePanX (undo pan)
+  
+  // So when we have u, v from screenToFrame, they are the "raw" frame coordinates (with pan/zoom already undone).
+  // To convert to parent, we should apply the same transformation as frameToScreen:
+  // But wait, we want the inverse - we want to go from frame coordinates to parent.
+  // If u, v are raw frame coordinates (no pan/zoom), then:
+  // parentX = originX + u * iX + v * jX (without zoom, because zoom affects screen representation)
+  
+  // Actually, I think the correct approach is:
+  // Frame coordinates (u, v) are the logical coordinates. To convert to parent:
+  // We need to apply zoom first (to get the "scaled" coordinates), then transform using base vectors.
+  // But wait, that doesn't match frameToScreen...
+  
+  // Let me re-read frameToScreen more carefully:
+  // frameU = u - framePanX  // u is the frame coordinate, we subtract pan to get "visible" coordinate
+  // scaledU = frameU * frameZoom  // scale by zoom
+  // parentX = originX + scaledU * iX  // transform using base vectors
+  
+  // So if we have a frame coordinate u (which is the "raw" coordinate, not accounting for pan/zoom),
+  // to convert to parent, we should:
+  // 1. Apply pan: frameU = u - framePanX
+  // 2. Apply zoom: scaledU = frameU * frameZoom  
+  // 3. Transform: parentX = originX + scaledU * iX
+  
+  // But when we snap, we snap the "raw" frame coordinates. So we need to apply pan/zoom when converting back.
+  const frameU = u - frameViewport.x
+  const frameV = v - frameViewport.y
+  const scaledU = frameU * frameViewport.zoom
+  const scaledV = frameV * frameViewport.zoom
+  const parentX = originX + scaledU * iX + scaledV * jX
+  const parentY = originY + scaledU * iY + scaledV * jY
   
   return [parentX, parentY]
 }
