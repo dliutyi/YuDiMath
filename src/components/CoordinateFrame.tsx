@@ -155,13 +155,6 @@ export function drawCoordinateFrame(
   )
   ctx.stroke()
 
-  // Calculate base vector endpoints in screen coordinates
-  // Base vectors are 1 unit in frame coordinates
-  // Use frameToScreen to account for frame viewport zoom and pan
-  const baseVectorScale = 1.0 // 1 unit in frame coordinates
-  const baseIEndScreen = frameToScreen([baseVectorScale, 0], frame, viewport, canvasWidth, canvasHeight)
-  const baseJEndScreen = frameToScreen([0, baseVectorScale], frame, viewport, canvasWidth, canvasHeight)
-
   // Draw frame grid, axes, and base vectors - all clipped to frame bounds
   // Save context state before clipping
   ctx.save()
