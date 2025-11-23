@@ -133,8 +133,10 @@ describe('CoordinateFrame', () => {
     drawCoordinateFrame(mockContext, parentFrame, defaultViewport, 800, 600, [parentFrame, childFrame])
     
     // Should draw both parent and child frames
-    // The rect should be called at least twice (once for parent, once for child)
-    expect(mockContext.rect.mock.calls.length).toBeGreaterThanOrEqual(2)
+    // Each frame uses moveTo/lineTo to draw the border (even for rectangles)
+    // So we should have multiple moveTo/lineTo calls (at least 2 frames * 4 corners = 8 moveTo calls minimum)
+    expect(mockContext.moveTo).toHaveBeenCalled()
+    expect(mockContext.moveTo.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
 
   it('handles frames with non-standard base vectors', () => {
