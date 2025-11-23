@@ -415,12 +415,11 @@ export default function Canvas({
         const framePointWithViewport = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
         
         // Remove viewport pan/zoom to get raw frame coordinates
-        // framePointWithViewport = (rawFramePoint - viewport.pan) * viewport.zoom + viewport.pan
-        // So: rawFramePoint = (framePointWithViewport - viewport.pan) / viewport.zoom + viewport.pan
-        // Actually wait, let me check the screenToFrame implementation...
-        // screenToFrame returns: u = frameU + frameViewport.x where frameU = scaledU / frameViewport.zoom
-        // So framePointWithViewport already has viewport.x added
-        // To get raw: rawU = (framePointWithViewport.u - frameViewport.x) / frameViewport.zoom
+        // screenToFrame returns coordinates that account for viewport:
+        //   u = frameU + frameViewport.x, where frameU = scaledU / frameViewport.zoom
+        // In frameToScreen, we do: frameU = u - frameViewport.x, then scaledU = frameU * frameViewport.zoom
+        // So the raw coordinate (what u would be if viewport was at origin with zoom 1.0) is:
+        //   rawU = (u - frameViewport.x) / frameViewport.zoom
         const rawFramePoint: Point2D = [
           (framePointWithViewport[0] - parentFrame.viewport.x) / parentFrame.viewport.zoom,
           (framePointWithViewport[1] - parentFrame.viewport.y) / parentFrame.viewport.zoom
