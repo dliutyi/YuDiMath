@@ -657,6 +657,44 @@ For each step:
 
 ---
 
+### [ ] Step 4.6: Add Parameter Sliders to Frame Properties
+**Task**: Add sliders in Frame Properties panel that create corresponding variables in Python code.
+
+**Implementation**:
+- Add slider controls to `PropertiesPanel` component
+- Sliders should be dynamically addable/removable
+- Each slider creates a variable in Python code with naming convention: `t1`, `t2`, `t3`, etc.
+- Store slider values in frame state (add `parameters?: Record<string, number>` to `CoordinateFrame` interface)
+- When slider value changes:
+  - Update frame state
+  - Regenerate Python code to include updated variable value
+  - Preserve user-added code (draw/plot calls) when regenerating
+- Sliders should have:
+  - Label showing variable name (e.g., "t1")
+  - Value input/display
+  - Min/max range (configurable, default: -10 to 10)
+  - Step size (configurable, default: 0.1)
+- Generated code should include:
+  ```python
+  t1 = <value>  # Parameter slider value
+  t2 = <value>  # Parameter slider value
+  # etc.
+  ```
+- Code generation should preserve parameter variables when regenerating (similar to how base vectors are preserved)
+
+**Tests**:
+- Test slider addition creates variable in code
+- Test slider value change updates code
+- Test multiple sliders (t1, t2, t3) work correctly
+- Test slider removal removes variable from code
+- Test code regeneration preserves parameter values
+- Test parameter values are preserved when frame properties change
+- Test slider min/max/step configuration
+
+**Commit**: `feat: add parameter sliders to frame properties with Python code integration`
+
+---
+
 ## Phase 5: Vector and Function Visualization
 
 ### [x] Step 5.1: Implement Vector Rendering in Frames
