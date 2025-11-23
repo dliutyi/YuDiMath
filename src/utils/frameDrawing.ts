@@ -294,12 +294,10 @@ function drawFrameAxes(
   canvasHeight: number,
   allFrames: CoordinateFrame[] = []
 ) {
-  const { bounds, baseI, baseJ, viewport: frameViewport } = frame
+  const { bounds, viewport: frameViewport } = frame
 
-  const iMagnitude = Math.sqrt(baseI[0] ** 2 + baseI[1] ** 2)
-  const jMagnitude = Math.sqrt(baseJ[0] ** 2 + baseJ[1] ** 2)
-  const avgMagnitude = (iMagnitude + jMagnitude) / 2
-  const gridStep = avgMagnitude > 0 ? avgMagnitude : 1.0
+  // Grid spacing is 1.0 (integer intervals) in frame coordinates, matching the grid
+  const gridStep = 1.0
 
   const topLeft = worldToScreen(bounds.x, bounds.y + bounds.height, viewport, canvasWidth, canvasHeight)
   const bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y, viewport, canvasWidth, canvasHeight)
@@ -310,15 +308,20 @@ function drawFrameAxes(
   const frameZoom = frameViewport.zoom
   const framePanX = frameViewport.x
   const framePanY = frameViewport.y
-  const parentZoomAxes = viewport.zoom
-  const frameToScreenScaleAxes = gridStep * frameZoom * parentZoomAxes
-  const halfFrameWidth = (frameScreenWidth / frameToScreenScaleAxes) / 2
-  const halfFrameHeight = (frameScreenHeight / frameToScreenScaleAxes) / 2
-  const paddingForLabels = Math.max(frameScreenWidth, frameScreenHeight) / frameToScreenScaleAxes * 3
-  const minFrameX = -halfFrameWidth - framePanX - paddingForLabels
-  const maxFrameX = halfFrameWidth - framePanX + paddingForLabels
-  const minFrameY = -halfFrameHeight - framePanY - paddingForLabels
-  const maxFrameY = halfFrameHeight - framePanY + paddingForLabels
+  const parentZoom = viewport.zoom
+  
+  // Estimate visible frame coordinate range (same approach as grid drawing)
+  const estimatedFrameUnitsWidth = frameScreenWidth / (frameZoom * parentZoom)
+  const estimatedFrameUnitsHeight = frameScreenHeight / (frameZoom * parentZoom)
+  
+  const halfWidth = estimatedFrameUnitsWidth / 2
+  const halfHeight = estimatedFrameUnitsHeight / 2
+  const padding = Math.max(estimatedFrameUnitsWidth, estimatedFrameUnitsHeight) * 0.5
+  
+  const minFrameX = -halfWidth - framePanX - padding
+  const maxFrameX = halfWidth - framePanX + padding
+  const minFrameY = -halfHeight - framePanY - padding
+  const maxFrameY = halfHeight - framePanY + padding
 
   const topLeftScreen = topLeft
   const topRightScreen: Point2D = [bottomRight[0], topLeft[1]]
@@ -394,26 +397,48 @@ function drawFrameAxes(
   ctx.textBaseline = 'middle'
   ctx.globalAlpha = 1.0
 
+  // Calculate label spacing based on screen space
+  // We need to determine how many frame coordinate units fit in minLabelSpacingPx pixels
   const minLabelSpacingPx = 40
-  const parentZoomLabels = viewport.zoom
-  const frameToScreenScaleLabels = gridStep * frameZoom * parentZoomLabels
-  const screenGridSpacing = frameToScreenScaleLabels
+  
+  // Calculate screen spacing for 1 unit in frame coordinates
+  // Transform two points 1 unit apart in frame coordinates to see screen distance
+  const transformToScreen = frame.parentFrameId
+    ? (point: Point2D): Point2D => nestedFrameToScreen(point, frame, allFrames, viewport, canvasWidth, canvasHeight)
+    : (point: Point2D): Point2D => frameToScreen(point, frame, viewport, canvasWidth, canvasHeight)
+  
+  const originScreen = transformToScreen([0, 0])
+  const oneUnitXScreen = transformToScreen([1, 0])
+  const oneUnitYScreen = transformToScreen([0, 1])
+  
+  const screenSpacingX = Math.abs(oneUnitXScreen[0] - originScreen[0])
+  const screenSpacingY = Math.abs(oneUnitYScreen[1] - originScreen[1])
+  const avgScreenSpacing = (screenSpacingX + screenSpacingY) / 2
+  
   let labelSpacingMultiplier = 1
-  if (screenGridSpacing < minLabelSpacingPx) {
-    labelSpacingMultiplier = Math.ceil(minLabelSpacingPx / screenGridSpacing)
+  if (avgScreenSpacing > 0 && avgScreenSpacing < minLabelSpacingPx) {
+    labelSpacingMultiplier = Math.ceil(minLabelSpacingPx / avgScreenSpacing)
   }
   const labelSpacing = gridStep * labelSpacingMultiplier
+
+  // Format number helper (same as canvasDrawing.ts)
+  const formatNumber = (value: number): string => {
+    if (Math.abs(value - Math.round(value)) < 0.0001) {
+      return Math.round(value).toString()
+    }
+    
+    const rounded = Math.round(value * 1000) / 1000
+    return rounded.toString()
+  }
 
   const startXLabel = Math.floor(minFrameX / labelSpacing) * labelSpacing
   const endXLabel = Math.ceil(maxFrameX / labelSpacing) * labelSpacing
   for (let x = startXLabel; x <= endXLabel; x += labelSpacing) {
     if (Math.abs(x) < 0.001) continue
     
-    const labelScreen = frame.parentFrameId
-      ? nestedFrameToScreen([x, 0], frame, allFrames, viewport, canvasWidth, canvasHeight)
-      : frameToScreen([x, 0], frame, viewport, canvasWidth, canvasHeight)
+    const labelScreen = transformToScreen([x, 0])
     
-    const labelText = x % 1 === 0 ? x.toString() : x.toFixed(2).replace(/\.?0+$/, '')
+    const labelText = formatNumber(x)
     ctx.fillText(labelText, labelScreen[0], labelScreen[1] + 15)
   }
 
@@ -422,11 +447,9 @@ function drawFrameAxes(
   for (let y = startYLabel; y <= endYLabel; y += labelSpacing) {
     if (Math.abs(y) < 0.001) continue
     
-    const labelScreen = frame.parentFrameId
-      ? nestedFrameToScreen([0, y], frame, allFrames, viewport, canvasWidth, canvasHeight)
-      : frameToScreen([0, y], frame, viewport, canvasWidth, canvasHeight)
+    const labelScreen = transformToScreen([0, y])
     
-    const labelText = y % 1 === 0 ? y.toString() : y.toFixed(2).replace(/\.?0+$/, '')
+    const labelText = formatNumber(y)
     ctx.textAlign = 'right'
     ctx.fillText(labelText, labelScreen[0] - 8, labelScreen[1])
   }
