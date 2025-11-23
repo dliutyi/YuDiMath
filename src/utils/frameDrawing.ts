@@ -508,11 +508,6 @@ function drawFrameAxes(
   const minFrameY = expandedMinV
   const maxFrameY = expandedMaxV
 
-  const topLeftScreen = topLeft
-  const topRightScreen: Point2D = [bottomRight[0], topLeft[1]]
-  const bottomLeftScreen: Point2D = [topLeft[0], bottomRight[1]]
-  const bottomRightScreen = bottomRight
-  
   const originScreenAxes = frame.parentFrameId
     ? nestedFrameToScreen([0, 0], frame, allFrames, viewport, canvasWidth, canvasHeight)
     : frameToScreen([0, 0], frame, viewport, canvasWidth, canvasHeight)
@@ -524,42 +519,197 @@ function drawFrameAxes(
     ? nestedFrameToScreen([0, 1], frame, allFrames, viewport, canvasWidth, canvasHeight)
     : frameToScreen([0, 1], frame, viewport, canvasWidth, canvasHeight)
   
+  // Calculate axis directions in screen space
   const baseIDirX = iAxisEndScreen[0] - originScreenAxes[0]
   const baseIDirY = iAxisEndScreen[1] - originScreenAxes[1]
   const baseJDirX = jAxisEndScreen[0] - originScreenAxes[0]
   const baseJDirY = jAxisEndScreen[1] - originScreenAxes[1]
   
+  // Calculate axis endpoints using the expanded visible range
+  // Transform the expanded range corners to screen coordinates to find where axes should extend
+  const expandedCorners: Point2D[] = [
+    transformToScreen([expandedMinU, expandedMinV]), // bottom-left
+    transformToScreen([expandedMaxU, expandedMinV]), // bottom-right
+    transformToScreen([expandedMaxU, expandedMaxV]), // top-right
+    transformToScreen([expandedMinU, expandedMaxV]), // top-left
+  ]
+  
+  // Find the bounding box of the expanded visible area in screen coordinates
+  let minScreenX = Infinity
+  let maxScreenX = -Infinity
+  let minScreenY = Infinity
+  let maxScreenY = -Infinity
+  
+  for (const corner of expandedCorners) {
+    minScreenX = Math.min(minScreenX, corner[0])
+    maxScreenX = Math.max(maxScreenX, corner[0])
+    minScreenY = Math.min(minScreenY, corner[1])
+    maxScreenY = Math.max(maxScreenY, corner[1])
+  }
+  
+  // Extend the bounding box slightly to ensure axes are fully visible
+  const axisPadding = 50
+  minScreenX -= axisPadding
+  maxScreenX += axisPadding
+  minScreenY -= axisPadding
+  maxScreenY += axisPadding
+  
+  // Calculate X-axis (baseI direction) endpoints
+  // The X-axis is the line through origin in the direction of baseI
   let xAxisStartScreen = originScreenAxes
   let xAxisEndScreen = originScreenAxes
   
-  if (Math.abs(baseIDirX) > 0.001) {
-    const tLeft = (topLeftScreen[0] - originScreenAxes[0]) / baseIDirX
-    const yLeft = originScreenAxes[1] + tLeft * baseIDirY
-    if (yLeft >= topLeftScreen[1] && yLeft <= bottomLeftScreen[1]) {
-      xAxisStartScreen = [topLeftScreen[0], yLeft]
+  const baseIMagnitude = Math.sqrt(baseIDirX * baseIDirX + baseIDirY * baseIDirY)
+  if (baseIMagnitude > 1e-10) {
+    // Normalize baseI direction
+    const baseINormX = baseIDirX / baseIMagnitude
+    const baseINormY = baseIDirY / baseIMagnitude
+    
+    // Find intersections with the expanded bounding box
+    // Test intersections with left, right, top, and bottom edges
+    const intersections: Point2D[] = []
+    
+    // Left edge: x = minScreenX
+    if (Math.abs(baseINormX) > 1e-10) {
+      const t = (minScreenX - originScreenAxes[0]) / baseINormX
+      const y = originScreenAxes[1] + t * baseINormY
+      if (y >= minScreenY && y <= maxScreenY) {
+        intersections.push([minScreenX, y])
+      }
     }
     
-    const tRight = (bottomRightScreen[0] - originScreenAxes[0]) / baseIDirX
-    const yRight = originScreenAxes[1] + tRight * baseIDirY
-    if (yRight >= topRightScreen[1] && yRight <= bottomRightScreen[1]) {
-      xAxisEndScreen = [bottomRightScreen[0], yRight]
+    // Right edge: x = maxScreenX
+    if (Math.abs(baseINormX) > 1e-10) {
+      const t = (maxScreenX - originScreenAxes[0]) / baseINormX
+      const y = originScreenAxes[1] + t * baseINormY
+      if (y >= minScreenY && y <= maxScreenY) {
+        intersections.push([maxScreenX, y])
+      }
+    }
+    
+    // Top edge: y = minScreenY
+    if (Math.abs(baseINormY) > 1e-10) {
+      const t = (minScreenY - originScreenAxes[1]) / baseINormY
+      const x = originScreenAxes[0] + t * baseINormX
+      if (x >= minScreenX && x <= maxScreenX) {
+        intersections.push([x, minScreenY])
+      }
+    }
+    
+    // Bottom edge: y = maxScreenY
+    if (Math.abs(baseINormY) > 1e-10) {
+      const t = (maxScreenY - originScreenAxes[1]) / baseINormY
+      const x = originScreenAxes[0] + t * baseINormX
+      if (x >= minScreenX && x <= maxScreenX) {
+        intersections.push([x, maxScreenY])
+      }
+    }
+    
+    // Find the two points furthest from origin (start and end)
+    if (intersections.length >= 2) {
+      // Sort by distance from origin
+      intersections.sort((a, b) => {
+        const distA = Math.hypot(a[0] - originScreenAxes[0], a[1] - originScreenAxes[1])
+        const distB = Math.hypot(b[0] - originScreenAxes[0], b[1] - originScreenAxes[1])
+        return distA - distB
+      })
+      xAxisStartScreen = intersections[0]
+      xAxisEndScreen = intersections[intersections.length - 1]
+    } else if (intersections.length === 1) {
+      // Only one intersection, extend in both directions
+      const dirX = intersections[0][0] - originScreenAxes[0]
+      const dirY = intersections[0][1] - originScreenAxes[1]
+      const dist = Math.hypot(dirX, dirY)
+      if (dist > 1e-10) {
+        const scale = 1000 // Large scale to extend beyond bounds
+        xAxisStartScreen = [
+          originScreenAxes[0] - (dirX / dist) * scale,
+          originScreenAxes[1] - (dirY / dist) * scale
+        ]
+        xAxisEndScreen = [
+          originScreenAxes[0] + (dirX / dist) * scale,
+          originScreenAxes[1] + (dirY / dist) * scale
+        ]
+      }
     }
   }
   
+  // Calculate Y-axis (baseJ direction) endpoints
+  // The Y-axis is the line through origin in the direction of baseJ
   let yAxisStartScreen = originScreenAxes
   let yAxisEndScreen = originScreenAxes
   
-  if (Math.abs(baseJDirY) > 0.001) {
-    const tTop = (topLeftScreen[1] - originScreenAxes[1]) / baseJDirY
-    const xTop = originScreenAxes[0] + tTop * baseJDirX
-    if (xTop >= topLeftScreen[0] && xTop <= topRightScreen[0]) {
-      yAxisStartScreen = [xTop, topLeftScreen[1]]
+  const baseJMagnitude = Math.sqrt(baseJDirX * baseJDirX + baseJDirY * baseJDirY)
+  if (baseJMagnitude > 1e-10) {
+    // Normalize baseJ direction
+    const baseJNormX = baseJDirX / baseJMagnitude
+    const baseJNormY = baseJDirY / baseJMagnitude
+    
+    // Find intersections with the expanded bounding box
+    const intersections: Point2D[] = []
+    
+    // Left edge: x = minScreenX
+    if (Math.abs(baseJNormX) > 1e-10) {
+      const t = (minScreenX - originScreenAxes[0]) / baseJNormX
+      const y = originScreenAxes[1] + t * baseJNormY
+      if (y >= minScreenY && y <= maxScreenY) {
+        intersections.push([minScreenX, y])
+      }
     }
     
-    const tBottom = (bottomRightScreen[1] - originScreenAxes[1]) / baseJDirY
-    const xBottom = originScreenAxes[0] + tBottom * baseJDirX
-    if (xBottom >= bottomLeftScreen[0] && xBottom <= bottomRightScreen[0]) {
-      yAxisEndScreen = [xBottom, bottomRightScreen[1]]
+    // Right edge: x = maxScreenX
+    if (Math.abs(baseJNormX) > 1e-10) {
+      const t = (maxScreenX - originScreenAxes[0]) / baseJNormX
+      const y = originScreenAxes[1] + t * baseJNormY
+      if (y >= minScreenY && y <= maxScreenY) {
+        intersections.push([maxScreenX, y])
+      }
+    }
+    
+    // Top edge: y = minScreenY
+    if (Math.abs(baseJNormY) > 1e-10) {
+      const t = (minScreenY - originScreenAxes[1]) / baseJNormY
+      const x = originScreenAxes[0] + t * baseJNormX
+      if (x >= minScreenX && x <= maxScreenX) {
+        intersections.push([x, minScreenY])
+      }
+    }
+    
+    // Bottom edge: y = maxScreenY
+    if (Math.abs(baseJNormY) > 1e-10) {
+      const t = (maxScreenY - originScreenAxes[1]) / baseJNormY
+      const x = originScreenAxes[0] + t * baseJNormX
+      if (x >= minScreenX && x <= maxScreenX) {
+        intersections.push([x, maxScreenY])
+      }
+    }
+    
+    // Find the two points furthest from origin (start and end)
+    if (intersections.length >= 2) {
+      // Sort by distance from origin
+      intersections.sort((a, b) => {
+        const distA = Math.hypot(a[0] - originScreenAxes[0], a[1] - originScreenAxes[1])
+        const distB = Math.hypot(b[0] - originScreenAxes[0], b[1] - originScreenAxes[1])
+        return distA - distB
+      })
+      yAxisStartScreen = intersections[0]
+      yAxisEndScreen = intersections[intersections.length - 1]
+    } else if (intersections.length === 1) {
+      // Only one intersection, extend in both directions
+      const dirX = intersections[0][0] - originScreenAxes[0]
+      const dirY = intersections[0][1] - originScreenAxes[1]
+      const dist = Math.hypot(dirX, dirY)
+      if (dist > 1e-10) {
+        const scale = 1000 // Large scale to extend beyond bounds
+        yAxisStartScreen = [
+          originScreenAxes[0] - (dirX / dist) * scale,
+          originScreenAxes[1] - (dirY / dist) * scale
+        ]
+        yAxisEndScreen = [
+          originScreenAxes[0] + (dirX / dist) * scale,
+          originScreenAxes[1] + (dirY / dist) * scale
+        ]
+      }
     }
   }
 
