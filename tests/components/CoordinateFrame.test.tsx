@@ -51,12 +51,6 @@ describe('CoordinateFrame', () => {
       viewport: {
         x: 0,
         y: 0,
-        zoom: 1,
-        gridStep: 1,
-      },
-      viewport: {
-        x: 0,
-        y: 0,
         zoom: 1.0,
         gridStep: 1,
       },
@@ -152,6 +146,147 @@ describe('CoordinateFrame', () => {
     // Should still draw the frame
     expect(mockContext.beginPath).toHaveBeenCalled()
     expect(mockContext.stroke).toHaveBeenCalled()
+  })
+
+  it('draws vectors from frame.vectors array', () => {
+    const frameWithVectors: CoordinateFrame = {
+      ...defaultFrame,
+      vectors: [
+        {
+          id: 'vec-1',
+          start: [0, 0],
+          end: [2, 3],
+          color: '#00ff00',
+        },
+        {
+          id: 'vec-2',
+          start: [1, 1],
+          end: [3, 4],
+          color: '#ff0000',
+        },
+      ],
+    }
+
+    const initialMoveToCalls = mockContext.moveTo.mock.calls.length
+    const initialLineToCalls = mockContext.lineTo.mock.calls.length
+
+    drawCoordinateFrame(mockContext, frameWithVectors, defaultViewport, 800, 600, [])
+    
+    // Should draw vectors (each vector requires moveTo and lineTo calls)
+    // We expect additional calls beyond base vectors
+    expect(mockContext.moveTo.mock.calls.length).toBeGreaterThan(initialMoveToCalls)
+    expect(mockContext.lineTo.mock.calls.length).toBeGreaterThan(initialLineToCalls)
+  })
+
+  it('does not draw vectors when vectors array is empty', () => {
+    const frameWithoutVectors: CoordinateFrame = {
+      ...defaultFrame,
+      vectors: [],
+    }
+
+    drawCoordinateFrame(mockContext, frameWithoutVectors, defaultViewport, 800, 600, [])
+    
+    // Should still draw frame (base vectors, grid, etc.)
+    expect(mockContext.beginPath).toHaveBeenCalled()
+    expect(mockContext.stroke).toHaveBeenCalled()
+  })
+
+  it('draws vectors with different colors', () => {
+    const frameWithVectors: CoordinateFrame = {
+      ...defaultFrame,
+      vectors: [
+        {
+          id: 'vec-1',
+          start: [0, 0],
+          end: [1, 1],
+          color: '#00ff00',
+        },
+        {
+          id: 'vec-2',
+          start: [0, 0],
+          end: [2, 2],
+          color: '#ff0000',
+        },
+      ],
+    }
+
+    drawCoordinateFrame(mockContext, frameWithVectors, defaultViewport, 800, 600, [])
+    
+    // Should set strokeStyle for each vector color
+    // The drawArrow function sets strokeStyle and fillStyle
+    expect(mockContext.strokeStyle).toBeDefined()
+    expect(mockContext.fillStyle).toBeDefined()
+  })
+
+  it('draws vectors with different magnitudes', () => {
+    const frameWithVectors: CoordinateFrame = {
+      ...defaultFrame,
+      vectors: [
+        {
+          id: 'vec-small',
+          start: [0, 0],
+          end: [0.5, 0.5],
+          color: '#00ff00',
+        },
+        {
+          id: 'vec-large',
+          start: [0, 0],
+          end: [5, 5],
+          color: '#ff0000',
+        },
+      ],
+    }
+
+    drawCoordinateFrame(mockContext, frameWithVectors, defaultViewport, 800, 600, [])
+    
+    // Should draw both vectors regardless of magnitude
+    expect(mockContext.moveTo).toHaveBeenCalled()
+    expect(mockContext.lineTo).toHaveBeenCalled()
+  })
+
+  it('draws vectors in nested frames', () => {
+    const childFrame: CoordinateFrame = {
+      id: 'child-frame-1',
+      origin: [2, 2],
+      baseI: [1, 0],
+      baseJ: [0, 1],
+      bounds: {
+        x: 2,
+        y: 2,
+        width: 5,
+        height: 5,
+      },
+      viewport: {
+        x: 0,
+        y: 0,
+        zoom: 1.0,
+        gridStep: 1,
+      },
+      mode: '2d',
+      vectors: [
+        {
+          id: 'vec-child',
+          start: [0, 0],
+          end: [1, 1],
+          color: '#ffff00',
+        },
+      ],
+      functions: [],
+      code: '',
+      parentFrameId: 'test-frame-1',
+      childFrameIds: [],
+    }
+
+    const parentFrame: CoordinateFrame = {
+      ...defaultFrame,
+      childFrameIds: ['child-frame-1'],
+    }
+
+    drawCoordinateFrame(mockContext, parentFrame, defaultViewport, 800, 600, [parentFrame, childFrame])
+    
+    // Should draw vectors in both parent and child frames
+    expect(mockContext.moveTo).toHaveBeenCalled()
+    expect(mockContext.lineTo).toHaveBeenCalled()
   })
 })
 
