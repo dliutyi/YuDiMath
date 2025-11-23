@@ -427,6 +427,9 @@ function App() {
                 onConfirm: () => {
                   workspace.clearWorkspace()
                 },
+                onCancel: () => {
+                  // Cancel: do nothing, just close the modal
+                },
                 variant: 'danger',
               })
             }}
