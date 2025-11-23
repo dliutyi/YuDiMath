@@ -9,8 +9,8 @@ interface FrameEditorPanelProps {
   onFrameViewportChange?: (frameId: string, viewport: ViewportState) => void
   onCodeChange: (frameId: string, code: string) => void
   onCodeRun?: (frameId: string, code: string) => void
-  onVectorsUpdate?: (frameId: string, vectors: Vector[]) => void
-  onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[]) => void
+  onVectorsUpdate?: (frameId: string, vectors: Vector[], replace?: boolean) => void
+  onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[], replace?: boolean) => void
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
   autoExecuteCode?: string | null

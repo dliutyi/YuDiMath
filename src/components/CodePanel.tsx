@@ -11,8 +11,8 @@ interface CodePanelProps {
   selectedFrame: CoordinateFrame | null
   onCodeChange: (frameId: string, code: string) => void
   onCodeRun?: (frameId: string, code: string) => void
-  onVectorsUpdate?: (frameId: string, vectors: Vector[]) => void
-  onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[]) => void
+  onVectorsUpdate?: (frameId: string, vectors: Vector[], replace?: boolean) => void
+  onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[], replace?: boolean) => void
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
   autoExecuteCode?: string | null // When set, automatically execute this code
@@ -179,6 +179,13 @@ export default function CodePanel({
       }
     })
 
+    // Small delay to ensure clearing is fully processed before execution
+    await new Promise<void>((resolve) => {
+      setTimeout(() => {
+        resolve()
+      }, 0)
+    })
+
     // Collect vectors and functions created during execution
     const newVectors: Vector[] = []
     const newFunctions: FunctionPlot[] = []
@@ -209,12 +216,12 @@ export default function CodePanel({
       if (result.success) {
         setExecutionResult({ success: true })
         
-        // Update frame with new vectors and functions
-        if (onVectorsUpdate && newVectors.length > 0) {
-          onVectorsUpdate(selectedFrame.id, newVectors)
+        // Replace vectors and functions (not append) since we cleared them before execution
+        if (onVectorsUpdate) {
+          onVectorsUpdate(selectedFrame.id, newVectors, true)
         }
-        if (onFunctionsUpdate && newFunctions.length > 0) {
-          onFunctionsUpdate(selectedFrame.id, newFunctions)
+        if (onFunctionsUpdate) {
+          onFunctionsUpdate(selectedFrame.id, newFunctions, true)
         }
         
         if (onCodeRun) {
