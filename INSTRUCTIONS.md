@@ -91,6 +91,26 @@ For each step:
 - ❌ **DO NOT duplicate functionality** that already exists in utils
 - ❌ **DO NOT create new functions** without first checking if similar ones exist
 
+**IMPORTANT - Debugging Rules:**
+- ✅ **Use debug logs when a problem persists after two attempts**
+  - If a fix doesn't work after two attempts, add strategic debug logging
+  - Log key variables, function inputs/outputs, and state changes
+  - Use descriptive log messages that identify the context (function name, component, etc.)
+  - Log before and after critical operations to track state transitions
+  - Use `console.log`, `console.debug`, or `console.error` as appropriate
+  - Consider using conditional logging based on environment (e.g., `if (process.env.NODE_ENV === 'development')`)
+- ✅ **Remove debug logs before committing**
+  - All debug logs must be removed before final commits
+  - Debug logs are temporary tools for investigation, not permanent code
+  - Use the Code Review Checklist to verify no debug code remains
+- ✅ **Debugging best practices**:
+  - Start with understanding the expected behavior vs. actual behavior
+  - Check browser console for errors and warnings
+  - Use React DevTools for component state inspection
+  - Use browser DevTools for network requests and performance
+  - Add breakpoints in critical code paths if needed
+  - Document findings and root cause analysis
+
 ---
 
 ## Phase 1: Project Setup and Foundation
