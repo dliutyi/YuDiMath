@@ -645,35 +645,9 @@ export default function Canvas({
     console.log('[Canvas] Mouse up - isDrawing:', isDrawing, 'drawingRect:', drawingRect)
 
     if (isDrawing && drawingRect.start) {
-      // Get current mouse position for end point
-      const rect = container.getBoundingClientRect()
-      const canvasWidth = width || rect.width || 800
-      const canvasHeight = height || rect.height || 600
-      const screenX = e.clientX - rect.left
-      const screenY = e.clientY - rect.top
-      let endPoint: Point2D
-      
-      if (drawingRect.parentFrame) {
-        // Convert screen coordinates directly to parent frame coordinates
-        // This accounts for the parent's viewport pan/zoom
-        // screenToFrame returns coordinates in the frame's coordinate system accounting for viewport
-        const framePoint = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
-        
-        // In frame coordinates, grid step is always 1.0
-        // Snap directly in the frame coordinate system (which accounts for viewport)
-        const snappedFramePoint = snapPointToGrid(framePoint, 1.0)
-        
-        // Convert back to parent world coordinates using frameToParent
-        // frameToParent applies the viewport transformation, which matches what screenToFrame did
-        // This ensures the coordinates are correctly transformed back to parent world space
-        endPoint = frameToParent(snappedFramePoint, drawingRect.parentFrame)
-        // Constrain to parent frame bounds
-        endPoint = clampPointToFrameBounds(endPoint, drawingRect.parentFrame.bounds)
-      } else {
-        // Snap to background grid
-        const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
-        endPoint = drawingRect.end || snapPointToGrid(worldPoint, viewport.gridStep)
-      }
+      // Use the end point that was already calculated in handleMouseMove
+      // This ensures consistency - the frame is created at the same location it was drawn
+      const endPoint = drawingRect.end || drawingRect.start
 
       console.log('[Canvas] End point:', endPoint, 'start:', drawingRect.start)
 
