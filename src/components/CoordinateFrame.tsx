@@ -162,20 +162,7 @@ export function drawCoordinateFrame(
   const baseIEndScreen = frameToScreen([baseVectorScale, 0], frame, viewport, canvasWidth, canvasHeight)
   const baseJEndScreen = frameToScreen([0, baseVectorScale], frame, viewport, canvasWidth, canvasHeight)
 
-  // Draw base i vector (red) as arrow
-  drawArrow(ctx, originScreen, baseIEndScreen, '#ef4444', 2, 8)
-
-  // Draw base j vector (blue) as arrow
-  drawArrow(ctx, originScreen, baseJEndScreen, '#3b82f6', 2, 8)
-
-  // Draw frame origin
-  ctx.fillStyle = '#cbd5e1' // text-secondary
-  ctx.font = '12px sans-serif'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'top'
-  ctx.fillText('O', originScreen[0], originScreen[1] + 5)
-
-  // Draw frame grid (lines along baseI and baseJ directions)
+  // Draw frame grid, axes, and base vectors - all clipped to frame bounds
   // Save context state before clipping
   ctx.save()
   
@@ -194,6 +181,19 @@ export function drawCoordinateFrame(
   
   // Draw frame axes with labels
   drawFrameAxes(ctx, frame, viewport, canvasWidth, canvasHeight)
+  
+  // Draw base vectors within clipped region
+  // Base vectors are 1 unit in frame coordinates
+  // Use frameToScreen to account for frame viewport zoom and pan
+  const baseVectorScale = 1.0 // 1 unit in frame coordinates
+  const baseIEndScreen = frameToScreen([baseVectorScale, 0], frame, viewport, canvasWidth, canvasHeight)
+  const baseJEndScreen = frameToScreen([0, baseVectorScale], frame, viewport, canvasWidth, canvasHeight)
+
+  // Draw base i vector (red) as arrow
+  drawArrow(ctx, originScreen, baseIEndScreen, '#ef4444', 2, 8)
+
+  // Draw base j vector (blue) as arrow
+  drawArrow(ctx, originScreen, baseJEndScreen, '#3b82f6', 2, 8)
   
   // Restore context state (removes clip)
   ctx.restore()
