@@ -495,8 +495,12 @@ export default function Canvas({
           const currentFrame = parentToFrame(currentWorld, frame)
           
           // Calculate pan delta in frame coordinates
-          const deltaX = lastFrame[0] - currentFrame[0]
-          const deltaY = lastFrame[1] - currentFrame[1]
+          // The delta is in "unscaled" frame coordinates (as if zoom was 1.0)
+          // But we need to account for frame zoom: when zoomed in, a pixel movement
+          // should correspond to less movement in frame coordinates
+          const frameZoom = frame.viewport.zoom
+          const deltaX = (lastFrame[0] - currentFrame[0]) / frameZoom
+          const deltaY = (lastFrame[1] - currentFrame[1]) / frameZoom
           
           // Update frame viewport
           onFrameViewportChange(frame.id, {
