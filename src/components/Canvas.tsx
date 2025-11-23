@@ -685,9 +685,13 @@ export default function Canvas({
         endPoint = snapPointToGrid(worldPoint, viewport.gridStep)
       }
 
-      console.log('[Canvas] End point:', endPoint, 'start:', startPoint)
-      console.log('[Canvas] Parent frame:', parentFrame?.id, 'bounds:', parentFrame?.bounds)
+      console.log('[Canvas] ===== MOUSE UP =====')
+      console.log('[Canvas] End point:', endPoint)
+      console.log('[Canvas] Start point:', startPoint)
+      console.log('[Canvas] Parent frame ID:', parentFrame?.id)
+      console.log('[Canvas] Parent frame bounds:', parentFrame?.bounds)
       console.log('[Canvas] Parent frame origin:', parentFrame?.origin)
+      console.log('[Canvas] Parent frame viewport:', parentFrame?.viewport)
 
       if (onFrameCreated) {
         // Finalize rectangle and create frame
@@ -695,6 +699,7 @@ export default function Canvas({
         const [x2, y2] = endPoint
         
         console.log('[Canvas] Creating frame with bounds - x1:', x1, 'y1:', y1, 'x2:', x2, 'y2:', y2)
+        console.log('[Canvas] Frame will be at minX:', Math.min(x1, x2), 'minY:', Math.min(y1, y2))
         
         // Calculate bounds (ensure positive width and height)
         let minX = Math.min(x1, x2)
@@ -703,8 +708,8 @@ export default function Canvas({
         let maxY = Math.max(y1, y2)
         
         // If drawing inside a parent frame, constrain bounds to stay within parent
-        if (drawingRect.parentFrame) {
-          const parentBounds = drawingRect.parentFrame.bounds
+        if (parentFrame) {
+          const parentBounds = parentFrame.bounds
           minX = Math.max(parentBounds.x, minX)
           maxX = Math.min(parentBounds.x + parentBounds.width, maxX)
           minY = Math.max(parentBounds.y, minY)
@@ -765,8 +770,13 @@ export default function Canvas({
             parentFrameId,
             childFrameIds: [],
           }
-          console.log('[Canvas] Creating frame:', newFrame)
+          console.log('[Canvas] ===== CREATING FRAME =====')
+          console.log('[Canvas] Frame ID:', frameId)
+          console.log('[Canvas] Frame bounds:', newBounds)
+          console.log('[Canvas] Frame origin:', [originX, originY])
           console.log('[Canvas] Parent frame ID:', parentFrameId)
+          console.log('[Canvas] Parent frame from ref:', parentFrame?.id)
+          console.log('[Canvas] Full frame object:', JSON.stringify(newFrame, null, 2))
           onFrameCreated(newFrame, parentFrameId)
         } else {
           console.log('[Canvas] Frame too small, not creating:', { frameWidth, frameHeight })
