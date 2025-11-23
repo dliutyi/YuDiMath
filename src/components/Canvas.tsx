@@ -691,6 +691,7 @@ export default function Canvas({
         // This ensures bounds are stored correctly regardless of parent's viewport state
         endPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
         console.log('[Canvas] Nested frame - before clamp - raw:', rawFramePoint, 'snapped:', snappedRawFramePoint, 'world:', endPoint)
+        console.log('[Canvas] DEBUG: startPoint at this moment:', startPoint, 'endPoint:', endPoint)
         // Constrain to parent frame bounds
         const endPointBeforeClamp = [...endPoint] as Point2D
         endPoint = clampPointToFrameBounds(endPoint, parentFrame.bounds)
@@ -714,12 +715,14 @@ export default function Canvas({
         
         // Debug: Verify startPoint makes sense
         console.log('[Canvas] ===== BOUNDS CALCULATION =====')
-        console.log('[Canvas] startPoint:', startPoint, 'endPoint:', endPoint)
+        console.log('[Canvas] startPoint:', JSON.stringify(startPoint), 'endPoint:', JSON.stringify(endPoint))
         if (parentFrame) {
           const startRaw = parentToFrame(startPoint, parentFrame)
           const endRaw = parentToFrame(endPoint, parentFrame)
-          console.log('[Canvas] startPoint raw frame coords:', startRaw, 'endPoint raw frame coords:', endRaw)
-          console.log('[Canvas] Parent frame origin:', parentFrame.origin, 'bounds:', parentFrame.bounds)
+          console.log('[Canvas] startPoint raw frame coords:', JSON.stringify(startRaw), 'endPoint raw frame coords:', JSON.stringify(endRaw))
+          console.log('[Canvas] Parent frame origin:', JSON.stringify(parentFrame.origin), 'bounds:', JSON.stringify(parentFrame.bounds))
+          console.log('[Canvas] Calculated minX:', Math.min(startPoint[0], endPoint[0]), 'maxX:', Math.max(startPoint[0], endPoint[0]))
+          console.log('[Canvas] Calculated minY:', Math.min(startPoint[1], endPoint[1]), 'maxY:', Math.max(startPoint[1], endPoint[1]))
         }
         
         // Calculate bounds (ensure positive width and height)
