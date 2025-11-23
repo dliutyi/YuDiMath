@@ -437,7 +437,6 @@ export default function Canvas({
         // This ensures bounds are stored correctly regardless of parent's viewport state
         snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
         
-        console.error('[Canvas] MOUSE DOWN - raw frame:', rawFramePoint, 'snapped raw:', snappedRawFramePoint, 'world:', snappedPoint)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
@@ -671,11 +670,6 @@ export default function Canvas({
       // Use refs to get the latest values to avoid stale closures
       const startPoint: Point2D = drawingRectStartRef.current
       const parentFrame = drawingRectParentFrameRef.current
-      console.error('[Canvas] MOUSE UP - startPoint from ref:', startPoint, 'parentFrame:', parentFrame?.id || 'null')
-      if (parentFrame) {
-        const rawFrameCheck = parentToFrame(startPoint, parentFrame)
-        console.error('[Canvas] MOUSE UP - raw frame coords:', rawFrameCheck, 'parent origin:', parentFrame.origin)
-      }
       
       // Recalculate end point using the same logic as handleMouseMove
       // This ensures we use the exact mouse position at mouse up time
@@ -719,7 +713,6 @@ export default function Canvas({
         // Convert raw frame coordinates to parent world coordinates
         // This ensures bounds are stored correctly regardless of parent's viewport state
         endPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
-        console.error('[Canvas] MOUSE UP - endPoint calculated - raw:', rawFramePoint, 'snapped:', snappedRawFramePoint, 'world:', endPoint)
       } else {
         // Snap to background grid
         const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
@@ -734,19 +727,6 @@ export default function Canvas({
         const [x1, y1] = startPoint
         const [x2, y2] = endPoint
         
-        // Debug: Verify startPoint makes sense
-        console.error('[Canvas] BOUNDS CALCULATION - startPoint:', startPoint, 'endPoint:', endPoint)
-        if (parentFrame) {
-          const startRaw = parentToFrame(startPoint, parentFrame)
-          const endRaw = parentToFrame(endPoint, parentFrame)
-          console.error('[Canvas] BOUNDS CALCULATION - startPoint raw:', startRaw, 'endPoint raw:', endRaw)
-          console.error('[Canvas] BOUNDS CALCULATION - parent origin:', parentFrame.origin, 'bounds:', parentFrame.bounds)
-          const minX = Math.min(startPoint[0], endPoint[0])
-          const maxX = Math.max(startPoint[0], endPoint[0])
-          const minY = Math.min(startPoint[1], endPoint[1])
-          const maxY = Math.max(startPoint[1], endPoint[1])
-          console.error('[Canvas] BOUNDS CALCULATION - minX:', minX, 'maxX:', maxX, 'minY:', minY, 'maxY:', maxY)
-        }
         
         // Calculate bounds (ensure positive width and height)
         let minX = Math.min(x1, x2)
