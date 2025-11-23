@@ -3,6 +3,7 @@ import Canvas from './components/Canvas'
 import GridStepSelector from './components/GridStepSelector'
 import FrameEditorPanel from './components/FrameEditorPanel'
 import LoadingOverlay from './components/LoadingOverlay'
+import { generateCode } from './utils/codeGenerator'
 import type { ViewportState, CoordinateFrame, Vector, FunctionPlot } from './types'
 
 function App() {
@@ -67,10 +68,17 @@ function App() {
     setFrames((prev) => {
       return prev.map((frame) => {
         if (frame.id === frameId) {
-          return {
+          const updatedFrame = {
             ...frame,
             ...updates,
           }
+          
+          // If origin or base vectors changed, regenerate code while preserving user code
+          if (updates.origin || updates.baseI || updates.baseJ) {
+            updatedFrame.code = generateCode(updatedFrame, frame.code)
+          }
+          
+          return updatedFrame
         }
         return frame
       })

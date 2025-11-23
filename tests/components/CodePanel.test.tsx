@@ -84,7 +84,8 @@ describe('CodePanel', () => {
     )
 
     const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
-    expect(textarea.value).toContain('# Python code for this frame')
+    expect(textarea.value).toContain('import numpy as np')
+    expect(textarea.value).toContain('from scipy import linalg')
   })
 
   it('updates code on frame selection change', () => {

@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import type { ViewportState, CoordinateFrame, Point2D, FrameBounds } from '../types'
 import { screenToWorld, snapPointToGrid, worldToScreen } from '../utils/coordinates'
 import { screenToFrame, parentToFrame, nestedFrameToScreen, frameCoordsToParentWorld } from '../utils/frameTransforms'
+import { generateCode } from '../utils/codeGenerator'
 
 interface UseCanvasDrawingProps {
   isDrawing: boolean
@@ -295,10 +296,13 @@ export function useCanvasDrawing({
         mode: '2d',
         vectors: [],
         functions: [],
-        code: '',
+        code: '', // Will be generated below
         parentFrameId: parentFrameId,
         childFrameIds: [],
       }
+      
+      // Generate initial code for the frame
+      newFrame.code = generateCode(newFrame)
 
       onFrameCreated(newFrame, parentFrameId)
     }
