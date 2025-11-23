@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import type { ViewportState, CoordinateFrame, Point2D, FrameBounds } from '../types'
 import { screenToWorld, snapPointToGrid, worldToScreen } from '../utils/coordinates'
-import { screenToFrame, parentToFrame, nestedFrameToScreen, frameToParent, frameCoordsToParentWorld } from '../utils/frameTransforms'
+import { screenToFrame, parentToFrame, nestedFrameToScreen, frameCoordsToParentWorld } from '../utils/frameTransforms'
 
 interface UseCanvasDrawingProps {
   isDrawing: boolean
