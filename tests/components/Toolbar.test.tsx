@@ -13,6 +13,8 @@ describe('Toolbar', () => {
     onExport: vi.fn(),
     onImport: vi.fn(),
     onClear: vi.fn(),
+    isDrawing: false,
+    onDrawingToggle: vi.fn(),
   }
 
   beforeEach(() => {
@@ -35,6 +37,9 @@ describe('Toolbar', () => {
     expect(screen.getByTitle('Export Workspace')).toBeInTheDocument()
     expect(screen.getByTitle('Import Workspace')).toBeInTheDocument()
     expect(screen.getByTitle('Clear Workspace')).toBeInTheDocument()
+    
+    // Draw Frame button should be present
+    expect(screen.getByTitle('Draw Frame')).toBeInTheDocument()
   })
 
   it('displays current grid step value', () => {
@@ -116,6 +121,19 @@ describe('Toolbar', () => {
     
     rerender(<Toolbar {...defaultProps} zoom={123.456} />)
     expect(screen.getByText('123.5x')).toBeInTheDocument()
+  })
+
+  it('calls onDrawingToggle when draw frame button is clicked', () => {
+    render(<Toolbar {...defaultProps} />)
+    const drawButton = screen.getByTitle('Draw Frame')
+    fireEvent.click(drawButton)
+    expect(defaultProps.onDrawingToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows active state when isDrawing is true', () => {
+    render(<Toolbar {...defaultProps} isDrawing={true} />)
+    const drawButton = screen.getByTitle('Draw Frame')
+    expect(drawButton).toHaveClass('bg-primary')
   })
 })
 

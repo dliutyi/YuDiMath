@@ -10,6 +10,8 @@ interface ToolbarProps {
   onExport: () => void
   onImport: () => void
   onClear: () => void
+  isDrawing: boolean
+  onDrawingToggle: () => void
 }
 
 const MIN_ZOOM = 5.0
@@ -25,6 +27,8 @@ export default function Toolbar({
   onExport,
   onImport,
   onClear,
+  isDrawing,
+  onDrawingToggle,
 }: ToolbarProps) {
   const formatZoom = (value: number): string => {
     return value.toFixed(1)
@@ -64,7 +68,7 @@ export default function Toolbar({
   }
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+    <div className="absolute bottom-4 left-4 z-10">
       <div className="bg-panel-bg/95 backdrop-blur-md border border-border/50 rounded-xl shadow-2xl p-3 flex items-center gap-4">
         {/* Grid Step Selector */}
         <div className="flex items-center gap-2">
@@ -259,6 +263,45 @@ export default function Toolbar({
             </span>
           </button>
         </div>
+
+        {/* Divider */}
+        <div className="w-px h-8 bg-border/50" />
+
+        {/* Draw Frame Button */}
+        <button
+          onClick={(e) => handleButtonClick(e, onDrawingToggle)}
+          onMouseDown={handleButtonMouseDown}
+          onMouseUp={handleButtonMouseUp}
+          onMouseLeave={handleButtonMouseLeave}
+          onTouchStart={handleButtonTouchStart}
+          onTouchEnd={handleButtonTouchEnd}
+          className={`relative px-3 py-2 rounded-lg transition-all duration-200 group touch-manipulation ${
+            isDrawing
+              ? 'bg-primary text-white shadow-lg shadow-primary/50 hover:bg-blue-600 hover:shadow-xl hover:shadow-primary/60'
+              : 'bg-bg-primary/50 border border-border/50 text-text-primary hover:bg-hover/50 hover:border-border hover:shadow-md'
+          }`}
+          style={{ WebkitTapHighlightColor: 'transparent' }}
+          title="Draw Frame"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-4 h-4"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+            <line x1="3" y1="9" x2="21" y2="9" />
+          </svg>
+          <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900/95 backdrop-blur-sm text-white text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-700/50 z-20">
+            Draw Frame
+            <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900/95"></span>
+          </span>
+        </button>
       </div>
     </div>
   )

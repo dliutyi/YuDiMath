@@ -300,7 +300,7 @@ function App() {
         <h1 className="text-xl font-bold text-text-primary">YuDiMath</h1>
         <p className="text-xs text-text-secondary">Linear Algebra & Calculus Visualizer</p>
       </div>
-      {/* Toolbar at top center */}
+      {/* Toolbar at bottom left */}
       <Toolbar
         gridStep={workspace.viewport.gridStep}
         onGridStepChange={handleGridStepChange}
@@ -326,6 +326,8 @@ function App() {
             variant: 'danger',
           })
         }}
+        isDrawing={isDrawing}
+        onDrawingToggle={() => setIsDrawing(!isDrawing)}
       />
       {/* Hidden file input for import */}
       <input
@@ -335,72 +337,6 @@ function App() {
         onChange={handleFileChange}
         style={{ display: 'none' }}
       />
-      {/* Draw Frame button on middle left */}
-      <div className="absolute top-1/2 left-4 -translate-y-1/2 z-10">
-        <button
-          onClick={(e) => {
-            // Immediately blur to remove focus after click
-            if (document.activeElement instanceof HTMLElement) {
-              document.activeElement.blur()
-            }
-            e.currentTarget.blur()
-            setIsDrawing(!isDrawing)
-          }}
-          onMouseDown={(e) => {
-            e.currentTarget.classList.add('active-touch')
-          }}
-          onMouseUp={(e) => {
-            e.currentTarget.classList.remove('active-touch')
-            e.currentTarget.blur()
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.classList.remove('active-touch')
-            e.currentTarget.blur()
-          }}
-          onTouchStart={(e) => {
-            e.currentTarget.classList.add('active-touch')
-          }}
-          onTouchEnd={(e) => {
-            // Force blur on touch end to remove focus
-            e.currentTarget.blur()
-            if (document.activeElement instanceof HTMLElement) {
-              document.activeElement.blur()
-            }
-            // Remove active class after a short delay to allow visual feedback
-            setTimeout(() => {
-              e.currentTarget.classList.remove('active-touch')
-            }, 150)
-          }}
-          className={`relative px-4 py-3 rounded-lg transition-all duration-200 group touch-manipulation ${
-            isDrawing
-              ? 'bg-primary text-white shadow-lg shadow-primary/50 hover:bg-blue-600 hover:shadow-xl hover:shadow-primary/60'
-              : 'bg-bg-primary/50 border border-border/50 text-text-primary hover:bg-hover/50 hover:border-border hover:shadow-md'
-          }`}
-          style={{ WebkitTapHighlightColor: 'transparent' }}
-          title="Draw Frame"
-        >
-          {/* Draw/Frame icon - rectangle with grid */}
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="w-5 h-5"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <line x1="9" y1="3" x2="9" y2="21" />
-            <line x1="3" y1="9" x2="21" y2="9" />
-          </svg>
-          {/* Tooltip */}
-          <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900/95 backdrop-blur-sm text-white text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-700/50 z-20">
-            Draw Frame
-            <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900/95"></span>
-          </span>
-        </button>
-      </div>
       <div className="absolute top-4 right-4 z-10">
         <FrameEditorPanel
           selectedFrame={workspace.selectedFrame}
