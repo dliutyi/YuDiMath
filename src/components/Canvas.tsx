@@ -428,6 +428,9 @@ export default function Canvas({
       drawingRectEndRef.current = snappedPoint
       drawingRectParentFrameRef.current = parentFrame
       setDrawingRect({ start: snappedPoint, end: snappedPoint, parentFrame })
+      if (parentFrame) {
+        console.log('[Canvas] Mouse down - stored startPoint:', snappedPoint, 'parentFrame:', parentFrame.id)
+      }
     } else {
       // Check if clicking on a frame (for selection)
       // We need to check in screen space, accounting for each frame's viewport
@@ -651,6 +654,7 @@ export default function Canvas({
       // Use refs to get the latest values to avoid stale closures
       const startPoint: Point2D = drawingRectStartRef.current
       const parentFrame = drawingRectParentFrameRef.current
+      console.log('[Canvas] Mouse up - startPoint from ref:', startPoint, 'parentFrame:', parentFrame?.id)
       
       // Recalculate end point using the same logic as handleMouseMove
       // This ensures we use the exact mouse position at mouse up time
@@ -688,8 +692,11 @@ export default function Canvas({
 
       if (onFrameCreated) {
         // Finalize rectangle and create frame
+        // IMPORTANT: startPoint and endPoint are both in parent world coordinates
+        // For nested frames, they're relative to the parent frame's coordinate system
         const [x1, y1] = startPoint
         const [x2, y2] = endPoint
+        console.log('[Canvas] Frame bounds calculation - startPoint:', startPoint, 'endPoint:', endPoint)
         
         
         // Calculate bounds (ensure positive width and height)
