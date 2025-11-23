@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import Canvas from './components/Canvas'
-import GridStepSelector from './components/GridStepSelector'
+import Toolbar from './components/Toolbar'
 import FrameEditorPanel from './components/FrameEditorPanel'
 import LoadingOverlay from './components/LoadingOverlay'
 import Modal from './components/Modal'
@@ -10,6 +10,10 @@ import { usePyScript } from './hooks/usePyScript'
 import { useWorkspace } from './hooks/useWorkspace'
 import { downloadWorkspace, importWorkspaceFromFile } from './utils/exportImport'
 import type { ViewportState, CoordinateFrame, Vector, FunctionPlot, WorkspaceState } from './types'
+
+const MIN_ZOOM = 5.0
+const MAX_ZOOM = 500.0
+const DEFAULT_ZOOM = 50.0
 
 function App() {
   const workspace = useWorkspace({ persist: true })
@@ -38,6 +42,22 @@ function App() {
 
   const handleGridStepChange = (gridStep: number) => {
     workspace.updateViewport({ gridStep })
+  }
+
+  const handleZoomIn = () => {
+    const currentZoom = workspace.viewport.zoom
+    const newZoom = Math.min(currentZoom * 1.2, MAX_ZOOM)
+    workspace.updateViewport({ zoom: newZoom })
+  }
+
+  const handleZoomOut = () => {
+    const currentZoom = workspace.viewport.zoom
+    const newZoom = Math.max(currentZoom / 1.2, MIN_ZOOM)
+    workspace.updateViewport({ zoom: newZoom })
+  }
+
+  const handleZoomReset = () => {
+    workspace.updateViewport({ zoom: DEFAULT_ZOOM })
   }
 
   const handleFrameCreated = (frame: CoordinateFrame, parentFrameId: string | null) => {
@@ -280,12 +300,33 @@ function App() {
         <h1 className="text-xl font-bold text-text-primary">YuDiMath</h1>
         <p className="text-xs text-text-secondary">Linear Algebra & Calculus Visualizer</p>
       </div>
-      <div className="absolute bottom-4 left-4 z-10">
-        <GridStepSelector
-          gridStep={workspace.viewport.gridStep}
-          onGridStepChange={handleGridStepChange}
-        />
-      </div>
+      {/* Toolbar at top center */}
+      <Toolbar
+        gridStep={workspace.viewport.gridStep}
+        onGridStepChange={handleGridStepChange}
+        zoom={workspace.viewport.zoom}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onZoomReset={handleZoomReset}
+        onExport={handleExportWorkspace}
+        onImport={handleImportClick}
+        onClear={() => {
+          setModalState({
+            isOpen: true,
+            title: 'Clear Workspace',
+            message: 'Are you sure you want to clear the entire workspace? This will remove all frames and reset the viewport.',
+            confirmText: 'Clear',
+            cancelText: 'Cancel',
+            onConfirm: () => {
+              workspace.clearWorkspace()
+            },
+            onCancel: () => {
+              // Cancel: do nothing, just close the modal
+            },
+            variant: 'danger',
+          })
+        }}
+      />
       {/* Hidden file input for import */}
       <input
         ref={fileInputRef}
@@ -294,257 +335,71 @@ function App() {
         onChange={handleFileChange}
         style={{ display: 'none' }}
       />
-      {/* Tools panel on middle left */}
+      {/* Draw Frame button on middle left */}
       <div className="absolute top-1/2 left-4 -translate-y-1/2 z-10">
-        <div className="bg-panel-bg/95 backdrop-blur-md border border-border/50 rounded-xl shadow-2xl p-3 flex flex-col gap-3">
-          <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-2 pb-1 border-b border-border/50 mb-1">
-            Tools
-          </div>
-          <button
-            onClick={(e) => {
-              if (document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur()
-              }
-              e.currentTarget.blur()
-              handleExportWorkspace()
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.classList.add('active-touch')
-            }}
-            onMouseUp={(e) => {
+        <button
+          onClick={(e) => {
+            // Immediately blur to remove focus after click
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur()
+            }
+            e.currentTarget.blur()
+            setIsDrawing(!isDrawing)
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.classList.add('active-touch')
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.classList.remove('active-touch')
+            e.currentTarget.blur()
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.classList.remove('active-touch')
+            e.currentTarget.blur()
+          }}
+          onTouchStart={(e) => {
+            e.currentTarget.classList.add('active-touch')
+          }}
+          onTouchEnd={(e) => {
+            // Force blur on touch end to remove focus
+            e.currentTarget.blur()
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur()
+            }
+            // Remove active class after a short delay to allow visual feedback
+            setTimeout(() => {
               e.currentTarget.classList.remove('active-touch')
-              e.currentTarget.blur()
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.classList.remove('active-touch')
-              e.currentTarget.blur()
-            }}
-            onTouchStart={(e) => {
-              e.currentTarget.classList.add('active-touch')
-            }}
-            onTouchEnd={(e) => {
-              e.currentTarget.blur()
-              if (document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur()
-              }
-              setTimeout(() => {
-                e.currentTarget.classList.remove('active-touch')
-              }, 150)
-            }}
-            className="relative px-4 py-3 rounded-lg transition-all duration-200 group touch-manipulation bg-bg-primary/50 border border-border/50 text-text-primary hover:bg-primary/20 hover:border-primary/50 hover:shadow-md"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-            title="Export Workspace"
+            }, 150)
+          }}
+          className={`relative px-4 py-3 rounded-lg transition-all duration-200 group touch-manipulation ${
+            isDrawing
+              ? 'bg-primary text-white shadow-lg shadow-primary/50 hover:bg-blue-600 hover:shadow-xl hover:shadow-primary/60'
+              : 'bg-bg-primary/50 border border-border/50 text-text-primary hover:bg-hover/50 hover:border-border hover:shadow-md'
+          }`}
+          style={{ WebkitTapHighlightColor: 'transparent' }}
+          title="Draw Frame"
+        >
+          {/* Draw/Frame icon - rectangle with grid */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-5 h-5"
           >
-            {/* Export/Download icon */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-5 h-5"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            {/* Tooltip */}
-            <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900/95 backdrop-blur-sm text-white text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-700/50 z-20">
-              Export Workspace
-              <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900/95"></span>
-            </span>
-          </button>
-          <button
-            onClick={(e) => {
-              if (document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur()
-              }
-              e.currentTarget.blur()
-              handleImportClick()
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.classList.add('active-touch')
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.classList.remove('active-touch')
-              e.currentTarget.blur()
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.classList.remove('active-touch')
-              e.currentTarget.blur()
-            }}
-            onTouchStart={(e) => {
-              e.currentTarget.classList.add('active-touch')
-            }}
-            onTouchEnd={(e) => {
-              e.currentTarget.blur()
-              if (document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur()
-              }
-              setTimeout(() => {
-                e.currentTarget.classList.remove('active-touch')
-              }, 150)
-            }}
-            className="relative px-4 py-3 rounded-lg transition-all duration-200 group touch-manipulation bg-bg-primary/50 border border-border/50 text-text-primary hover:bg-primary/20 hover:border-primary/50 hover:shadow-md"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-            title="Import Workspace"
-          >
-            {/* Import/Upload icon */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-5 h-5"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            {/* Tooltip */}
-            <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900/95 backdrop-blur-sm text-white text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-700/50 z-20">
-              Import Workspace
-              <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900/95"></span>
-            </span>
-          </button>
-          <button
-            onClick={(e) => {
-              if (document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur()
-              }
-              e.currentTarget.blur()
-              setModalState({
-                isOpen: true,
-                title: 'Clear Workspace',
-                message: 'Are you sure you want to clear the entire workspace? This will remove all frames and reset the viewport.',
-                confirmText: 'Clear',
-                cancelText: 'Cancel',
-                onConfirm: () => {
-                  workspace.clearWorkspace()
-                },
-                onCancel: () => {
-                  // Cancel: do nothing, just close the modal
-                },
-                variant: 'danger',
-              })
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.classList.add('active-touch')
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.classList.remove('active-touch')
-              e.currentTarget.blur()
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.classList.remove('active-touch')
-              e.currentTarget.blur()
-            }}
-            onTouchStart={(e) => {
-              e.currentTarget.classList.add('active-touch')
-            }}
-            onTouchEnd={(e) => {
-              e.currentTarget.blur()
-              if (document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur()
-              }
-              setTimeout(() => {
-                e.currentTarget.classList.remove('active-touch')
-              }, 150)
-            }}
-            className="relative px-4 py-3 rounded-lg transition-all duration-200 group touch-manipulation bg-bg-primary/50 border border-border/50 text-text-primary hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-md"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-            title="Clear Workspace"
-          >
-            {/* Clear/Trash icon */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-5 h-5"
-            >
-              <path d="M3 6h18" />
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-            </svg>
-            {/* Tooltip */}
-            <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900/95 backdrop-blur-sm text-white text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-700/50 z-20">
-              Clear Workspace
-              <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900/95"></span>
-            </span>
-          </button>
-          <button
-            onClick={(e) => {
-              // Immediately blur to remove focus after click
-              if (document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur()
-              }
-              e.currentTarget.blur()
-              setIsDrawing(!isDrawing)
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.classList.add('active-touch')
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.classList.remove('active-touch')
-              e.currentTarget.blur()
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.classList.remove('active-touch')
-              e.currentTarget.blur()
-            }}
-            onTouchStart={(e) => {
-              e.currentTarget.classList.add('active-touch')
-            }}
-            onTouchEnd={(e) => {
-              // Force blur on touch end to remove focus
-              e.currentTarget.blur()
-              if (document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur()
-              }
-              // Remove active class after a short delay to allow visual feedback
-              setTimeout(() => {
-                e.currentTarget.classList.remove('active-touch')
-              }, 150)
-            }}
-            className={`relative px-4 py-3 rounded-lg transition-all duration-200 group touch-manipulation ${
-              isDrawing
-                ? 'bg-primary text-white shadow-lg shadow-primary/50 hover:bg-blue-600 hover:shadow-xl hover:shadow-primary/60'
-                : 'bg-bg-primary/50 border border-border/50 text-text-primary hover:bg-hover/50 hover:border-border hover:shadow-md'
-            }`}
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-            title="Draw Frame"
-          >
-            {/* Draw/Frame icon - rectangle with grid */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-5 h-5"
-            >
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <line x1="9" y1="3" x2="9" y2="21" />
-              <line x1="3" y1="9" x2="21" y2="9" />
-            </svg>
-            {/* Tooltip */}
-            <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900/95 backdrop-blur-sm text-white text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-700/50 z-20">
-              Draw Frame
-              <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900/95"></span>
-            </span>
-          </button>
-        </div>
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+            <line x1="3" y1="9" x2="21" y2="9" />
+          </svg>
+          {/* Tooltip */}
+          <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900/95 backdrop-blur-sm text-white text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-700/50 z-20">
+            Draw Frame
+            <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900/95"></span>
+          </span>
+        </button>
       </div>
       <div className="absolute top-4 right-4 z-10">
         <FrameEditorPanel
