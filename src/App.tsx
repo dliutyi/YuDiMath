@@ -3,7 +3,7 @@ import Canvas from './components/Canvas'
 import GridStepSelector from './components/GridStepSelector'
 import FrameEditorPanel from './components/FrameEditorPanel'
 import LoadingOverlay from './components/LoadingOverlay'
-import type { ViewportState, CoordinateFrame } from './types'
+import type { ViewportState, CoordinateFrame, Vector, FunctionPlot } from './types'
 
 function App() {
   const [viewport, setViewport] = useState<ViewportState>({
@@ -85,6 +85,62 @@ function App() {
     // Code execution is handled by CodePanel, this is just a callback
     // Future: Could add logging or other side effects here
     console.log('[App] Code executed for frame:', frameId)
+  }
+
+  const handleVectorsUpdate = (frameId: string, vectors: Vector[]) => {
+    setFrames((prev) => {
+      return prev.map((frame) => {
+        if (frame.id === frameId) {
+          return {
+            ...frame,
+            vectors: [...(frame.vectors || []), ...vectors],
+          }
+        }
+        return frame
+      })
+    })
+  }
+
+  const handleFunctionsUpdate = (frameId: string, functions: FunctionPlot[]) => {
+    setFrames((prev) => {
+      return prev.map((frame) => {
+        if (frame.id === frameId) {
+          return {
+            ...frame,
+            functions: [...(frame.functions || []), ...functions],
+          }
+        }
+        return frame
+      })
+    })
+  }
+
+  const handleVectorsClear = (frameId: string) => {
+    setFrames((prev) => {
+      return prev.map((frame) => {
+        if (frame.id === frameId) {
+          return {
+            ...frame,
+            vectors: [],
+          }
+        }
+        return frame
+      })
+    })
+  }
+
+  const handleFunctionsClear = (frameId: string) => {
+    setFrames((prev) => {
+      return prev.map((frame) => {
+        if (frame.id === frameId) {
+          return {
+            ...frame,
+            functions: [],
+          }
+        }
+        return frame
+      })
+    })
   }
 
   const selectedFrame = frames.find(f => f.id === selectedFrameId) || null
@@ -192,6 +248,10 @@ function App() {
           onFrameViewportChange={handleFrameViewportChange}
           onCodeChange={handleCodeChange}
           onCodeRun={handleCodeRun}
+          onVectorsUpdate={handleVectorsUpdate}
+          onFunctionsUpdate={handleFunctionsUpdate}
+          onVectorsClear={handleVectorsClear}
+          onFunctionsClear={handleFunctionsClear}
         />
       </div>
     </div>

@@ -54,14 +54,18 @@ export interface Vector {
 export interface FunctionPlot {
   /** Unique identifier for the function plot */
   id: string
-  /** Function expression (string or callable) */
-  expression: string
+  /** Function expression (string) - used when points are not provided */
+  expression?: string
+  /** Pre-computed points for the function plot - used when provided instead of expression */
+  points?: Array<[number, number]>
   /** Minimum x value for evaluation range */
   xMin: number
   /** Maximum x value for evaluation range */
   xMax: number
   /** Color of the function plot (hex format, e.g., '#ff00ff') */
   color: string
+  /** Number of points to sample for plotting (default: 1000) */
+  numPoints?: number
 }
 
 /**

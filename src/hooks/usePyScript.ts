@@ -1,4 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
+import {
+  setupFunctionContext,
+  clearFunctionContext,
+  getCapturedCalls,
+  injectFunctionsIntoPyodide,
+} from '../utils/pythonFunctions'
+import type { Vector, FunctionPlot } from '../types'
 
 interface PyScriptError {
   message: string
@@ -8,7 +15,12 @@ interface PyScriptError {
 
 interface UsePyScriptReturn {
   isReady: boolean
-  executeCode: (code: string) => Promise<{ success: boolean; error?: PyScriptError; result?: any }>
+  executeCode: (
+    code: string,
+    frameId: string,
+    onVectorCreated: (vector: Omit<Vector, 'id'>) => void,
+    onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void
+  ) => Promise<{ success: boolean; error?: PyScriptError; result?: any; functionCalls: Array<{ name: string; args: unknown[]; frameId: string }> }>
   isExecuting: boolean
 }
 
@@ -72,7 +84,12 @@ export function usePyScript(): UsePyScriptReturn {
           // Install NumPy and SciPy
           await pyodide.loadPackage(['numpy', 'scipy'])
           
-          console.log('[usePyScript] Packages installed, Pyodide ready!')
+          console.log('[usePyScript] Packages installed, injecting predefined functions...')
+          
+          // Inject predefined functions into Python context
+          injectFunctionsIntoPyodide(pyodide)
+          
+          console.log('[usePyScript] Pyodide ready!')
           
           // Store globally
           globalPyodideInstance = pyodide
@@ -152,7 +169,12 @@ export function usePyScript(): UsePyScriptReturn {
    * Execute Python code and return the result
    */
   const executeCode = useCallback(
-    async (code: string): Promise<{ success: boolean; error?: PyScriptError; result?: any }> => {
+    async (
+      code: string,
+      frameId: string,
+      onVectorCreated: (vector: Omit<Vector, 'id'>) => void,
+      onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void
+    ): Promise<{ success: boolean; error?: PyScriptError; result?: any; functionCalls: Array<{ name: string; args: unknown[]; frameId: string }> }> => {
       if (!isReady) {
         return {
           success: false,
@@ -160,10 +182,14 @@ export function usePyScript(): UsePyScriptReturn {
             message: 'PyScript is not ready yet',
             type: 'NotReadyError',
           },
+          functionCalls: [],
         }
       }
 
       setIsExecuting(true)
+
+      // Set up function context for this execution
+      setupFunctionContext(frameId, onVectorCreated, onFunctionCreated)
 
       try {
         // Use the global Pyodide instance
@@ -174,17 +200,25 @@ export function usePyScript(): UsePyScriptReturn {
         }
 
         // Execute the code
-        console.log('[usePyScript] Executing Python code...')
+        console.log('[usePyScript] Executing Python code for frame:', frameId)
         const result = await pyodide.runPythonAsync(code)
         console.log('[usePyScript] Code executed successfully')
 
+        // Get captured function calls
+        const functionCalls = getCapturedCalls()
+        console.log('[usePyScript] Captured function calls:', functionCalls)
+
         setIsExecuting(false)
+        clearFunctionContext()
+        
         return {
           success: true,
           result,
+          functionCalls,
         }
       } catch (error: any) {
         setIsExecuting(false)
+        clearFunctionContext()
         
         const pyScriptError: PyScriptError = {
           message: error.message || 'Unknown error occurred',
@@ -195,6 +229,7 @@ export function usePyScript(): UsePyScriptReturn {
         return {
           success: false,
           error: pyScriptError,
+          functionCalls: getCapturedCalls(), // Return any calls captured before error
         }
       }
     },

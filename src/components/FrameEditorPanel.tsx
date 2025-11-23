@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import PropertiesPanel from './PropertiesPanel'
 import CodePanel from './CodePanel'
-import type { CoordinateFrame, ViewportState } from '../types'
+import type { CoordinateFrame, ViewportState, Vector, FunctionPlot } from '../types'
 
 interface FrameEditorPanelProps {
   selectedFrame: CoordinateFrame | null
@@ -9,6 +9,10 @@ interface FrameEditorPanelProps {
   onFrameViewportChange?: (frameId: string, viewport: ViewportState) => void
   onCodeChange: (frameId: string, code: string) => void
   onCodeRun?: (frameId: string, code: string) => void
+  onVectorsUpdate?: (frameId: string, vectors: Vector[]) => void
+  onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[]) => void
+  onVectorsClear?: (frameId: string) => void
+  onFunctionsClear?: (frameId: string) => void
 }
 
 type TabType = 'properties' | 'code'
@@ -19,6 +23,10 @@ export default function FrameEditorPanel({
   onFrameViewportChange,
   onCodeChange,
   onCodeRun,
+  onVectorsUpdate,
+  onFunctionsUpdate,
+  onVectorsClear,
+  onFunctionsClear,
 }: FrameEditorPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('properties')
 
@@ -70,6 +78,10 @@ export default function FrameEditorPanel({
             selectedFrame={selectedFrame}
             onCodeChange={onCodeChange}
             onCodeRun={onCodeRun}
+            onVectorsUpdate={onVectorsUpdate}
+            onFunctionsUpdate={onFunctionsUpdate}
+            onVectorsClear={onVectorsClear}
+            onFunctionsClear={onFunctionsClear}
           />
         )}
       </div>

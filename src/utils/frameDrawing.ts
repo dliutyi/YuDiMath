@@ -1,4 +1,4 @@
-import type { CoordinateFrame, ViewportState, Point2D, Vector } from '../types'
+import type { CoordinateFrame, ViewportState, Point2D, Vector, FunctionPlot } from '../types'
 import { worldToScreen, screenToWorld } from '../utils/coordinates'
 import { drawArrow } from '../utils/arrows'
 import {
@@ -272,6 +272,9 @@ export function drawCoordinateFrame(
   
   // Draw vectors within clipped region
   drawFrameVectors(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
+  
+  // Draw function plots within clipped region
+  drawFrameFunctions(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
   
   // Recursively draw child frames
   frame.childFrameIds.forEach(childId => {
@@ -999,5 +1002,197 @@ function drawFrameVectors(
     
     drawArrow(ctx, startScreen, endScreen, vector.color, 2, arrowSize)
   })
+}
+
+/**
+ * Draw function plots defined in a frame
+ * Functions are evaluated and drawn as curves in frame coordinates
+ */
+function drawFrameFunctions(
+  ctx: CanvasRenderingContext2D,
+  frame: CoordinateFrame,
+  viewport: ViewportState,
+  canvasWidth: number,
+  canvasHeight: number,
+  allFrames: CoordinateFrame[] = []
+) {
+  if (!frame.functions || frame.functions.length === 0) {
+    return
+  }
+
+  // Transform function for converting frame coordinates to screen coordinates
+  const transformToScreen = frame.parentFrameId
+    ? (point: Point2D): Point2D => nestedFrameToScreen(point, frame, allFrames, viewport, canvasWidth, canvasHeight)
+    : (point: Point2D): Point2D => frameToScreen(point, frame, viewport, canvasWidth, canvasHeight)
+
+  // Draw each function plot
+  frame.functions.forEach((func: FunctionPlot) => {
+    try {
+      ctx.strokeStyle = func.color
+      ctx.lineWidth = 2
+      ctx.globalAlpha = 0.9
+      ctx.beginPath()
+      
+      let firstPoint = true
+      
+      // If points are provided, use them directly (for callable functions evaluated in Python)
+      if (func.points && func.points.length > 0) {
+        for (let i = 0; i < func.points.length; i++) {
+          const [x, y] = func.points[i]
+          
+          // Skip invalid points (NaN, Infinity, etc.)
+          if (!isFinite(x) || !isFinite(y)) {
+            // If we have a valid previous point, end the current path segment
+            // This creates a visual break at discontinuities
+            if (!firstPoint) {
+              ctx.stroke()
+              ctx.beginPath()
+              firstPoint = true
+            }
+            continue
+          }
+          
+          const pointScreen = transformToScreen([x, y])
+          
+          // Check if this point is too far from the previous one (potential discontinuity)
+          // This helps detect jumps that might indicate a discontinuity
+          if (!firstPoint && i > 0) {
+            const prevPoint = func.points[i - 1]
+            const [prevX, prevY] = prevPoint
+            if (isFinite(prevX) && isFinite(prevY)) {
+              const prevScreen = transformToScreen([prevX, prevY])
+              const dx = Math.abs(pointScreen[0] - prevScreen[0])
+              const dy = Math.abs(pointScreen[1] - prevScreen[1])
+              // If the jump is very large (more than 100 pixels), break the path
+              // This handles cases where the function has a discontinuity
+              if (dx > 100 || dy > 100) {
+                ctx.stroke()
+                ctx.beginPath()
+                firstPoint = true
+              }
+            }
+          }
+          
+          if (firstPoint) {
+            ctx.moveTo(Math.round(pointScreen[0]) + 0.5, Math.round(pointScreen[1]) + 0.5)
+            firstPoint = false
+          } else {
+            ctx.lineTo(Math.round(pointScreen[0]) + 0.5, Math.round(pointScreen[1]) + 0.5)
+          }
+        }
+      } else if (func.expression) {
+        // Otherwise, evaluate the expression at multiple points
+        const numPoints = func.numPoints ?? 1000 // Number of points to sample (default: 1000)
+        const xMin = func.xMin
+        const xMax = func.xMax
+        const step = (xMax - xMin) / numPoints
+        
+        let prevX: number | null = null
+        let prevY: number | null = null
+        let prevScreen: Point2D | null = null
+        
+        for (let i = 0; i <= numPoints; i++) {
+          const x = xMin + i * step
+          
+          // Evaluate the function expression
+          let y: number
+          try {
+            y = evaluateExpression(func.expression, x)
+            // Skip invalid results (NaN, Infinity, -Infinity)
+            if (!isFinite(y)) {
+              // If we have a valid previous point, end the current path segment
+              // This creates a visual break at discontinuities
+              if (!firstPoint) {
+                ctx.stroke()
+                ctx.beginPath()
+                firstPoint = true
+              }
+              prevX = null
+              prevY = null
+              prevScreen = null
+              continue
+            }
+          } catch (e) {
+            // If evaluation fails (e.g., division by zero, sqrt of negative), skip this point
+            if (!firstPoint) {
+              ctx.stroke()
+              ctx.beginPath()
+              firstPoint = true
+            }
+            prevX = null
+            prevY = null
+            prevScreen = null
+            continue
+          }
+          
+          const pointScreen = transformToScreen([x, y])
+          
+          // Check if this point is too far from the previous one (potential discontinuity)
+          // This helps detect jumps that might indicate a discontinuity
+          if (!firstPoint && prevScreen !== null && prevX !== null && prevY !== null) {
+            const dx = Math.abs(pointScreen[0] - prevScreen[0])
+            const dy = Math.abs(pointScreen[1] - prevScreen[1])
+            // If the jump is very large (more than 100 pixels), break the path
+            // This handles cases where the function has a discontinuity
+            if (dx > 100 || dy > 100) {
+              ctx.stroke()
+              ctx.beginPath()
+              firstPoint = true
+            }
+          }
+          
+          if (firstPoint) {
+            ctx.moveTo(Math.round(pointScreen[0]) + 0.5, Math.round(pointScreen[1]) + 0.5)
+            firstPoint = false
+          } else {
+            ctx.lineTo(Math.round(pointScreen[0]) + 0.5, Math.round(pointScreen[1]) + 0.5)
+          }
+          
+          // Store previous point for discontinuity detection
+          prevX = x
+          prevY = y
+          prevScreen = pointScreen
+        }
+      }
+      
+      ctx.stroke()
+      ctx.globalAlpha = 1.0
+    } catch (error) {
+      // If drawing fails, skip this function
+      console.warn('[drawFrameFunctions] Failed to draw function:', func.expression || 'points', error)
+    }
+  })
+}
+
+/**
+ * Simple expression evaluator for basic math expressions
+ * Supports: x, numbers, +, -, *, /, **, parentheses, and common functions
+ * This is a simplified evaluator - for complex expressions, consider using a proper parser
+ */
+function evaluateExpression(expression: string, x: number): number {
+  // Replace 'x' with the actual value
+  let expr = expression.replace(/x/g, `(${x})`)
+  
+  // Handle common math functions
+  expr = expr.replace(/sin\(/g, 'Math.sin(')
+  expr = expr.replace(/cos\(/g, 'Math.cos(')
+  expr = expr.replace(/tan\(/g, 'Math.tan(')
+  expr = expr.replace(/exp\(/g, 'Math.exp(')
+  expr = expr.replace(/log\(/g, 'Math.log(')
+  expr = expr.replace(/sqrt\(/g, 'Math.sqrt(')
+  expr = expr.replace(/abs\(/g, 'Math.abs(')
+  expr = expr.replace(/\*\*/g, '**') // Python's ** is same as JS
+  
+  // Evaluate using Function constructor (safe for our use case)
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = new Function('return ' + expr)()
+    if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
+      return result
+    }
+    throw new Error('Invalid result')
+  } catch (e) {
+    throw new Error(`Failed to evaluate expression: ${expression}`)
+  }
 }
 

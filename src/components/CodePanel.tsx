@@ -4,12 +4,16 @@ import { highlight, languages } from 'prismjs'
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
 import { usePyScript } from '../hooks/usePyScript'
-import type { CoordinateFrame } from '../types'
+import type { CoordinateFrame, Vector, FunctionPlot } from '../types'
 
 interface CodePanelProps {
   selectedFrame: CoordinateFrame | null
   onCodeChange: (frameId: string, code: string) => void
   onCodeRun?: (frameId: string, code: string) => void
+  onVectorsUpdate?: (frameId: string, vectors: Vector[]) => void
+  onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[]) => void
+  onVectorsClear?: (frameId: string) => void
+  onFunctionsClear?: (frameId: string) => void
 }
 
 const DEFAULT_CODE = `# Python code for this frame
@@ -28,6 +32,10 @@ export default function CodePanel({
   selectedFrame,
   onCodeChange,
   onCodeRun,
+  onVectorsUpdate,
+  onFunctionsUpdate,
+  onVectorsClear,
+  onFunctionsClear,
 }: CodePanelProps) {
   const [localCode, setLocalCode] = useState<string>('')
   const [isRunning, setIsRunning] = useState(false)
@@ -149,11 +157,52 @@ export default function CodePanel({
     setIsRunning(true)
     setExecutionResult(null)
 
+    // Clear existing vectors and functions before running new code
+    if (onVectorsClear) {
+      onVectorsClear(selectedFrame.id)
+    }
+    if (onFunctionsClear) {
+      onFunctionsClear(selectedFrame.id)
+    }
+
+    // Collect vectors and functions created during execution
+    const newVectors: Vector[] = []
+    const newFunctions: FunctionPlot[] = []
+
+    // Generate unique IDs for vectors and functions
+    const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
     try {
-      const result = await executeCode(localCode)
+      const result = await executeCode(
+        localCode,
+        selectedFrame.id,
+        // onVectorCreated callback
+        (vector) => {
+          newVectors.push({
+            ...vector,
+            id: generateId('vec'),
+          })
+        },
+        // onFunctionCreated callback
+        (func) => {
+          newFunctions.push({
+            ...func,
+            id: generateId('func'),
+          })
+        }
+      )
       
       if (result.success) {
         setExecutionResult({ success: true })
+        
+        // Update frame with new vectors and functions
+        if (onVectorsUpdate && newVectors.length > 0) {
+          onVectorsUpdate(selectedFrame.id, newVectors)
+        }
+        if (onFunctionsUpdate && newFunctions.length > 0) {
+          onFunctionsUpdate(selectedFrame.id, newFunctions)
+        }
+        
         if (onCodeRun) {
           onCodeRun(selectedFrame.id, localCode)
         }

@@ -34,7 +34,7 @@ describe('CodePanel', () => {
     // Mock usePyScript to return ready state by default
     vi.spyOn(usePyScriptModule, 'usePyScript').mockReturnValue({
       isReady: true,
-      executeCode: vi.fn().mockResolvedValue({ success: true, result: undefined }),
+      executeCode: vi.fn().mockResolvedValue({ success: true, result: undefined, functionCalls: [] }),
       isExecuting: false,
     })
   })
@@ -152,7 +152,11 @@ describe('CodePanel', () => {
   })
 
   it('executes code when Run button is clicked', async () => {
-    const mockExecuteCode = vi.fn().mockResolvedValue({ success: true, result: undefined })
+    const mockExecuteCode = vi.fn().mockResolvedValue({ 
+      success: true, 
+      result: undefined,
+      functionCalls: []
+    })
     vi.spyOn(usePyScriptModule, 'usePyScript').mockReturnValue({
       isReady: true,
       executeCode: mockExecuteCode,
@@ -171,7 +175,12 @@ describe('CodePanel', () => {
     fireEvent.click(runButton)
 
     await waitFor(() => {
-      expect(mockExecuteCode).toHaveBeenCalledWith('print("Hello")')
+      expect(mockExecuteCode).toHaveBeenCalled()
+      const call = mockExecuteCode.mock.calls[0]
+      expect(call[0]).toBe('print("Hello")')
+      expect(call[1]).toBe('test-frame-1')
+      expect(typeof call[2]).toBe('function') // onVectorCreated
+      expect(typeof call[3]).toBe('function') // onFunctionCreated
     })
 
     await waitFor(() => {
@@ -185,6 +194,7 @@ describe('CodePanel', () => {
     const mockExecuteCode = vi.fn().mockResolvedValue({
       success: false,
       error: { message: 'Syntax error', type: 'SyntaxError' },
+      functionCalls: [],
     })
     vi.spyOn(usePyScriptModule, 'usePyScript').mockReturnValue({
       isReady: true,
@@ -214,7 +224,7 @@ describe('CodePanel', () => {
   it('disables Run button while executing', () => {
     vi.spyOn(usePyScriptModule, 'usePyScript').mockReturnValue({
       isReady: true,
-      executeCode: vi.fn(),
+      executeCode: vi.fn().mockResolvedValue({ success: true, result: undefined, functionCalls: [] }),
       isExecuting: true,
     })
 

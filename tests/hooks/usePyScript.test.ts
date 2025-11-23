@@ -6,6 +6,10 @@ import { usePyScript, resetPyodideState } from '../../src/hooks/usePyScript'
 const mockPyodide = {
   loadPackage: vi.fn().mockResolvedValue(undefined),
   runPythonAsync: vi.fn().mockResolvedValue(undefined),
+  runPython: vi.fn(),
+  globals: {
+    set: vi.fn(),
+  },
   loadedPackages: {},
 }
 
@@ -70,6 +74,8 @@ describe('usePyScript', () => {
     const testCode = 'import numpy as np\nresult = np.array([1, 2, 3])'
     const expectedResult = [1, 2, 3]
     mockPyodide.runPythonAsync.mockResolvedValue(expectedResult)
+    const mockOnVectorCreated = vi.fn()
+    const mockOnFunctionCreated = vi.fn()
 
     const { result } = renderHook(() => usePyScript())
 
@@ -80,17 +86,25 @@ describe('usePyScript', () => {
       { timeout: 3000 }
     )
 
-    const executionResult = await result.current.executeCode(testCode)
+    const executionResult = await result.current.executeCode(
+      testCode,
+      'test-frame-1',
+      mockOnVectorCreated,
+      mockOnFunctionCreated
+    )
 
     expect(executionResult.success).toBe(true)
     expect(mockPyodide.loadPackage).toHaveBeenCalledWith(['numpy', 'scipy'])
     expect(mockPyodide.runPythonAsync).toHaveBeenCalledWith(testCode)
+    expect(executionResult.functionCalls).toBeDefined()
   })
 
   it('should handle execution errors', async () => {
     const testCode = 'invalid python code'
     const error = new Error('SyntaxError: invalid syntax')
     mockPyodide.runPythonAsync.mockRejectedValue(error)
+    const mockOnVectorCreated = vi.fn()
+    const mockOnFunctionCreated = vi.fn()
 
     const { result } = renderHook(() => usePyScript())
 
@@ -101,24 +115,38 @@ describe('usePyScript', () => {
       { timeout: 3000 }
     )
 
-    const executionResult = await result.current.executeCode(testCode)
+    const executionResult = await result.current.executeCode(
+      testCode,
+      'test-frame-1',
+      mockOnVectorCreated,
+      mockOnFunctionCreated
+    )
 
     expect(executionResult.success).toBe(false)
     expect(executionResult.error).toBeDefined()
     expect(executionResult.error?.message).toBe('SyntaxError: invalid syntax')
+    expect(executionResult.functionCalls).toBeDefined()
   })
 
   it('should return error when PyScript is not ready', async () => {
     const { result } = renderHook(() => usePyScript())
+    const mockOnVectorCreated = vi.fn()
+    const mockOnFunctionCreated = vi.fn()
 
     // PyScript is not ready
     expect(result.current.isReady).toBe(false)
 
-    const executionResult = await result.current.executeCode('print("test")')
+    const executionResult = await result.current.executeCode(
+      'print("test")',
+      'test-frame-1',
+      mockOnVectorCreated,
+      mockOnFunctionCreated
+    )
 
     expect(executionResult.success).toBe(false)
     expect(executionResult.error?.message).toBe('PyScript is not ready yet')
     expect(executionResult.error?.type).toBe('NotReadyError')
+    expect(executionResult.functionCalls).toEqual([])
   })
 
   it('should set isExecuting flag during execution', async () => {
@@ -127,6 +155,8 @@ describe('usePyScript', () => {
       resolveExecution = resolve
     })
     mockPyodide.runPythonAsync.mockReturnValue(executionPromise)
+    const mockOnVectorCreated = vi.fn()
+    const mockOnFunctionCreated = vi.fn()
 
     const { result } = renderHook(() => usePyScript())
 
@@ -137,7 +167,12 @@ describe('usePyScript', () => {
       { timeout: 3000 }
     )
 
-    const executePromise = result.current.executeCode('print("test")')
+    const executePromise = result.current.executeCode(
+      'print("test")',
+      'test-frame-1',
+      mockOnVectorCreated,
+      mockOnFunctionCreated
+    )
 
     // Wait for state update - isExecuting should become true
     await waitFor(
