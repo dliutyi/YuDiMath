@@ -428,16 +428,19 @@ export default function Canvas({
       let snappedPoint: Point2D
       
       if (parentFrame) {
-        // For nested frames, convert screen to parent frame coordinates
-        // First convert screen to parent world (accounting for parent frame's viewport)
-        // Then convert to raw frame coordinates
-        const parentWorldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
-        console.error('[Canvas] MOUSE DOWN - screen:', [screenX, screenY], 'parent world:', parentWorldPoint)
+        // For nested frames, use screenToFrame which accounts for parent frame's viewport
+        // screenToFrame returns frame coordinates WITH viewport applied
+        // We need to extract raw coordinates by undoing the viewport
+        const framePointWithViewport = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
         
-        // Convert parent world coordinates to parent frame coordinates (raw, no viewport)
-        // This gives us the "raw" frame coordinates, not accounting for parent's viewport pan/zoom
-        const rawFramePoint = parentToFrame(parentWorldPoint, parentFrame)
-        console.error('[Canvas] MOUSE DOWN - raw frame point:', rawFramePoint, 'parent origin:', parentFrame.origin)
+        // Extract raw frame coordinates: screenToFrame returns u = frameU + viewport.x
+        // where frameU = scaledU / zoom, so we need to undo the viewport pan
+        // Actually, screenToFrame already undoes zoom, so we just need to undo pan
+        const rawFramePoint: Point2D = [
+          framePointWithViewport[0] - parentFrame.viewport.x,
+          framePointWithViewport[1] - parentFrame.viewport.y
+        ]
+        console.error('[Canvas] MOUSE DOWN - screen:', [screenX, screenY], 'frame with viewport:', framePointWithViewport, 'raw frame:', rawFramePoint)
         
         // In frame coordinates, grid step is always 1.0
         let snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
@@ -575,12 +578,14 @@ export default function Canvas({
       let snappedPoint: Point2D
       
       if (drawingRect.parentFrame) {
-        // Convert screen to parent world coordinates first (using main viewport)
-        const parentWorldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+        // For nested frames, use screenToFrame which accounts for parent frame's viewport
+        const framePointWithViewport = screenToFrame([screenX, screenY], drawingRect.parentFrame, viewport, canvasWidth, canvasHeight)
         
-        // Convert parent world coordinates to parent frame coordinates (without viewport)
-        // This gives us the "raw" frame coordinates, not accounting for parent's viewport pan/zoom
-        const rawFramePoint = parentToFrame(parentWorldPoint, drawingRect.parentFrame)
+        // Extract raw frame coordinates by undoing viewport pan
+        const rawFramePoint: Point2D = [
+          framePointWithViewport[0] - drawingRect.parentFrame.viewport.x,
+          framePointWithViewport[1] - drawingRect.parentFrame.viewport.y
+        ]
         
         // In frame coordinates, grid step is always 1.0
         let snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
