@@ -142,12 +142,23 @@ export function useCanvasDrawing({
 
     if (parentFrame) {
       // Convert screen to frame coordinates (accounts for frame viewport)
-      const rawFramePoint = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
+      const framePointWithViewport = screenToFrame([screenX, screenY], parentFrame, viewport, canvasWidth, canvasHeight)
+      // Undo viewport to get raw frame coordinates
+      const rawFramePoint: Point2D = [
+        framePointWithViewport[0] + parentFrame.viewport.x,
+        framePointWithViewport[1] + parentFrame.viewport.y
+      ]
+      // Apply inverse zoom to get raw coordinates
+      const rawFramePointScaled: Point2D = [
+        rawFramePoint[0] / parentFrame.viewport.zoom,
+        rawFramePoint[1] / parentFrame.viewport.zoom
+      ]
       // Snap to grid in frame coordinates (integer intervals)
-      const snappedRawFramePoint = snapPointToGrid(rawFramePoint, 1.0)
-      // Convert back to parent world coordinates (accounting for frame viewport)
-      // Use frameToParent which accounts for viewport, not frameCoordsToParentWorld
-      snappedPoint = frameToParent(snappedRawFramePoint, parentFrame)
+      const snappedRawFramePoint = snapPointToGrid(rawFramePointScaled, 1.0)
+      // Convert back to parent world coordinates WITHOUT viewport
+      // Bounds should represent the rectangle in parent frame coordinates, not accounting for viewport
+      // Use frameCoordsToParentWorld which does NOT apply viewport
+      snappedPoint = frameCoordsToParentWorld(snappedRawFramePoint, parentFrame)
     } else {
       const worldPoint = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
       snappedPoint = snapPointToGrid(worldPoint, viewport.gridStep)
