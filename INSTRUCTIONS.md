@@ -515,7 +515,7 @@ For each step:
 
 ## Phase 4: Python Code Integration
 
-### [ ] Step 4.1: Set Up PyScript Integration
+### [x] Step 4.1: Set Up PyScript Integration
 **Task**: Configure PyScript in the HTML and set up Python execution environment.
 
 **Implementation**:
@@ -536,7 +536,29 @@ For each step:
 
 ---
 
-### [ ] Step 4.2: Create Predefined Functions System
+### [x] Step 4.2: Create Code Panel Component
+**Task**: Build the right-side code panel with editor and run button.
+
+**Implementation**:
+- Create `src/components/CodePanel.tsx`
+- Display Python code for selected frame
+- Make code editable (use textarea or code editor)
+- Add "Run" button
+- Show code for selected frame only
+- Add syntax highlighting (optional: use simple highlighting)
+
+**Tests**:
+- Test code panel displays selected frame code
+- Test code panel updates on frame selection
+- Test code editing updates state
+- Test run button is present and functional
+- Test code panel shows default code when no frame selected
+
+**Commit**: `feat: create code panel component with editor and run button`
+
+---
+
+### [ ] Step 4.3: Create Predefined Functions System
 **Task**: Implement extensible system for predefined Python functions (draw, plot).
 
 **Implementation**:
@@ -573,7 +595,7 @@ For each step:
 
 ---
 
-### [ ] Step 4.3: Implement Python Code Generator
+### [ ] Step 4.4: Implement Python Code Generator
 **Task**: Generate Python code from frame state with default template.
 
 **Implementation**:
@@ -610,28 +632,6 @@ For each step:
 - Test code format is correct
 
 **Commit**: `feat: implement Python code generator with default template`
-
----
-
-### [ ] Step 4.4: Create Code Panel Component
-**Task**: Build the right-side code panel with editor and run button.
-
-**Implementation**:
-- Create `src/components/CodePanel.tsx`
-- Display Python code for selected frame
-- Make code editable (use textarea or code editor)
-- Add "Run" button
-- Show code for selected frame only
-- Add syntax highlighting (optional: use simple highlighting)
-
-**Tests**:
-- Test code panel displays selected frame code
-- Test code panel updates on frame selection
-- Test code editing updates state
-- Test run button is present and functional
-- Test code panel shows default code when no frame selected
-
-**Commit**: `feat: create code panel component with editor and run button`
 
 ---
 

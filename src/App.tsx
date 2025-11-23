@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Canvas from './components/Canvas'
 import GridStepSelector from './components/GridStepSelector'
 import PropertiesPanel from './components/PropertiesPanel'
+import CodePanel from './components/CodePanel'
 import type { ViewportState, CoordinateFrame } from './types'
 
 function App() {
@@ -74,6 +75,16 @@ function App() {
         return frame
       })
     })
+  }
+
+  const handleCodeChange = (frameId: string, code: string) => {
+    handleFrameUpdate(frameId, { code })
+  }
+
+  const handleCodeRun = (frameId: string, _code: string) => {
+    // Code execution is handled by CodePanel, this is just a callback
+    // Future: Could add logging or other side effects here
+    console.log('[App] Code executed for frame:', frameId)
   }
 
   const selectedFrame = frames.find(f => f.id === selectedFrameId) || null
@@ -173,11 +184,16 @@ function App() {
           </button>
         </div>
       </div>
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 right-4 z-10 flex flex-col gap-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
         <PropertiesPanel
           selectedFrame={selectedFrame}
           onFrameUpdate={handleFrameUpdate}
           onFrameViewportChange={handleFrameViewportChange}
+        />
+        <CodePanel
+          selectedFrame={selectedFrame}
+          onCodeChange={handleCodeChange}
+          onCodeRun={handleCodeRun}
         />
       </div>
     </div>
