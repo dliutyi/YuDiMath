@@ -262,7 +262,7 @@ function nestedFrameToScreen(
  * Inverse of frameToParent (without viewport pan/zoom)
  * This is used for converting world coordinates to frame coordinates for rendering
  */
-export export function parentToFrame(point: Point2D, frame: CoordinateFrame): Point2D {
+export function parentToFrame(point: Point2D, frame: CoordinateFrame): Point2D {
   const [px, py] = point
   const [originX, originY] = frame.origin
   const [iX, iY] = frame.baseI
