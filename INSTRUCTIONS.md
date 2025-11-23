@@ -47,15 +47,22 @@ For each step:
 1. ✅ **Implement** the feature/functionality completely
 2. ✅ **Write unit tests** - All tests must be in the `tests/` folder (dedicated folder next to `src/`). All tests must pass before proceeding
 3. ✅ **Run tests** - Execute `npm test -- --run` and ensure 100% pass rate
-4. ✅ **Create git commit** - Use descriptive commit message following conventional commits
-5. ✅ **Restart Docker** - Restart the Docker container and verify it works:
+4. ✅ **Restart Docker** - Restart the Docker container and verify it works:
    - Build/restart: `docker-compose -f docker/docker-compose.yml build` and `docker-compose -f docker/docker-compose.yml up -d`
    - Verify with curl: `curl http://localhost:3000` should return HTML without errors
    - Check logs: `docker-compose -f docker/docker-compose.yml logs` should show no errors
-6. ✅ **Verify in browser** - Manually test the feature in the browser at http://localhost:3000
+5. ✅ **Verify in browser** - Manually test the feature in the browser at http://localhost:3000
+6. ✅ **Create git commit** - **ONLY after the step is fully complete and verified**. Use descriptive commit message following conventional commits
 7. ✅ **Mark step complete** - Check off the step in this checklist before proceeding
 
 **Do not proceed to the next step until the current step is fully complete and verified.**
+
+**IMPORTANT - Commit Timing Rules:**
+- ✅ **Commit ONLY when a step is fully completed** (all tests pass, feature works, verified in browser)
+- ✅ **Commit ONLY when a bug is fixed AND the developer explicitly confirms** "the bug is fixed and it is time to create a commit"
+- ❌ **DO NOT commit during debugging** - wait until the issue is resolved and confirmed
+- ❌ **DO NOT commit intermediate changes** - only commit when work is complete and verified
+- ❌ **DO NOT commit automatically** - always wait for explicit confirmation from the developer
 
 ---
 

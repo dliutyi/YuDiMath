@@ -140,6 +140,28 @@ project-root/
 ```
 
 ## Git Workflow
+
+### Commit Timing Rules
+**CRITICAL**: Commits should ONLY be made in the following situations:
+
+1. **When a step is fully completed**:
+   - All implementation is done
+   - All tests pass
+   - Feature is verified in browser
+   - Step is ready to be marked complete
+
+2. **When a bug is fixed AND developer explicitly confirms**:
+   - Bug is fully resolved
+   - Developer explicitly states: "the bug is fixed and it is time to create a commit"
+   - Do NOT commit during debugging or intermediate fixes
+
+**DO NOT commit:**
+- During active debugging or troubleshooting
+- For intermediate changes that are not yet complete
+- Automatically without explicit developer confirmation
+- When tests are failing or features are incomplete
+
+### Commit Message Guidelines
 - Use meaningful commit messages following conventional commits
 - Create feature branches for new features
 - Keep commits atomic and focused
