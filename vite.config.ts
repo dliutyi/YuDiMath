@@ -4,7 +4,9 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: '/YuDiMath/',
+  // Use base path for GitHub Pages, but not for local development
+  // Check for GITHUB_PAGES env var (set in GitHub Actions) or use empty for local
+  base: process.env.GITHUB_PAGES === 'true' ? '/YuDiMath/' : '/',
   plugins: [react()],
   resolve: {
     alias: {

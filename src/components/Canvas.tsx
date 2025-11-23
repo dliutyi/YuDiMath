@@ -9,6 +9,8 @@ import { useCanvasDrawing } from '../hooks/useCanvasDrawing'
 
 const MIN_ZOOM = 5.0
 const MAX_ZOOM = 500.0
+const FRAME_MIN_ZOOM = 0.1
+const FRAME_MAX_ZOOM = 10.0
 
 interface CanvasProps {
   viewport: ViewportState
@@ -499,14 +501,110 @@ export default function Canvas({
   const touchStartRef = useRef<{ x: number; y: number; distance: number } | null>(null)
 
   const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (e.touches.length === 1) {
-      // Single touch - start panning
+    if (isDrawing && e.touches.length === 1) {
+      // Drawing mode - single touch starts drawing
       const touch = e.touches[0]
       const rect = e.currentTarget.getBoundingClientRect()
+      const canvasWidth = width || rect.width || 800
+      const canvasHeight = height || rect.height || 600
+      const screenX = touch.clientX - rect.left
+      const screenY = touch.clientY - rect.top
+      handleDrawingMouseDown(screenX, screenY, canvasWidth, canvasHeight)
+      e.preventDefault()
+      return
+    }
+    
+    if (e.touches.length === 1) {
+      // Single touch - check if touching inside a frame for frame panning
+      const touch = e.touches[0]
+      const rect = e.currentTarget.getBoundingClientRect()
+      const canvasWidth = width || rect.width || 800
+      const canvasHeight = height || rect.height || 600
+      const screenX = touch.clientX - rect.left
+      const screenY = touch.clientY - rect.top
+
+      // Check if touching on a frame (same logic as mouse handler)
+      let clickedFrame: CoordinateFrame | null = null
+      let smallestArea = Infinity
+      
+      for (const frame of frames) {
+        let cornersScreen: Point2D[]
+        
+        if (frame.parentFrameId) {
+          const parentFrameForCheck = frames.find(f => f.id === frame.parentFrameId)
+          if (!parentFrameForCheck) {
+            continue
+          }
+          
+          const bounds = frame.bounds
+          
+          if (bounds.frameCoords) {
+            const { minU, maxU, minV, maxV } = bounds.frameCoords
+            cornersScreen = [
+              frameToScreen([minU, maxV], parentFrameForCheck, viewport, canvasWidth, canvasHeight),
+              frameToScreen([maxU, maxV], parentFrameForCheck, viewport, canvasWidth, canvasHeight),
+              frameToScreen([maxU, minV], parentFrameForCheck, viewport, canvasWidth, canvasHeight),
+              frameToScreen([minU, minV], parentFrameForCheck, viewport, canvasWidth, canvasHeight),
+            ]
+          } else {
+            const topLeftWorld: Point2D = [bounds.x, bounds.y + bounds.height]
+            const topRightWorld: Point2D = [bounds.x + bounds.width, bounds.y + bounds.height]
+            const bottomRightWorld: Point2D = [bounds.x + bounds.width, bounds.y]
+            const bottomLeftWorld: Point2D = [bounds.x, bounds.y]
+            
+            const topLeftFrame = parentToFrame(topLeftWorld, parentFrameForCheck)
+            const topRightFrame = parentToFrame(topRightWorld, parentFrameForCheck)
+            const bottomRightFrame = parentToFrame(bottomRightWorld, parentFrameForCheck)
+            const bottomLeftFrame = parentToFrame(bottomLeftWorld, parentFrameForCheck)
+            
+            cornersScreen = [
+              nestedFrameToScreen(topLeftFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight),
+              nestedFrameToScreen(topRightFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight),
+              nestedFrameToScreen(bottomRightFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight),
+              nestedFrameToScreen(bottomLeftFrame, parentFrameForCheck, frames, viewport, canvasWidth, canvasHeight),
+            ]
+          }
+        } else {
+          const topLeft = worldToScreen(frame.bounds.x, frame.bounds.y + frame.bounds.height, viewport, canvasWidth, canvasHeight)
+          const topRight = worldToScreen(frame.bounds.x + frame.bounds.width, frame.bounds.y + frame.bounds.height, viewport, canvasWidth, canvasHeight)
+          const bottomRight = worldToScreen(frame.bounds.x + frame.bounds.width, frame.bounds.y, viewport, canvasWidth, canvasHeight)
+          const bottomLeft = worldToScreen(frame.bounds.x, frame.bounds.y, viewport, canvasWidth, canvasHeight)
+          cornersScreen = [topLeft, topRight, bottomRight, bottomLeft]
+        }
+        
+        const screenPoint: Point2D = [screenX, screenY]
+        if (isPointInPolygon(screenPoint, cornersScreen)) {
+          const minX = Math.min(...cornersScreen.map(c => c[0]))
+          const maxX = Math.max(...cornersScreen.map(c => c[0]))
+          const minY = Math.min(...cornersScreen.map(c => c[1]))
+          const maxY = Math.max(...cornersScreen.map(c => c[1]))
+          const frameArea = (maxX - minX) * (maxY - minY)
+          
+          if (frameArea < smallestArea) {
+            smallestArea = frameArea
+            clickedFrame = frame
+          }
+        }
+      }
+      
+      // Handle frame selection
+      if (clickedFrame && onFrameSelected) {
+        onFrameSelected(clickedFrame.id)
+      } else if (onFrameSelected) {
+        onFrameSelected(null)
+      }
+      
+      // Start panning - check if inside a frame for frame-level panning
+      if (clickedFrame && onFrameViewportChange) {
+        panningFrameRef.current = clickedFrame.id
+      } else {
+        panningFrameRef.current = null
+      }
+      
       isPanningRef.current = true
       lastPanPointRef.current = {
-        x: touch.clientX - rect.left,
-        y: touch.clientY - rect.top,
+        x: screenX,
+        y: screenY,
       }
     } else if (e.touches.length === 2) {
       // Two touches - prepare for pinch zoom
@@ -523,11 +621,9 @@ export default function Canvas({
       isPanningRef.current = false
     }
     e.preventDefault()
-  }, [])
+  }, [isDrawing, width, height, handleDrawingMouseDown, frames, viewport, onFrameSelected, onFrameViewportChange])
 
   const handleTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (!onViewportChange) return
-
     const canvas = canvasRef.current
     const container = containerRef.current
     if (!canvas || !container) return
@@ -536,41 +632,107 @@ export default function Canvas({
     const canvasWidth = width || rect.width || 800
     const canvasHeight = height || rect.height || 600
 
+    if (isDrawing && e.touches.length === 1) {
+      // Drawing mode - single touch continues drawing
+      const touch = e.touches[0]
+      const screenX = touch.clientX - rect.left
+      const screenY = touch.clientY - rect.top
+      handleDrawingMouseMove(screenX, screenY, canvasWidth, canvasHeight)
+      e.preventDefault()
+      return
+    }
+
+    if (!onViewportChange) return
+
     if (e.touches.length === 1 && isPanningRef.current && lastPanPointRef.current) {
-      // Single touch - panning
+      // Single touch - panning (check if frame panning or background panning)
       const touch = e.touches[0]
       const currentPoint = {
         x: touch.clientX - rect.left,
         y: touch.clientY - rect.top,
       }
 
-      const lastWorld = screenToWorld(
-        lastPanPointRef.current.x,
-        lastPanPointRef.current.y,
-        viewport,
-        canvasWidth,
-        canvasHeight
-      )
-      const currentWorld = screenToWorld(
-        currentPoint.x,
-        currentPoint.y,
-        viewport,
-        canvasWidth,
-        canvasHeight
-      )
+      if (panningFrameRef.current && onFrameViewportChange) {
+        // Panning inside a frame - update frame viewport
+        const frame = frames.find(f => f.id === panningFrameRef.current)
+        if (frame) {
+          // Convert screen points to frame coordinates
+          const lastWorld = screenToWorld(
+            lastPanPointRef.current.x,
+            lastPanPointRef.current.y,
+            viewport,
+            canvasWidth,
+            canvasHeight
+          )
+          const currentWorld = screenToWorld(
+            currentPoint.x,
+            currentPoint.y,
+            viewport,
+            canvasWidth,
+            canvasHeight
+          )
+          
+          // Inverse transform: parent to frame coordinates
+          const parentToFrameTransform = (point: Point2D, frame: CoordinateFrame): Point2D => {
+            const [px, py] = point
+            const [originX, originY] = frame.origin
+            const dx = px - originX
+            const dy = py - originY
+            const [iX, iY] = frame.baseI
+            const [jX, jY] = frame.baseJ
+            const det = iX * jY - iY * jX
+            if (Math.abs(det) < 1e-10) return [0, 0]
+            const invDet = 1.0 / det
+            const u = (jY * dx - jX * dy) * invDet
+            const v = (-iY * dx + iX * dy) * invDet
+            return [u, v]
+          }
+          
+          const lastFrame = parentToFrameTransform(lastWorld, frame)
+          const currentFrame = parentToFrameTransform(currentWorld, frame)
+          
+          // Calculate pan delta in frame coordinates
+          const frameZoom = frame.viewport.zoom
+          const deltaX = (lastFrame[0] - currentFrame[0]) / frameZoom
+          const deltaY = (lastFrame[1] - currentFrame[1]) / frameZoom
+          
+          // Update frame viewport
+          onFrameViewportChange(frame.id, {
+            ...frame.viewport,
+            x: frame.viewport.x + deltaX,
+            y: frame.viewport.y + deltaY,
+          })
+        }
+      } else if (onViewportChange) {
+        // Panning background
+        const lastWorld = screenToWorld(
+          lastPanPointRef.current.x,
+          lastPanPointRef.current.y,
+          viewport,
+          canvasWidth,
+          canvasHeight
+        )
+        const currentWorld = screenToWorld(
+          currentPoint.x,
+          currentPoint.y,
+          viewport,
+          canvasWidth,
+          canvasHeight
+        )
 
-      const deltaX = lastWorld[0] - currentWorld[0]
-      const deltaY = lastWorld[1] - currentWorld[1]
+        const deltaX = lastWorld[0] - currentWorld[0]
+        const deltaY = lastWorld[1] - currentWorld[1]
 
-      onViewportChange({
-        ...viewport,
-        x: viewport.x + deltaX,
-        y: viewport.y + deltaY,
-      })
+        onViewportChange({
+          ...viewport,
+          x: viewport.x + deltaX,
+          y: viewport.y + deltaY,
+        })
+      }
 
       lastPanPointRef.current = currentPoint
     } else if (e.touches.length === 2 && touchStartRef.current) {
-      // Two touches - pinch zoom
+      // Two touches - pinch zoom (check if zooming inside a frame)
       const touch1 = e.touches[0]
       const touch2 = e.touches[1]
       const distance = Math.hypot(
@@ -582,38 +744,91 @@ export default function Canvas({
       const centerX = ((touch1.clientX + touch2.clientX) / 2) - rect.left
       const centerY = ((touch1.clientY + touch2.clientY) / 2) - rect.top
 
-      // Get world coordinates before zoom
-      const worldBefore = screenToWorld(centerX, centerY, viewport, canvasWidth, canvasHeight)
+      // Check if zooming inside a frame (use selected frame if available, otherwise check touch point)
+      const zoomingFrame = selectedFrameId 
+        ? frames.find(f => f.id === selectedFrameId) || null
+        : null
 
-      // Calculate new zoom
-      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom * scale))
-
-      if (newZoom !== viewport.zoom) {
-        const newViewport: ViewportState = {
-          ...viewport,
-          zoom: newZoom,
+      if (zoomingFrame && onFrameViewportChange) {
+        // Zooming the selected frame
+        const worldPoint = screenToWorld(centerX, centerY, viewport, canvasWidth, canvasHeight)
+        const framePoint = parentToFrame(worldPoint, zoomingFrame)
+        
+        const zoomFactor = scale
+        const newZoom = Math.max(FRAME_MIN_ZOOM, Math.min(FRAME_MAX_ZOOM, zoomingFrame.viewport.zoom * zoomFactor))
+        
+        if (Math.abs(newZoom - zoomingFrame.viewport.zoom) < 0.001) {
+          touchStartRef.current.distance = distance
+          e.preventDefault()
+          return
         }
-
-        const worldAfter = screenToWorld(centerX, centerY, newViewport, canvasWidth, canvasHeight)
-
-        onViewportChange({
-          ...newViewport,
-          x: viewport.x + (worldBefore[0] - worldAfter[0]),
-          y: viewport.y + (worldBefore[1] - worldAfter[1]),
+        
+        const oldZoom = zoomingFrame.viewport.zoom
+        const oldPanX = zoomingFrame.viewport.x
+        const oldPanY = zoomingFrame.viewport.y
+        
+        const newPanX = framePoint[0] - (framePoint[0] - oldPanX) * (oldZoom / newZoom)
+        const newPanY = framePoint[1] - (framePoint[1] - oldPanY) * (oldZoom / newZoom)
+        
+        onFrameViewportChange(zoomingFrame.id, {
+          ...zoomingFrame.viewport,
+          zoom: newZoom,
+          x: newPanX,
+          y: newPanY,
         })
+      } else if (onViewportChange) {
+        // Zooming background
+        const worldBefore = screenToWorld(centerX, centerY, viewport, canvasWidth, canvasHeight)
+
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom * scale))
+
+        if (newZoom !== viewport.zoom) {
+          const newViewport: ViewportState = {
+            ...viewport,
+            zoom: newZoom,
+          }
+
+          const worldAfter = screenToWorld(centerX, centerY, newViewport, canvasWidth, canvasHeight)
+
+          onViewportChange({
+            ...newViewport,
+            x: viewport.x + (worldBefore[0] - worldAfter[0]),
+            y: viewport.y + (worldBefore[1] - worldAfter[1]),
+          })
+        }
       }
 
       touchStartRef.current.distance = distance
     }
 
     e.preventDefault()
-  }, [viewport, onViewportChange, width, height, MIN_ZOOM, MAX_ZOOM])
+  }, [isDrawing, viewport, onViewportChange, onFrameViewportChange, frames, selectedFrameId, width, height, MIN_ZOOM, MAX_ZOOM, FRAME_MIN_ZOOM, FRAME_MAX_ZOOM, handleDrawingMouseMove])
 
-  const handleTouchEnd = useCallback(() => {
+  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    const container = containerRef.current
+    
+    if (isDrawing && e.touches.length === 0 && container) {
+      // Drawing mode - touch ended, finish drawing
+      const rect = container.getBoundingClientRect()
+      const canvasWidth = width || rect.width || 800
+      const canvasHeight = height || rect.height || 600
+      
+      // Use the last touch point from changedTouches (the touch that just ended)
+      if (e.changedTouches.length > 0) {
+        const touch = e.changedTouches[0]
+        const screenX = touch.clientX - rect.left
+        const screenY = touch.clientY - rect.top
+        handleDrawingMouseUp(screenX, screenY, canvasWidth, canvasHeight)
+        if (onDrawingModeChange) {
+          onDrawingModeChange(false)
+        }
+      }
+    }
+    
     isPanningRef.current = false
     lastPanPointRef.current = null
     touchStartRef.current = null
-  }, [])
+  }, [isDrawing, width, height, handleDrawingMouseUp, onDrawingModeChange])
 
   return (
     <div

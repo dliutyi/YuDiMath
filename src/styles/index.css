@@ -3,8 +3,17 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    height: 100%;
+    height: 100dvh; /* Dynamic viewport height for mobile */
+    overflow: hidden;
+  }
+
   body {
     margin: 0;
+    height: 100%;
+    height: 100dvh; /* Dynamic viewport height for mobile */
+    overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
       'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
       sans-serif;
@@ -12,6 +21,12 @@
     -moz-osx-font-smoothing: grayscale;
     background-color: #0f172a; /* bg-primary */
     color: #f1f5f9; /* text-primary */
+  }
+
+  #root {
+    height: 100%;
+    height: 100dvh; /* Dynamic viewport height for mobile */
+    overflow: hidden;
   }
 
   /* Dark theme base styles */
@@ -43,6 +58,51 @@
   .input {
     @apply bg-panel-bg border border-border text-text-primary rounded-lg px-3 py-2 
            focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+  }
+
+  /* Fix for touch devices - prevent active state from persisting */
+  button,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent !important;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Allow normal active state for visual feedback during interaction */
+  button:active {
+    opacity: 0.9;
+  }
+
+  /* Custom active state for touch - only when explicitly added */
+  button.active-touch,
+  [role="button"].active-touch {
+    opacity: 0.8 !important;
+  }
+
+  /* Remove focus outline on touch devices but allow active state */
+  @media (hover: none) and (pointer: coarse) {
+    button,
+    [role="button"],
+    button:focus,
+    [role="button"]:focus,
+    button:focus-visible,
+    [role="button"]:focus-visible {
+      outline: none !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
+    
+    /* Allow active state but prevent it from persisting */
+    button:active {
+      opacity: 0.9;
+    }
+  }
+  
+  /* Force no focus styles on all devices for these buttons */
+  [role="button"]:focus,
+  [role="button"]:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
   }
 }
 

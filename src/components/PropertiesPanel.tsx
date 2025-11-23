@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
-import type { CoordinateFrame, Point2D } from '../types'
+import type { CoordinateFrame, Point2D, ViewportState } from '../types'
 import { areVectorsCollinear, normalizeVector, vectorMagnitude, orthogonalVector } from '../utils/vectorUtils'
 
 interface PropertiesPanelProps {
   selectedFrame: CoordinateFrame | null
   onFrameUpdate: (frameId: string, updates: Partial<CoordinateFrame>) => void
+  onFrameViewportChange?: (frameId: string, viewport: ViewportState) => void
 }
 
 export default function PropertiesPanel({
   selectedFrame,
   onFrameUpdate,
+  onFrameViewportChange,
 }: PropertiesPanelProps) {
   const [originX, setOriginX] = useState<string>('0')
   const [originY, setOriginY] = useState<string>('0')
@@ -343,6 +345,153 @@ export default function PropertiesPanel({
             When enabled, base vectors will be normalized to unit length. Changing one vector adjusts the other to be orthogonal.
           </p>
         </div>
+
+        {/* Viewport Controls */}
+        {onFrameViewportChange && (
+          <div className="pt-4 border-t border-border">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              Viewport
+            </label>
+            <div className="flex gap-2">
+              <div
+                onClick={(e) => {
+                  // Immediately blur to remove focus
+                  if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur()
+                  }
+                  e.currentTarget.blur()
+                  
+                  if (selectedFrame && onFrameViewportChange) {
+                    onFrameViewportChange(selectedFrame.id, {
+                      ...selectedFrame.viewport,
+                      x: 0,
+                      y: 0,
+                    })
+                  }
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.classList.add('active-touch')
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.classList.remove('active-touch')
+                  e.currentTarget.blur()
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.classList.remove('active-touch')
+                  e.currentTarget.blur()
+                }}
+                onTouchEnd={(e) => {
+                  // Force blur on touch end
+                  e.currentTarget.blur()
+                  if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur()
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-bg-primary border border-border rounded-lg text-text-primary hover:bg-hover transition-colors text-sm touch-manipulation cursor-pointer select-none"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    e.currentTarget.blur()
+                    if (selectedFrame && onFrameViewportChange) {
+                      onFrameViewportChange(selectedFrame.id, {
+                        ...selectedFrame.viewport,
+                        x: 0,
+                        y: 0,
+                      })
+                    }
+                  }
+                }}
+                title="Move to frame origin"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-4 h-4"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 2v20M2 12h20" />
+                </svg>
+                <span>Move to Origin</span>
+              </div>
+              <div
+                onClick={(e) => {
+                  // Immediately blur to remove focus
+                  if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur()
+                  }
+                  e.currentTarget.blur()
+                  
+                  if (selectedFrame && onFrameViewportChange) {
+                    onFrameViewportChange(selectedFrame.id, {
+                      ...selectedFrame.viewport,
+                      zoom: 1.0,
+                    })
+                  }
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.classList.add('active-touch')
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.classList.remove('active-touch')
+                  e.currentTarget.blur()
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.classList.remove('active-touch')
+                  e.currentTarget.blur()
+                }}
+                onTouchEnd={(e) => {
+                  // Force blur on touch end
+                  e.currentTarget.blur()
+                  if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur()
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-bg-primary border border-border rounded-lg text-text-primary hover:bg-hover transition-colors text-sm touch-manipulation cursor-pointer select-none"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    e.currentTarget.blur()
+                    if (selectedFrame && onFrameViewportChange) {
+                      onFrameViewportChange(selectedFrame.id, {
+                        ...selectedFrame.viewport,
+                        zoom: 1.0,
+                      })
+                    }
+                  }
+                }}
+                title="Reset zoom to default"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-4 h-4"
+                >
+                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                  <path d="M21 3v5h-5" />
+                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                  <path d="M3 21v-5h5" />
+                </svg>
+                <span>Reset Zoom</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
