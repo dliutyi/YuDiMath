@@ -1143,10 +1143,10 @@ function drawFrameFunctions(
         const maxDepth = 8 // Maximum recursion depth for adaptive sampling
         const minStep = (xMax - xMin) / 10000 // Minimum step size to prevent infinite recursion
         
-        // Adaptive sampling function
+        // Adaptive sampling function with derivative-based detection
         const sampleAdaptive = (x1: number, x2: number, y1: number | null, depth: number) => {
           if (depth > maxDepth || (x2 - x1) < minStep) {
-            // Base case: evaluate at midpoint
+            // Base case: evaluate at midpoint and add it
             try {
               const x = (x1 + x2) / 2
               const y = evaluateExpression(expression, x)
@@ -1160,10 +1160,12 @@ function drawFrameFunctions(
             return
           }
           
-          // Evaluate at endpoints and midpoint
+          // Evaluate at endpoints, midpoint, and quarter points for better derivative estimation
           let y1_val = y1
           let y2: number
           let yMid: number
+          let yQ1: number | null = null
+          let yQ3: number | null = null
           
           try {
             if (y1_val === null) {
@@ -1178,16 +1180,69 @@ function drawFrameFunctions(
               return
             }
             
+            // Evaluate at quarter points for better curvature estimation
+            const xQ1 = (x1 + xMid) / 2
+            const xQ3 = (xMid + x2) / 2
+            try {
+              yQ1 = evaluateExpression(expression, xQ1)
+              yQ3 = evaluateExpression(expression, xQ3)
+            } catch (e) {
+              // If quarter points fail, continue with midpoint only
+            }
+            
             // Calculate linear interpolation at midpoint
             const yLinear = (y1_val + y2) / 2
             
-            // Check if the actual value differs significantly from linear interpolation
-            // This indicates rapid change - need more sampling
-            const changeRatio = Math.abs(yMid - yLinear) / (Math.max(Math.abs(y1_val), Math.abs(y2), 1) + 1)
-            const threshold = 0.1 // 10% difference triggers subdivision
+            // Estimate first derivative (slope) at endpoints
+            const dx = x2 - x1
+            const slope1 = (xMid - x1) > 0 ? (yMid - y1_val) / (xMid - x1) : 0
+            const slope2 = (x2 - xMid) > 0 ? (y2 - yMid) / (x2 - xMid) : 0
             
-            if (changeRatio > threshold) {
-              // Function changes rapidly - subdivide
+            // Estimate second derivative (curvature) if quarter points are available
+            let curvature = 0
+            if (yQ1 !== null && yQ3 !== null && isFinite(yQ1) && isFinite(yQ3)) {
+              const slopeQ1 = (xMid - xQ1) > 0 ? (yMid - yQ1) / (xMid - xQ1) : 0
+              const slopeQ3 = (xQ3 - xMid) > 0 ? (yQ3 - yMid) / (xQ3 - xMid) : 0
+              curvature = (xQ3 - xQ1) > 0 ? Math.abs(slopeQ3 - slopeQ1) / (xQ3 - xQ1) : 0
+            } else {
+              // Fallback: estimate curvature from slope change
+              curvature = dx > 0 ? Math.abs(slope2 - slope1) / dx : 0
+            }
+            
+            // Calculate error metric: combination of deviation from linear and curvature
+            const maxY = Math.max(Math.abs(y1_val), Math.abs(y2), Math.abs(yMid), 1)
+            const linearError = Math.abs(yMid - yLinear) / (maxY + 1)
+            
+            // Normalize curvature by function scale and x-range
+            const normalizedCurvature = curvature * dx * dx / (maxY + 1)
+            
+            // Combined error metric: linear error + curvature contribution
+            // Curvature is weighted less since it's a second-order effect
+            const combinedError = linearError + normalizedCurvature * 0.3
+            
+            // Adaptive threshold: more sensitive for smaller ranges
+            const rangeScale = Math.max(1, (xMax - xMin) / 10)
+            const threshold = 0.03 / rangeScale // More sensitive for smaller ranges
+            
+            // Also check for rapid slope change
+            const slopeChangeRatio = Math.abs(slope2 - slope1) / (Math.abs(slope1) + Math.abs(slope2) + 1)
+            
+            if (combinedError > threshold || slopeChangeRatio > 0.5) {
+              // Function changes rapidly or has high curvature - subdivide and add all points
+              const pointScreen = transformToScreen([xMid, yMid])
+              validPoints.push({ point: [xMid, yMid], screen: pointScreen })
+              
+              // Add quarter points if they're valid
+              if (yQ1 !== null && isFinite(yQ1)) {
+                const pointScreenQ1 = transformToScreen([xQ1, yQ1])
+                validPoints.push({ point: [xQ1, yQ1], screen: pointScreenQ1 })
+              }
+              if (yQ3 !== null && isFinite(yQ3)) {
+                const pointScreenQ3 = transformToScreen([xQ3, yQ3])
+                validPoints.push({ point: [xQ3, yQ3], screen: pointScreenQ3 })
+              }
+              
+              // Recursively subdivide both halves
               sampleAdaptive(x1, xMid, y1_val, depth + 1)
               sampleAdaptive(xMid, x2, yMid, depth + 1)
             } else {
@@ -1198,6 +1253,15 @@ function drawFrameFunctions(
           } catch (e) {
             // If evaluation fails, try to subdivide anyway
             const xMid = (x1 + x2) / 2
+            try {
+              const yMid = evaluateExpression(expression, xMid)
+              if (isFinite(yMid)) {
+                const pointScreen = transformToScreen([xMid, yMid])
+                validPoints.push({ point: [xMid, yMid], screen: pointScreen })
+              }
+            } catch (e2) {
+              // Skip if midpoint also fails
+            }
             sampleAdaptive(x1, xMid, y1_val, depth + 1)
             sampleAdaptive(xMid, x2, null, depth + 1)
           }

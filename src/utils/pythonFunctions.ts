@@ -744,7 +744,7 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         return
                     
                     try:
-                        # Evaluate at endpoints and midpoint
+                        # Evaluate at endpoints, midpoint, and quarter points for better derivative estimation
                         if y1_val is None:
                             y1_val = float(original_callable(x1))
                         y2 = float(original_callable(x2))
@@ -754,15 +754,62 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         if not (np.isfinite(y1_val) and np.isfinite(y2) and np.isfinite(y_mid)):
                             return
                         
-                        # Check if function changes rapidly (non-linear)
-                        # Use a more sensitive threshold for functions with rapid changes
-                        max_y = max(abs(y1_val), abs(y2), abs(y_mid), 1)
-                        change_ratio = abs(y_mid - y_linear) / (max_y + 1)
-                        threshold = 0.05  # 5% difference triggers subdivision (more sensitive)
+                        # Evaluate at quarter points for better curvature estimation
+                        x_q1 = (x1 + x_mid) / 2
+                        x_q3 = (x_mid + x2) / 2
+                        y_q1 = None
+                        y_q3 = None
+                        try:
+                            y_q1 = float(original_callable(x_q1))
+                            y_q3 = float(original_callable(x_q3))
+                        except:
+                            pass
                         
-                        if change_ratio > threshold:
-                            # Function changes rapidly - subdivide and add midpoint
+                        # Calculate linear interpolation at midpoint
+                        y_linear = (y1_val + y2) / 2
+                        
+                        # Estimate first derivative (slope) at endpoints
+                        dx = x2 - x1
+                        slope1 = (y_mid - y1_val) / (x_mid - x1) if (x_mid - x1) > 0 else 0
+                        slope2 = (y2 - y_mid) / (x2 - x_mid) if (x2 - x_mid) > 0 else 0
+                        
+                        # Estimate second derivative (curvature) if quarter points are available
+                        curvature = 0
+                        if y_q1 is not None and y_q3 is not None and np.isfinite(y_q1) and np.isfinite(y_q3):
+                            slope_q1 = (y_mid - y_q1) / (x_mid - x_q1) if (x_mid - x_q1) > 0 else 0
+                            slope_q3 = (y_q3 - y_mid) / (x_q3 - x_mid) if (x_q3 - x_mid) > 0 else 0
+                            curvature = abs(slope_q3 - slope_q1) / (x_q3 - x_q1) if (x_q3 - x_q1) > 0 else 0
+                        else:
+                            # Fallback: estimate curvature from slope change
+                            curvature = abs(slope2 - slope1) / dx if dx > 0 else 0
+                        
+                        # Calculate error metric: combination of deviation from linear and curvature
+                        max_y = max(abs(y1_val), abs(y2), abs(y_mid), 1)
+                        linear_error = abs(y_mid - y_linear) / (max_y + 1)
+                        
+                        # Normalize curvature by function scale and x-range
+                        normalized_curvature = curvature * dx * dx / (max_y + 1) if max_y > 0 else 0
+                        
+                        # Combined error metric: linear error + curvature contribution
+                        # Curvature is weighted less since it's a second-order effect
+                        combined_error = linear_error + normalized_curvature * 0.3
+                        
+                        # Adaptive threshold: more sensitive for smaller ranges
+                        range_scale = max(1, (x_max - x_min) / 10)
+                        threshold = 0.03 / range_scale  # More sensitive for smaller ranges
+                        
+                        # Also check for rapid slope change
+                        slope_change_ratio = abs(slope2 - slope1) / (abs(slope1) + abs(slope2) + 1)
+                        
+                        if combined_error > threshold or slope_change_ratio > 0.5:
+                            # Function changes rapidly or has high curvature - subdivide and add all points
                             points.append([float(x_mid), float(y_mid)])
+                            
+                            # Add quarter points if they're valid
+                            if y_q1 is not None and np.isfinite(y_q1):
+                                points.append([float(x_q1), float(y_q1)])
+                            if y_q3 is not None and np.isfinite(y_q3):
+                                points.append([float(x_q3), float(y_q3)])
                             
                             # Recursively subdivide both halves
                             sample_adaptive(x1, x_mid, y1_val, depth + 1)
@@ -779,21 +826,39 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 # First pass: uniform sampling
                 x_samples = np.linspace(x_min, x_max, n_points)
                 initial_points = []
+                valid_count = 0
+                error_count = 0
                 for x in x_samples:
                     try:
                         y = float(original_callable(x))
                         if np.isfinite(y):
                             points.append([float(x), y])
                             initial_points.append((x, y))
+                            valid_count += 1
                         else:
                             initial_points.append((x, None))
-                    except (ZeroDivisionError, ValueError, OverflowError, TypeError):
+                            error_count += 1
+                    except (ZeroDivisionError, ValueError, OverflowError, TypeError) as e:
                         initial_points.append((x, None))
+                        error_count += 1
                         continue
                     except Exception as e:
                         print(f"[plot wrapper] Warning: Error evaluating function at x={x}: {e}")
                         initial_points.append((x, None))
+                        error_count += 1
                         continue
+                
+                print(f"[plot wrapper] Initial sampling: {valid_count} valid, {error_count} errors out of {n_points} points")
+                
+                # If we got very few valid points, the function might be mostly undefined
+                # In this case, skip adaptive sampling and just use what we have
+                if valid_count < 2:
+                    print(f"[plot wrapper] Only {valid_count} valid points found, skipping adaptive sampling")
+                    if len(points) > 0:
+                        points.sort(key=lambda p: p[0])
+                        points_list = [[float(p[0]), float(p[1])] for p in points]
+                        return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None, n_points)
+                    # If still no points, will be caught by fallback below
                 
                 # Second pass: adaptive refinement between consecutive valid points
                 # Check for rapid changes in function value
@@ -810,7 +875,7 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                             # Evaluate at midpoint to check for rapid change
                             try:
                                 x_mid = (x1 + x2) / 2
-                                y_mid = float(formula(x_mid))
+                                y_mid = float(original_callable(x_mid))
                                 
                                 if np.isfinite(y_mid):
                                     # Check if function changes rapidly (non-linear)
@@ -829,6 +894,70 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 points.sort(key=lambda p: p[0])
                 
                 print(f"[plot wrapper] Evaluated {len(points)} points from callable function")
+                
+                # Fallback: if no points were collected, try simple uniform sampling
+                if len(points) == 0:
+                    print(f"[plot wrapper] No points collected, trying fallback uniform sampling")
+                    # Try a simpler approach: just evaluate at evenly spaced points
+                    # Use a denser grid for fallback to increase chances of finding valid points
+                    fallback_points = []
+                    fallback_n = max(200, min(500, n_points * 2))  # Use more points for fallback
+                    error_count = 0
+                    success_count = 0
+                    last_error = None
+                    last_success_x = None
+                    
+                    # Try with a denser grid
+                    for x in np.linspace(x_min, x_max, fallback_n):
+                        try:
+                            y = float(original_callable(x))
+                            if np.isfinite(y):
+                                fallback_points.append([float(x), y])
+                                success_count += 1
+                                last_success_x = x
+                            else:
+                                error_count += 1
+                        except ZeroDivisionError as e:
+                            error_count += 1
+                            last_error = f"ZeroDivisionError: {str(e)}"
+                            continue
+                        except (ValueError, OverflowError, TypeError) as e:
+                            error_count += 1
+                            last_error = f"{type(e).__name__}: {str(e)}"
+                            continue
+                        except Exception as e:
+                            error_count += 1
+                            last_error = f"{type(e).__name__}: {str(e)}"
+                            # Only print first few errors to avoid spam
+                            if error_count <= 3:
+                                print(f"[plot wrapper] Fallback: Error at x={x}: {e}")
+                            continue
+                    
+                    if len(fallback_points) > 0:
+                        points = fallback_points
+                        print(f"[plot wrapper] Fallback collected {len(points)} points (had {error_count} errors, last success at x={last_success_x})")
+                    else:
+                        # Try one more time with even denser sampling and different strategy
+                        print(f"[plot wrapper] Fallback failed, trying ultra-dense sampling")
+                        ultra_dense_points = []
+                        ultra_n = 1000  # Very dense
+                        for x in np.linspace(x_min, x_max, ultra_n):
+                            try:
+                                y = float(original_callable(x))
+                                if np.isfinite(y):
+                                    ultra_dense_points.append([float(x), y])
+                            except:
+                                continue
+                        
+                        if len(ultra_dense_points) > 0:
+                            points = ultra_dense_points
+                            print(f"[plot wrapper] Ultra-dense sampling collected {len(points)} points")
+                        else:
+                            error_msg = f"plot() could not evaluate callable function at any points in range [{x_min}, {x_max}]"
+                            if last_error:
+                                error_msg += f". Last error: {last_error}"
+                            error_msg += f". Tried {fallback_n} and {ultra_n} points."
+                            raise ValueError(error_msg)
                 
                 # Convert points to a JavaScript-compatible format (list of lists)
                 # Pyodide will handle the conversion, but we ensure it's a plain Python list
@@ -951,7 +1080,7 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         return
                     
                     try:
-                        # Evaluate at endpoints and midpoint
+                        # Evaluate at endpoints, midpoint, and quarter points for better derivative estimation
                         if y1_val is None:
                             y1_val = float(original_callable(x1))
                         y2 = float(original_callable(x2))
@@ -961,15 +1090,62 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         if not (np.isfinite(y1_val) and np.isfinite(y2) and np.isfinite(y_mid)):
                             return
                         
-                        # Check if function changes rapidly (non-linear)
-                        # Use a more sensitive threshold for functions with rapid changes
-                        max_y = max(abs(y1_val), abs(y2), abs(y_mid), 1)
-                        change_ratio = abs(y_mid - y_linear) / (max_y + 1)
-                        threshold = 0.05  # 5% difference triggers subdivision (more sensitive)
+                        # Evaluate at quarter points for better curvature estimation
+                        x_q1 = (x1 + x_mid) / 2
+                        x_q3 = (x_mid + x2) / 2
+                        y_q1 = None
+                        y_q3 = None
+                        try:
+                            y_q1 = float(original_callable(x_q1))
+                            y_q3 = float(original_callable(x_q3))
+                        except:
+                            pass
                         
-                        if change_ratio > threshold:
-                            # Function changes rapidly - subdivide and add midpoint
+                        # Calculate linear interpolation at midpoint
+                        y_linear = (y1_val + y2) / 2
+                        
+                        # Estimate first derivative (slope) at endpoints
+                        dx = x2 - x1
+                        slope1 = (y_mid - y1_val) / (x_mid - x1) if (x_mid - x1) > 0 else 0
+                        slope2 = (y2 - y_mid) / (x2 - x_mid) if (x2 - x_mid) > 0 else 0
+                        
+                        # Estimate second derivative (curvature) if quarter points are available
+                        curvature = 0
+                        if y_q1 is not None and y_q3 is not None and np.isfinite(y_q1) and np.isfinite(y_q3):
+                            slope_q1 = (y_mid - y_q1) / (x_mid - x_q1) if (x_mid - x_q1) > 0 else 0
+                            slope_q3 = (y_q3 - y_mid) / (x_q3 - x_mid) if (x_q3 - x_mid) > 0 else 0
+                            curvature = abs(slope_q3 - slope_q1) / (x_q3 - x_q1) if (x_q3 - x_q1) > 0 else 0
+                        else:
+                            # Fallback: estimate curvature from slope change
+                            curvature = abs(slope2 - slope1) / dx if dx > 0 else 0
+                        
+                        # Calculate error metric: combination of deviation from linear and curvature
+                        max_y = max(abs(y1_val), abs(y2), abs(y_mid), 1)
+                        linear_error = abs(y_mid - y_linear) / (max_y + 1)
+                        
+                        # Normalize curvature by function scale and x-range
+                        normalized_curvature = curvature * dx * dx / (max_y + 1) if max_y > 0 else 0
+                        
+                        # Combined error metric: linear error + curvature contribution
+                        # Curvature is weighted less since it's a second-order effect
+                        combined_error = linear_error + normalized_curvature * 0.3
+                        
+                        # Adaptive threshold: more sensitive for smaller ranges
+                        range_scale = max(1, (x_max - x_min) / 10)
+                        threshold = 0.03 / range_scale  # More sensitive for smaller ranges
+                        
+                        # Also check for rapid slope change
+                        slope_change_ratio = abs(slope2 - slope1) / (abs(slope1) + abs(slope2) + 1)
+                        
+                        if combined_error > threshold or slope_change_ratio > 0.5:
+                            # Function changes rapidly or has high curvature - subdivide and add all points
                             points.append([float(x_mid), float(y_mid)])
+                            
+                            # Add quarter points if they're valid
+                            if y_q1 is not None and np.isfinite(y_q1):
+                                points.append([float(x_q1), float(y_q1)])
+                            if y_q3 is not None and np.isfinite(y_q3):
+                                points.append([float(x_q3), float(y_q3)])
                             
                             # Recursively subdivide both halves
                             sample_adaptive(x1, x_mid, y1_val, depth + 1)
@@ -986,21 +1162,39 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 # First pass: uniform sampling
                 x_samples = np.linspace(x_min, x_max, n_points)
                 initial_points = []
+                valid_count = 0
+                error_count = 0
                 for x in x_samples:
                     try:
                         y = float(original_callable(x))
                         if np.isfinite(y):
                             points.append([float(x), y])
                             initial_points.append((x, y))
+                            valid_count += 1
                         else:
                             initial_points.append((x, None))
-                    except (ZeroDivisionError, ValueError, OverflowError, TypeError):
+                            error_count += 1
+                    except (ZeroDivisionError, ValueError, OverflowError, TypeError) as e:
                         initial_points.append((x, None))
+                        error_count += 1
                         continue
                     except Exception as e:
                         print(f"[plot wrapper] Warning: Error evaluating function at x={x}: {e}")
                         initial_points.append((x, None))
+                        error_count += 1
                         continue
+                
+                print(f"[plot wrapper] Initial sampling: {valid_count} valid, {error_count} errors out of {n_points} points")
+                
+                # If we got very few valid points, the function might be mostly undefined
+                # In this case, skip adaptive sampling and just use what we have
+                if valid_count < 2:
+                    print(f"[plot wrapper] Only {valid_count} valid points found, skipping adaptive sampling")
+                    if len(points) > 0:
+                        points.sort(key=lambda p: p[0])
+                        points_list = [[float(p[0]), float(p[1])] for p in points]
+                        return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None, n_points)
+                    # If still no points, will be caught by fallback below
                 
                 # Second pass: adaptive refinement between consecutive valid points
                 # Check for rapid changes in function value
@@ -1017,7 +1211,7 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                             # Evaluate at midpoint to check for rapid change
                             try:
                                 x_mid = (x1 + x2) / 2
-                                y_mid = float(formula(x_mid))
+                                y_mid = float(original_callable(x_mid))
                                 
                                 if np.isfinite(y_mid):
                                     # Check if function changes rapidly (non-linear)
@@ -1036,6 +1230,70 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 points.sort(key=lambda p: p[0])
                 
                 print(f"[plot wrapper] Evaluated {len(points)} points from callable function")
+                
+                # Fallback: if no points were collected, try simple uniform sampling
+                if len(points) == 0:
+                    print(f"[plot wrapper] No points collected, trying fallback uniform sampling")
+                    # Try a simpler approach: just evaluate at evenly spaced points
+                    # Use a denser grid for fallback to increase chances of finding valid points
+                    fallback_points = []
+                    fallback_n = max(200, min(500, n_points * 2))  # Use more points for fallback
+                    error_count = 0
+                    success_count = 0
+                    last_error = None
+                    last_success_x = None
+                    
+                    # Try with a denser grid
+                    for x in np.linspace(x_min, x_max, fallback_n):
+                        try:
+                            y = float(original_callable(x))
+                            if np.isfinite(y):
+                                fallback_points.append([float(x), y])
+                                success_count += 1
+                                last_success_x = x
+                            else:
+                                error_count += 1
+                        except ZeroDivisionError as e:
+                            error_count += 1
+                            last_error = f"ZeroDivisionError: {str(e)}"
+                            continue
+                        except (ValueError, OverflowError, TypeError) as e:
+                            error_count += 1
+                            last_error = f"{type(e).__name__}: {str(e)}"
+                            continue
+                        except Exception as e:
+                            error_count += 1
+                            last_error = f"{type(e).__name__}: {str(e)}"
+                            # Only print first few errors to avoid spam
+                            if error_count <= 3:
+                                print(f"[plot wrapper] Fallback: Error at x={x}: {e}")
+                            continue
+                    
+                    if len(fallback_points) > 0:
+                        points = fallback_points
+                        print(f"[plot wrapper] Fallback collected {len(points)} points (had {error_count} errors, last success at x={last_success_x})")
+                    else:
+                        # Try one more time with even denser sampling and different strategy
+                        print(f"[plot wrapper] Fallback failed, trying ultra-dense sampling")
+                        ultra_dense_points = []
+                        ultra_n = 1000  # Very dense
+                        for x in np.linspace(x_min, x_max, ultra_n):
+                            try:
+                                y = float(original_callable(x))
+                                if np.isfinite(y):
+                                    ultra_dense_points.append([float(x), y])
+                            except:
+                                continue
+                        
+                        if len(ultra_dense_points) > 0:
+                            points = ultra_dense_points
+                            print(f"[plot wrapper] Ultra-dense sampling collected {len(points)} points")
+                        else:
+                            error_msg = f"plot() could not evaluate callable function at any points in range [{x_min}, {x_max}]"
+                            if last_error:
+                                error_msg += f". Last error: {last_error}"
+                            error_msg += f". Tried {fallback_n} and {ultra_n} points."
+                            raise ValueError(error_msg)
                 
                 # Convert points to a JavaScript-compatible format (list of lists)
                 # Pyodide will handle the conversion, but we ensure it's a plain Python list
@@ -1149,7 +1407,7 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         return
                     
                     try:
-                        # Evaluate at endpoints and midpoint
+                        # Evaluate at endpoints, midpoint, and quarter points for better derivative estimation
                         if y1_val is None:
                             y1_val = float(original_callable(x1))
                         y2 = float(original_callable(x2))
@@ -1159,15 +1417,62 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         if not (np.isfinite(y1_val) and np.isfinite(y2) and np.isfinite(y_mid)):
                             return
                         
-                        # Check if function changes rapidly (non-linear)
-                        # Use a more sensitive threshold for functions with rapid changes
-                        max_y = max(abs(y1_val), abs(y2), abs(y_mid), 1)
-                        change_ratio = abs(y_mid - y_linear) / (max_y + 1)
-                        threshold = 0.05  # 5% difference triggers subdivision (more sensitive)
+                        # Evaluate at quarter points for better curvature estimation
+                        x_q1 = (x1 + x_mid) / 2
+                        x_q3 = (x_mid + x2) / 2
+                        y_q1 = None
+                        y_q3 = None
+                        try:
+                            y_q1 = float(original_callable(x_q1))
+                            y_q3 = float(original_callable(x_q3))
+                        except:
+                            pass
                         
-                        if change_ratio > threshold:
-                            # Function changes rapidly - subdivide and add midpoint
+                        # Calculate linear interpolation at midpoint
+                        y_linear = (y1_val + y2) / 2
+                        
+                        # Estimate first derivative (slope) at endpoints
+                        dx = x2 - x1
+                        slope1 = (y_mid - y1_val) / (x_mid - x1) if (x_mid - x1) > 0 else 0
+                        slope2 = (y2 - y_mid) / (x2 - x_mid) if (x2 - x_mid) > 0 else 0
+                        
+                        # Estimate second derivative (curvature) if quarter points are available
+                        curvature = 0
+                        if y_q1 is not None and y_q3 is not None and np.isfinite(y_q1) and np.isfinite(y_q3):
+                            slope_q1 = (y_mid - y_q1) / (x_mid - x_q1) if (x_mid - x_q1) > 0 else 0
+                            slope_q3 = (y_q3 - y_mid) / (x_q3 - x_mid) if (x_q3 - x_mid) > 0 else 0
+                            curvature = abs(slope_q3 - slope_q1) / (x_q3 - x_q1) if (x_q3 - x_q1) > 0 else 0
+                        else:
+                            # Fallback: estimate curvature from slope change
+                            curvature = abs(slope2 - slope1) / dx if dx > 0 else 0
+                        
+                        # Calculate error metric: combination of deviation from linear and curvature
+                        max_y = max(abs(y1_val), abs(y2), abs(y_mid), 1)
+                        linear_error = abs(y_mid - y_linear) / (max_y + 1)
+                        
+                        # Normalize curvature by function scale and x-range
+                        normalized_curvature = curvature * dx * dx / (max_y + 1) if max_y > 0 else 0
+                        
+                        # Combined error metric: linear error + curvature contribution
+                        # Curvature is weighted less since it's a second-order effect
+                        combined_error = linear_error + normalized_curvature * 0.3
+                        
+                        # Adaptive threshold: more sensitive for smaller ranges
+                        range_scale = max(1, (x_max - x_min) / 10)
+                        threshold = 0.03 / range_scale  # More sensitive for smaller ranges
+                        
+                        # Also check for rapid slope change
+                        slope_change_ratio = abs(slope2 - slope1) / (abs(slope1) + abs(slope2) + 1)
+                        
+                        if combined_error > threshold or slope_change_ratio > 0.5:
+                            # Function changes rapidly or has high curvature - subdivide and add all points
                             points.append([float(x_mid), float(y_mid)])
+                            
+                            # Add quarter points if they're valid
+                            if y_q1 is not None and np.isfinite(y_q1):
+                                points.append([float(x_q1), float(y_q1)])
+                            if y_q3 is not None and np.isfinite(y_q3):
+                                points.append([float(x_q3), float(y_q3)])
                             
                             # Recursively subdivide both halves
                             sample_adaptive(x1, x_mid, y1_val, depth + 1)
@@ -1184,21 +1489,39 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 # First pass: uniform sampling
                 x_samples = np.linspace(x_min, x_max, n_points)
                 initial_points = []
+                valid_count = 0
+                error_count = 0
                 for x in x_samples:
                     try:
                         y = float(original_callable(x))
                         if np.isfinite(y):
                             points.append([float(x), y])
                             initial_points.append((x, y))
+                            valid_count += 1
                         else:
                             initial_points.append((x, None))
-                    except (ZeroDivisionError, ValueError, OverflowError, TypeError):
+                            error_count += 1
+                    except (ZeroDivisionError, ValueError, OverflowError, TypeError) as e:
                         initial_points.append((x, None))
+                        error_count += 1
                         continue
                     except Exception as e:
                         print(f"[plot wrapper] Warning: Error evaluating function at x={x}: {e}")
                         initial_points.append((x, None))
+                        error_count += 1
                         continue
+                
+                print(f"[plot wrapper] Initial sampling: {valid_count} valid, {error_count} errors out of {n_points} points")
+                
+                # If we got very few valid points, the function might be mostly undefined
+                # In this case, skip adaptive sampling and just use what we have
+                if valid_count < 2:
+                    print(f"[plot wrapper] Only {valid_count} valid points found, skipping adaptive sampling")
+                    if len(points) > 0:
+                        points.sort(key=lambda p: p[0])
+                        points_list = [[float(p[0]), float(p[1])] for p in points]
+                        return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None, n_points)
+                    # If still no points, will be caught by fallback below
                 
                 # Second pass: adaptive refinement between consecutive valid points
                 # Check for rapid changes in function value
@@ -1215,7 +1538,7 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                             # Evaluate at midpoint to check for rapid change
                             try:
                                 x_mid = (x1 + x2) / 2
-                                y_mid = float(formula(x_mid))
+                                y_mid = float(original_callable(x_mid))
                                 
                                 if np.isfinite(y_mid):
                                     # Check if function changes rapidly (non-linear)
@@ -1234,6 +1557,70 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 points.sort(key=lambda p: p[0])
                 
                 print(f"[plot wrapper] Evaluated {len(points)} points from callable function")
+                
+                # Fallback: if no points were collected, try simple uniform sampling
+                if len(points) == 0:
+                    print(f"[plot wrapper] No points collected, trying fallback uniform sampling")
+                    # Try a simpler approach: just evaluate at evenly spaced points
+                    # Use a denser grid for fallback to increase chances of finding valid points
+                    fallback_points = []
+                    fallback_n = max(200, min(500, n_points * 2))  # Use more points for fallback
+                    error_count = 0
+                    success_count = 0
+                    last_error = None
+                    last_success_x = None
+                    
+                    # Try with a denser grid
+                    for x in np.linspace(x_min, x_max, fallback_n):
+                        try:
+                            y = float(original_callable(x))
+                            if np.isfinite(y):
+                                fallback_points.append([float(x), y])
+                                success_count += 1
+                                last_success_x = x
+                            else:
+                                error_count += 1
+                        except ZeroDivisionError as e:
+                            error_count += 1
+                            last_error = f"ZeroDivisionError: {str(e)}"
+                            continue
+                        except (ValueError, OverflowError, TypeError) as e:
+                            error_count += 1
+                            last_error = f"{type(e).__name__}: {str(e)}"
+                            continue
+                        except Exception as e:
+                            error_count += 1
+                            last_error = f"{type(e).__name__}: {str(e)}"
+                            # Only print first few errors to avoid spam
+                            if error_count <= 3:
+                                print(f"[plot wrapper] Fallback: Error at x={x}: {e}")
+                            continue
+                    
+                    if len(fallback_points) > 0:
+                        points = fallback_points
+                        print(f"[plot wrapper] Fallback collected {len(points)} points (had {error_count} errors, last success at x={last_success_x})")
+                    else:
+                        # Try one more time with even denser sampling and different strategy
+                        print(f"[plot wrapper] Fallback failed, trying ultra-dense sampling")
+                        ultra_dense_points = []
+                        ultra_n = 1000  # Very dense
+                        for x in np.linspace(x_min, x_max, ultra_n):
+                            try:
+                                y = float(original_callable(x))
+                                if np.isfinite(y):
+                                    ultra_dense_points.append([float(x), y])
+                            except:
+                                continue
+                        
+                        if len(ultra_dense_points) > 0:
+                            points = ultra_dense_points
+                            print(f"[plot wrapper] Ultra-dense sampling collected {len(points)} points")
+                        else:
+                            error_msg = f"plot() could not evaluate callable function at any points in range [{x_min}, {x_max}]"
+                            if last_error:
+                                error_msg += f". Last error: {last_error}"
+                            error_msg += f". Tried {fallback_n} and {ultra_n} points."
+                            raise ValueError(error_msg)
                 
                 # Convert points to a JavaScript-compatible format (list of lists)
                 # Pyodide will handle the conversion, but we ensure it's a plain Python list
