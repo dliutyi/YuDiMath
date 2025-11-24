@@ -5,76 +5,97 @@ export default function LoadingOverlay() {
   const { isReady } = usePyScript()
   const [progress, setProgress] = useState(0)
   const [fadeOut, setFadeOut] = useState(false)
+  const animationFrameRef = useRef<number | null>(null)
   const fadeOutTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Handle fade-out when progress reaches 100% and isReady
-  useEffect(() => {
-    if (isReady && progress >= 100 && fadeOutTimeoutRef.current === null) {
-      fadeOutTimeoutRef.current = setTimeout(() => {
-        setFadeOut(true)
-      }, 300)
-    }
-    
-    return () => {
-      if (fadeOutTimeoutRef.current !== null) {
-        clearTimeout(fadeOutTimeoutRef.current)
-        fadeOutTimeoutRef.current = null
-      }
-    }
-  }, [isReady, progress])
 
   // Simulate smooth progress while loading
   useEffect(() => {
-    let animationFrameId: number | null = null
     let lastUpdate = Date.now()
+    let shouldContinue = true
     
     const animate = () => {
+      if (!shouldContinue) return
+      
       const now = Date.now()
       const deltaTime = (now - lastUpdate) / 1000 // seconds
       lastUpdate = now
       
       if (isReady) {
-        // Smoothly animate to 100% when ready
+        // When ready, quickly animate to 100%
         setProgress((prev) => {
           if (prev >= 100) {
+            // Stop animation when we reach 100%
+            shouldContinue = false
+            // Trigger fade-out after a brief delay
+            if (fadeOutTimeoutRef.current === null) {
+              fadeOutTimeoutRef.current = setTimeout(() => {
+                setFadeOut(true)
+              }, 500)
+            }
             return 100
           }
           
           const targetProgress = 100
           const distanceToTarget = targetProgress - prev
-          // Ease out: slow down as we approach 100% (faster than before)
-          const speed = Math.min(40 * deltaTime, distanceToTarget * 0.2)
+          // Fast animation to 100%
+          const speed = Math.min(50 * deltaTime, distanceToTarget * 0.3)
+          const newProgress = Math.min(prev + speed, 100)
           
-          return Math.min(prev + speed, 100)
+          // If we just reached 100%, schedule fade-out
+          if (newProgress >= 100 && fadeOutTimeoutRef.current === null) {
+            shouldContinue = false
+            fadeOutTimeoutRef.current = setTimeout(() => {
+              setFadeOut(true)
+            }, 500)
+          }
+          
+          return newProgress
         })
       } else {
-        // Smooth, gradual progress increase (up to 85%) - faster than before
-        const targetProgress = 85
+        // Smooth, gradual progress increase (up to 90%) - faster than before
+        const targetProgress = 90
         
         setProgress((prev) => {
           if (prev >= targetProgress) {
             return prev
           }
           
-          // Smooth acceleration: start slow, speed up in middle, slow down near target (faster)
+          // Smooth acceleration: start slow, speed up in middle, slow down near target
           const distanceToTarget = targetProgress - prev
-          const speed = Math.min(18 * deltaTime, distanceToTarget * 0.12) // Max 18% per second (was 12%), but slow down as we approach target
+          const speed = Math.min(20 * deltaTime, distanceToTarget * 0.15) // Max 20% per second
           
           return Math.min(prev + speed, targetProgress)
         })
       }
       
-      animationFrameId = requestAnimationFrame(animate)
+      if (shouldContinue) {
+        animationFrameRef.current = requestAnimationFrame(animate)
+      }
     }
     
-    animationFrameId = requestAnimationFrame(animate)
+    animationFrameRef.current = requestAnimationFrame(animate)
     
     return () => {
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId)
+      shouldContinue = false
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+      if (fadeOutTimeoutRef.current !== null) {
+        clearTimeout(fadeOutTimeoutRef.current)
+        fadeOutTimeoutRef.current = null
       }
     }
   }, [isReady])
+
+  // Also handle fade-out when isReady changes (fallback)
+  useEffect(() => {
+    if (isReady && progress >= 99 && fadeOutTimeoutRef.current === null) {
+      fadeOutTimeoutRef.current = setTimeout(() => {
+        setFadeOut(true)
+      }, 500)
+    }
+  }, [isReady, progress])
 
   if (fadeOut) {
     return null
@@ -110,10 +131,10 @@ export default function LoadingOverlay() {
         </p>
         
         {/* Progress bar */}
-        <div className="w-80 h-2 bg-bg-secondary rounded-full overflow-hidden mx-auto mb-2" style={{ minWidth: '320px', maxWidth: '320px' }}>
+        <div className="w-full max-w-[320px] h-2 bg-bg-secondary rounded-full overflow-hidden mx-auto mb-2">
           <div 
-            className="h-full bg-primary rounded-full transition-all duration-300 ease-out relative"
-            style={{ width: `${progress}%`, minWidth: '0%', maxWidth: '100%' }}
+            className="h-full bg-primary rounded-full transition-all duration-100 ease-linear relative"
+            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
           >
             <div className="h-full w-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
           </div>
@@ -130,8 +151,10 @@ export default function LoadingOverlay() {
             ? 'Downloading Python runtime...' 
             : progress < 70 
             ? 'Installing NumPy and SciPy...' 
-            : progress < 90
+            : progress < 95
             ? 'Almost ready...'
+            : isReady
+            ? 'Ready!'
             : 'Finalizing setup...'}
         </p>
       </div>
