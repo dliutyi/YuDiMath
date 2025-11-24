@@ -69,6 +69,44 @@ function Canvas({
     onFrameCreated,
   })
 
+  // Add global mouseup listener when drawing to handle mouseup outside canvas
+  useEffect(() => {
+    if (!isDrawing) return
+
+    const handleGlobalMouseUp = (e: MouseEvent) => {
+      const canvas = canvasRef.current
+      const container = containerRef.current
+      if (!canvas || !container || !drawingRect?.start) return
+
+      // Check if the mouseup is outside the canvas
+      const rect = container.getBoundingClientRect()
+      const isOutsideCanvas = 
+        e.clientX < rect.left || 
+        e.clientX > rect.right || 
+        e.clientY < rect.top || 
+        e.clientY > rect.bottom
+
+      if (isOutsideCanvas) {
+        // Complete drawing with the last known position or edge position
+        const canvasWidth = width || rect.width || 800
+        const canvasHeight = height || rect.height || 600
+        // Clamp to canvas bounds
+        const screenX = Math.max(0, Math.min(canvasWidth, e.clientX - rect.left))
+        const screenY = Math.max(0, Math.min(canvasHeight, e.clientY - rect.top))
+        handleDrawingMouseUp(screenX, screenY, canvasWidth, canvasHeight)
+        if (onDrawingModeChange) {
+          onDrawingModeChange(false)
+        }
+      }
+    }
+
+    window.addEventListener('mouseup', handleGlobalMouseUp, { capture: true })
+    
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp, { capture: true })
+    }
+  }, [isDrawing, drawingRect, width, height, handleDrawingMouseUp, onDrawingModeChange])
+
   // Memoize top-level frames to avoid recalculating on every render
   const topLevelFrames = useMemo(
     () => frames.filter(f => f.parentFrameId === null),
@@ -495,11 +533,29 @@ function Canvas({
     panningFrameRef.current = null
   }, [isDrawing, onDrawingModeChange, width, height, handleDrawingMouseUp])
 
-  const handleMouseLeave = useCallback(() => {
+  const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    // If drawing, complete the drawing when mouse leaves
+    if (isDrawing && drawingRect?.start) {
+      const canvas = canvasRef.current
+      const container = containerRef.current
+      if (canvas && container) {
+        const rect = container.getBoundingClientRect()
+        const canvasWidth = width || rect.width || 800
+        const canvasHeight = height || rect.height || 600
+        // Use the last known mouse position or the edge of the canvas
+        const screenX = Math.max(0, Math.min(canvasWidth, e.clientX - rect.left))
+        const screenY = Math.max(0, Math.min(canvasHeight, e.clientY - rect.top))
+        handleDrawingMouseUp(screenX, screenY, canvasWidth, canvasHeight)
+        if (onDrawingModeChange) {
+          onDrawingModeChange(false)
+        }
+      }
+    }
+    
     isPanningRef.current = false
     lastPanPointRef.current = null
     panningFrameRef.current = null
-  }, [])
+  }, [isDrawing, drawingRect, width, height, handleDrawingMouseUp, onDrawingModeChange])
 
 
   // Touch handlers for mobile support

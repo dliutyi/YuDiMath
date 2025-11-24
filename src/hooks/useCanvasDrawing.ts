@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import type { ViewportState, CoordinateFrame, Point2D, FrameBounds } from '../types'
 import { screenToWorld, snapPointToGrid, worldToScreen } from '../utils/coordinates'
 import { screenToFrame, parentToFrame, nestedFrameToScreen, frameCoordsToParentWorld } from '../utils/frameTransforms'
@@ -28,6 +28,17 @@ export function useCanvasDrawing({
   const drawingRectEndRef = useRef<Point2D | null>(null)
   const drawingRectStartRef = useRef<Point2D | null>(null)
   const drawingRectParentFrameRef = useRef<CoordinateFrame | null>(null)
+
+  // Reset drawing state when drawing mode is activated
+  useEffect(() => {
+    if (isDrawing) {
+      // Reset all drawing state when drawing mode is turned on
+      setDrawingRect({ start: null, end: null, parentFrame: null })
+      drawingRectStartRef.current = null
+      drawingRectEndRef.current = null
+      drawingRectParentFrameRef.current = null
+    }
+  }, [isDrawing])
 
   const findParentFrame = useCallback((
     screenX: number,

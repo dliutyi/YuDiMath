@@ -534,7 +534,7 @@ function App() {
         onChange={handleFileChange}
         style={{ display: 'none' }}
       />
-      <div className="absolute top-4 right-4 z-10">
+      <div className={`absolute top-4 right-4 z-10 ${workspace.selectedFrame ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         <FrameEditorPanel
           selectedFrame={workspace.selectedFrame}
           onFrameUpdate={handleFrameUpdate}
