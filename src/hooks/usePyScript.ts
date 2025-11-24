@@ -29,11 +29,27 @@ let globalPyodideInstance: any = null
 let globalLoadingPromise: Promise<any> | null = null
 let globalIsReady = false
 
+// Execution queue management
+let lastExecutionCompletionTime: number = 0
+let executionQueue: Array<{
+  resolve: (value: any) => void
+  reject: (error: any) => void
+  code: string
+  frameId: string
+  onVectorCreated: (vector: Omit<Vector, 'id'>) => void
+  onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void
+}> = []
+let isProcessingQueue = false
+const EXECUTION_DELAY_MS = 3 // Wait 3ms after previous execution completes
+
 // Export reset function for testing
 export function resetPyodideState() {
   globalPyodideInstance = null
   globalLoadingPromise = null
   globalIsReady = false
+  lastExecutionCompletionTime = 0
+  executionQueue = []
+  isProcessingQueue = false
 }
 
 /**
@@ -166,7 +182,86 @@ export function usePyScript(): UsePyScriptReturn {
   }, []) // Empty dependency array - only run once
 
   /**
+   * Process the execution queue
+   */
+  const processQueue = useCallback(async () => {
+    if (isProcessingQueue || executionQueue.length === 0) {
+      return
+    }
+
+    isProcessingQueue = true
+
+    while (executionQueue.length > 0) {
+      const item = executionQueue.shift()!
+      
+      // Wait for previous execution to complete + 3ms delay
+      const timeSinceLastExecution = Date.now() - lastExecutionCompletionTime
+      if (timeSinceLastExecution < EXECUTION_DELAY_MS) {
+        const waitTime = EXECUTION_DELAY_MS - timeSinceLastExecution
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+      }
+
+      // Execute the code
+      try {
+        setIsExecuting(true)
+
+        // Set up function context for this execution
+        setupFunctionContext(item.frameId, item.onVectorCreated, item.onFunctionCreated)
+
+        // Use the global Pyodide instance
+        const pyodide = globalPyodideInstance
+
+        if (!pyodide) {
+          throw new Error('Pyodide is not ready yet. Please wait for it to finish loading.')
+        }
+
+        // Execute the code
+        console.log('[usePyScript] Executing Python code for frame:', item.frameId)
+        const result = await pyodide.runPythonAsync(item.code)
+        console.log('[usePyScript] Code executed successfully')
+
+        // Get captured function calls
+        const functionCalls = getCapturedCalls()
+        console.log('[usePyScript] Captured function calls:', functionCalls)
+
+        clearFunctionContext()
+        
+        // Update completion time
+        lastExecutionCompletionTime = Date.now()
+        setIsExecuting(false)
+
+        item.resolve({
+          success: true,
+          result,
+          functionCalls,
+        })
+      } catch (error: any) {
+        clearFunctionContext()
+        
+        const pyScriptError: PyScriptError = {
+          message: error.message || 'Unknown error occurred',
+          type: error.name || 'ExecutionError',
+          traceback: error.traceback || error.stack,
+        }
+
+        // Update completion time even on error
+        lastExecutionCompletionTime = Date.now()
+        setIsExecuting(false)
+
+        item.reject({
+          success: false,
+          error: pyScriptError,
+          functionCalls: getCapturedCalls(), // Return any calls captured before error
+        })
+      }
+    }
+
+    isProcessingQueue = false
+  }, [])
+
+  /**
    * Execute Python code and return the result
+   * Queues executions to ensure they don't start until previous one completes + 3ms
    */
   const executeCode = useCallback(
     async (
@@ -186,54 +281,22 @@ export function usePyScript(): UsePyScriptReturn {
         }
       }
 
-      setIsExecuting(true)
+      // Queue the execution
+      return new Promise((resolve, reject) => {
+        executionQueue.push({
+          resolve,
+          reject,
+          code,
+          frameId,
+          onVectorCreated,
+          onFunctionCreated,
+        })
 
-      // Set up function context for this execution
-      setupFunctionContext(frameId, onVectorCreated, onFunctionCreated)
-
-      try {
-        // Use the global Pyodide instance
-        const pyodide = globalPyodideInstance
-
-        if (!pyodide) {
-          throw new Error('Pyodide is not ready yet. Please wait for it to finish loading.')
-        }
-
-        // Execute the code
-        console.log('[usePyScript] Executing Python code for frame:', frameId)
-        const result = await pyodide.runPythonAsync(code)
-        console.log('[usePyScript] Code executed successfully')
-
-        // Get captured function calls
-        const functionCalls = getCapturedCalls()
-        console.log('[usePyScript] Captured function calls:', functionCalls)
-
-        setIsExecuting(false)
-        clearFunctionContext()
-        
-        return {
-          success: true,
-          result,
-          functionCalls,
-        }
-      } catch (error: any) {
-        setIsExecuting(false)
-        clearFunctionContext()
-        
-        const pyScriptError: PyScriptError = {
-          message: error.message || 'Unknown error occurred',
-          type: error.name || 'ExecutionError',
-          traceback: error.traceback || error.stack,
-        }
-
-        return {
-          success: false,
-          error: pyScriptError,
-          functionCalls: getCapturedCalls(), // Return any calls captured before error
-        }
-      }
+        // Start processing the queue if not already processing
+        processQueue()
+      })
     },
-    [isReady]
+    [isReady, processQueue]
   )
 
   return {
