@@ -54,33 +54,41 @@ export default function LoadingOverlay() {
         </div>
         
         {/* Loading text */}
-        <h2 className="text-3xl font-bold text-text-primary mb-2 bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
+        <h2 className="text-5xl font-extrabold mb-3 bg-gradient-to-r from-primary via-blue-400 to-purple-500 bg-clip-text text-transparent tracking-tight drop-shadow-lg">
           YuDiMath
         </h2>
-        <p className="text-text-secondary mb-6 text-lg">Initializing Python runtime...</p>
+        <p className="text-xl font-semibold text-text-primary mb-8 tracking-wide">
+          <span className="bg-gradient-to-r from-primary/90 to-blue-400/90 bg-clip-text text-transparent">
+            Initializing Python runtime...
+          </span>
+        </p>
         
         {/* Progress bar */}
-        <div className="w-80 max-w-full h-2 bg-bg-secondary/50 rounded-full overflow-hidden mx-auto mb-2 shadow-inner">
+        <div className="w-80 h-2.5 bg-bg-secondary/50 rounded-full overflow-hidden mx-auto mb-3 shadow-inner border border-border/30" style={{ minWidth: '320px', maxWidth: '320px' }}>
           <div 
-            className="h-full bg-gradient-to-r from-primary via-blue-500 to-primary rounded-full transition-all duration-300 ease-out shadow-lg"
-            style={{ width: `${progress}%` }}
+            className="h-full bg-gradient-to-r from-primary via-blue-500 to-primary rounded-full transition-all duration-300 ease-out shadow-lg relative"
+            style={{ width: `${progress}%`, minWidth: '0%', maxWidth: '100%' }}
           >
-            <div className="h-full w-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
+            <div className="h-full w-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
           </div>
         </div>
         
         {/* Progress percentage */}
-        <p className="text-sm text-text-secondary/80 mb-4">{Math.round(progress)}%</p>
+        <p className="text-lg font-bold mb-5 bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent tracking-wide">
+          {Math.round(progress)}%
+        </p>
         
         {/* Helpful message */}
-        <p className="text-xs text-text-secondary/60 max-w-md mx-auto">
-          {progress < 30 
-            ? 'Downloading Python runtime...' 
-            : progress < 70 
-            ? 'Installing NumPy and SciPy...' 
-            : progress < 90
-            ? 'Almost ready...'
-            : 'Finalizing setup...'}
+        <p className="text-sm font-semibold text-text-primary/90 max-w-md mx-auto tracking-wide">
+          <span className="inline-block bg-gradient-to-r from-primary/80 via-blue-400/80 to-purple-500/80 bg-clip-text text-transparent">
+            {progress < 30 
+              ? 'Downloading Python runtime...' 
+              : progress < 70 
+              ? 'Installing NumPy and SciPy...' 
+              : progress < 90
+              ? 'Almost ready...'
+              : 'Finalizing setup...'}
+          </span>
         </p>
       </div>
     </div>
