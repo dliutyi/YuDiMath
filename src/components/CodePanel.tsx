@@ -168,7 +168,10 @@ export default function CodePanel({
 
     setIsRunning(true)
     setShowLoading(true)
-    setExecutionResult(null)
+    // Only clear previous success messages, keep errors visible
+    if (executionResult?.success) {
+      setExecutionResult(null)
+    }
     
     // Minimum display time for loading indicator to prevent blinking
     const loadingStartTime = Date.now()
@@ -250,7 +253,10 @@ export default function CodePanel({
           setShowLoading(false)
         }, remaining)
       } else {
-        setShowLoading(false)
+        // Use a small delay even if we've exceeded min time to prevent flicker
+        setTimeout(() => {
+          setShowLoading(false)
+        }, 50)
       }
     }
   }
@@ -272,7 +278,7 @@ export default function CodePanel({
       )}
 
       {/* Loading indicator during execution */}
-      {showLoading && (isRunning || isExecuting) && (
+      {showLoading && (
         <div className="mb-4 p-3 bg-primary/10 border border-primary/30 rounded-lg flex items-center gap-3">
           <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
           <span className="text-sm text-primary font-medium">Executing Python code...</span>
@@ -281,7 +287,7 @@ export default function CodePanel({
 
       {/* Execution result messages - always show errors, success only when not loading */}
       {executionResult && (
-        !executionResult.success || (!isRunning && !isExecuting && !showLoading)
+        !executionResult.success || !showLoading
       ) && (
         <div className={`mb-4 p-3 rounded-lg text-sm ${
           executionResult.success
