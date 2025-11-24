@@ -199,16 +199,22 @@ function CodePanel({
     }, 500) // Check every 500ms instead of 100ms
 
     // Sync line numbers AND pre element with textarea scroll
-    // react-simple-code-editor should handle this, but we need to ensure it works
+    // Line numbers should scroll with content, not independently
     const handleScroll = () => {
       if (!textarea) return
       
       const scrollTop = textarea.scrollTop
       const scrollLeft = textarea.scrollLeft
       
-      // Sync line numbers
+      // Sync line numbers - use transform to move content since container has overflow: hidden
+      // This prevents independent scrolling while keeping visual sync
       if (lineNumbers) {
-        lineNumbers.scrollTop = scrollTop
+        const lineNumbersContent = lineNumbers.querySelector('.code-editor-line-numbers-content') as HTMLElement
+        if (lineNumbersContent) {
+          // Move line numbers content to match textarea scroll position
+          // The container has padding-top: 12px which matches editor padding, so transform aligns correctly
+          lineNumbersContent.style.transform = `translateY(-${scrollTop}px)`
+        }
       }
       
       // Sync pre element scroll position - MUST match exactly
@@ -466,12 +472,15 @@ function CodePanel({
           <div 
             ref={lineNumbersRef}
             className="code-editor-line-numbers flex-shrink-0"
+            style={{ overflow: 'hidden' }}
           >
-            {localCode.split('\n').map((_, index) => (
-              <div key={index} className="code-editor-line-number">
-                {index + 1}
-              </div>
-            ))}
+            <div className="code-editor-line-numbers-content">
+              {localCode.split('\n').map((_, index) => (
+                <div key={index} className="code-editor-line-number">
+                  {index + 1}
+                </div>
+              ))}
+            </div>
           </div>
           <div className="flex-1 relative" style={{ minHeight: 0, overflow: 'hidden' }}>
             <Editor

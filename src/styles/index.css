@@ -138,8 +138,7 @@
   user-select: none !important;
   text-align: right !important;
   min-width: 50px !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  overflow: hidden !important; /* Prevent independent scrolling - sync with textarea */
   scrollbar-width: none !important; /* Firefox */
   -ms-overflow-style: none !important; /* IE and Edge */
   height: 100% !important;
@@ -147,6 +146,10 @@
 
 .code-editor-line-numbers::-webkit-scrollbar {
   display: none !important; /* Chrome, Safari, Opera */
+}
+
+.code-editor-line-numbers-content {
+  /* Wrapper for line numbers content - transform is applied here for scrolling */
 }
 
 .code-editor-line-number {
