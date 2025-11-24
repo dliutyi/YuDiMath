@@ -41,6 +41,7 @@ export default function CodePanel({
   const [localCode, setLocalCode] = useState<string>('')
   const [isRunning, setIsRunning] = useState(false)
   const [executionResult, setExecutionResult] = useState<{ success: boolean; error?: string } | null>(null)
+  const [showLoading, setShowLoading] = useState(false)
   const { isReady, executeCode, isExecuting } = usePyScript()
   const editorRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -166,7 +167,12 @@ export default function CodePanel({
     }
 
     setIsRunning(true)
+    setShowLoading(true)
     setExecutionResult(null)
+    
+    // Minimum display time for loading indicator to prevent blinking
+    const loadingStartTime = Date.now()
+    const minLoadingTime = 300 // milliseconds
 
     // Collect vectors and functions created during execution
     // Don't clear first - keep old ones visible for smooth transition
@@ -235,6 +241,17 @@ export default function CodePanel({
       })
     } finally {
       setIsRunning(false)
+      
+      // Ensure loading indicator shows for minimum time
+      const elapsed = Date.now() - loadingStartTime
+      const remaining = Math.max(0, minLoadingTime - elapsed)
+      if (remaining > 0) {
+        setTimeout(() => {
+          setShowLoading(false)
+        }, remaining)
+      } else {
+        setShowLoading(false)
+      }
     }
   }
 
@@ -255,15 +272,17 @@ export default function CodePanel({
       )}
 
       {/* Loading indicator during execution */}
-      {(isRunning || isExecuting) && (
+      {showLoading && (isRunning || isExecuting) && (
         <div className="mb-4 p-3 bg-primary/10 border border-primary/30 rounded-lg flex items-center gap-3">
           <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
           <span className="text-sm text-primary font-medium">Executing Python code...</span>
         </div>
       )}
 
-      {/* Execution result messages */}
-      {executionResult && !isRunning && !isExecuting && (
+      {/* Execution result messages - always show errors, success only when not loading */}
+      {executionResult && (
+        !executionResult.success || (!isRunning && !isExecuting && !showLoading)
+      ) && (
         <div className={`mb-4 p-3 rounded-lg text-sm ${
           executionResult.success
             ? 'bg-success/20 border border-success/50 text-success'
