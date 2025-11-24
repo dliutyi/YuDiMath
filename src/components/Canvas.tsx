@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, memo, useMemo } from 'react'
 import type { ViewportState, CoordinateFrame, Point2D } from '../types'
 import { worldToScreen, screenToWorld, isPointInPolygon } from '../utils/coordinates'
 import { drawCoordinateFrame, parentToFrame, nestedFrameToScreen } from './CoordinateFrame'
-import { frameToScreen, screenToFrame } from '../utils/frameTransforms'
+import { frameToScreen, screenToFrame, screenToNestedFrame } from '../utils/frameTransforms'
 import { drawGrid, drawAxes } from '../utils/canvasDrawing'
 import { useCanvasZoom } from '../hooks/useCanvasZoom'
 import { useCanvasDrawing } from '../hooks/useCanvasDrawing'
@@ -812,8 +812,10 @@ function Canvas({
 
       if (zoomingFrame && onFrameViewportChange) {
         // Zooming the selected frame
-        // Use screenToFrame which properly accounts for frame viewport pan/zoom
-        const framePoint = screenToFrame([centerX, centerY], zoomingFrame, viewport, canvasWidth, canvasHeight)
+        // Use screenToNestedFrame for nested frames, screenToFrame for top-level frames
+        const framePoint = zoomingFrame.parentFrameId
+          ? screenToNestedFrame([centerX, centerY], zoomingFrame, frames, viewport, canvasWidth, canvasHeight)
+          : screenToFrame([centerX, centerY], zoomingFrame, viewport, canvasWidth, canvasHeight)
         
         const zoomFactor = scale
         const newZoom = Math.max(FRAME_MIN_ZOOM, Math.min(FRAME_MAX_ZOOM, zoomingFrame.viewport.zoom * zoomFactor))

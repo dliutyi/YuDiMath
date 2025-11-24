@@ -247,3 +247,60 @@ export function parentWorldToFrameCoords(point: Point2D, frame: CoordinateFrame)
   return parentToFrame(point, frame)
 }
 
+/**
+ * Transform a point from screen coordinates to nested frame coordinates
+ * Recursively transforms through all parent frames, accounting for each frame's viewport
+ * Inverse of nestedFrameToScreen
+ * @param screenPoint Point in screen coordinates [x, y]
+ * @param frame The target coordinate frame (may be nested)
+ * @param allFrames All frames in the workspace
+ * @param rootViewport Root viewport state
+ * @param canvasWidth Canvas width in pixels
+ * @param canvasHeight Canvas height in pixels
+ * @returns Point in frame coordinates [u, v]
+ */
+export function screenToNestedFrame(
+  screenPoint: Point2D,
+  frame: CoordinateFrame,
+  allFrames: CoordinateFrame[],
+  rootViewport: ViewportState,
+  canvasWidth: number,
+  canvasHeight: number
+): Point2D {
+  // If this frame has a parent, transform through the parent first
+  if (frame.parentFrameId) {
+    const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
+    if (parentFrame) {
+      // Step 1: Convert screen to parent's frame coordinates (recursively)
+      const parentFramePoint = screenToNestedFrame(screenPoint, parentFrame, allFrames, rootViewport, canvasWidth, canvasHeight)
+      
+      // Step 2: Convert parent frame coordinates to parent world coordinates
+      // frameToParent applies parent's viewport pan/zoom, then transforms using base vectors
+      const parentWorldPoint = frameToParent(parentFramePoint, parentFrame)
+      
+      // Step 3: Convert parent world coordinates to this frame's raw coordinates
+      // parentToFrame does NOT apply viewport - it's just the coordinate transformation
+      const rawFramePoint = parentToFrame(parentWorldPoint, frame)
+      
+      // Step 4: Account for this frame's viewport to get the coordinates the user sees
+      // screenToFrame returns coordinates with viewport accounted for
+      // The rawFramePoint is what we'd get if viewport was (0,0) zoom 1
+      // We need the coordinate that, when viewport is applied, gives the same world point
+      // If raw gives world at (0,0) zoom 1, and we want world with viewport:
+      // world_raw = origin + rawU * baseI + rawV * baseJ
+      // world_viewport = origin + (u - viewport.x) * viewport.zoom * baseI + (v - viewport.y) * viewport.zoom * baseJ
+      // We want world_raw = world_viewport
+      // So: rawU = (u - viewport.x) * viewport.zoom
+      //     u = rawU / viewport.zoom + viewport.x
+      const { viewport: frameViewport } = frame
+      const u = rawFramePoint[0] / frameViewport.zoom + frameViewport.x
+      const v = rawFramePoint[1] / frameViewport.zoom + frameViewport.y
+      
+      return [u, v]
+    }
+  }
+  
+  // No parent (or parent not found), use screenToFrame directly
+  return screenToFrame(screenPoint, frame, rootViewport, canvasWidth, canvasHeight)
+}
+
