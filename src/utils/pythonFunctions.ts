@@ -292,12 +292,17 @@ const plotImplementation: FunctionImplementation = (args, _frameId, _storeVector
     }
   }
   
+  // Calculate optimal number of points based on range
+  // Use ~50-100 points per unit of range, with min 200 and max 2000
+  const range = xMax - xMin
+  const optimalPoints = numPoints ?? Math.max(200, Math.min(2000, Math.round(range * 75)))
+  
   const functionPlot: Omit<FunctionPlot, 'id'> = {
     expression: formulaString,
     xMin,
     xMax,
     color,
-    numPoints: numPoints ?? 1000, // Default to 1000 points
+    numPoints: optimalPoints,
   }
   
   console.log('[plotImplementation] Storing function plot:', functionPlot)
@@ -701,10 +706,16 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
             print(f"[plot wrapper] Will evaluate callable at points: {e}")
             # Evaluate the function at many points and pass them directly
             try:
-                # Use num_points if provided, otherwise default to 1000
-                n_points = int(num_points) if num_points is not None else 1000
+                # Use num_points if provided, otherwise calculate optimal based on range
+                # Use ~75 points per unit of range, with min 200 and max 2000
+                if num_points is not None:
+                    n_points = int(num_points)
+                else:
+                    range = x_max - x_min
+                    n_points = max(200, min(2000, int(range * 75)))
+                
                 if n_points < 2:
-                    n_points = 1000
+                    n_points = 200
                 
                 # Sample the function at many points in the range
                 x_samples = np.linspace(x_min, x_max, n_points)
@@ -808,10 +819,16 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
             print(f"[plot wrapper] Will evaluate callable at points: {e}")
             # Evaluate the function at many points and pass them directly
             try:
-                # Use num_points if provided, otherwise default to 1000
-                n_points = int(num_points) if num_points is not None else 1000
+                # Use num_points if provided, otherwise calculate optimal based on range
+                # Use ~75 points per unit of range, with min 200 and max 2000
+                if num_points is not None:
+                    n_points = int(num_points)
+                else:
+                    range = x_max - x_min
+                    n_points = max(200, min(2000, int(range * 75)))
+                
                 if n_points < 2:
-                    n_points = 1000
+                    n_points = 200
                 
                 # Sample the function at many points in the range
                 x_samples = np.linspace(x_min, x_max, n_points)

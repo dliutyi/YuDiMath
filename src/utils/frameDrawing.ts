@@ -1005,6 +1005,54 @@ function drawFrameVectors(
 }
 
 /**
+ * Draw a smooth curve through points using cubic Bezier curves
+ * Uses proper Catmull-Rom to Bezier conversion for maximum smoothness
+ */
+function drawSmoothCurve(ctx: CanvasRenderingContext2D, points: Point2D[]): void {
+  if (points.length === 0) return
+  if (points.length === 1) {
+    ctx.moveTo(points[0][0], points[0][1])
+    return
+  }
+  if (points.length === 2) {
+    ctx.moveTo(points[0][0], points[0][1])
+    ctx.lineTo(points[1][0], points[1][1])
+    return
+  }
+  
+  // Enable image smoothing for smoother curves
+  const oldSmoothing = ctx.imageSmoothingEnabled
+  ctx.imageSmoothingEnabled = true
+  
+  // Start at first point
+  ctx.moveTo(points[0][0], points[0][1])
+  
+  // For each segment, calculate control points using Catmull-Rom spline
+  // Convert Catmull-Rom to cubic Bezier control points
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = i > 0 ? points[i - 1] : points[i]
+    const p1 = points[i]
+    const p2 = points[i + 1]
+    const p3 = i < points.length - 2 ? points[i + 2] : points[i + 1]
+    
+    // Catmull-Rom to Bezier conversion
+    // Control point 1: 1/6 of the way from p1 toward p2, adjusted by (p2 - p0)
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6
+    
+    // Control point 2: 1/6 of the way from p2 toward p1, adjusted by (p3 - p1)
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6
+    
+    // Use cubic Bezier curve - don't round, let smoothing handle it
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2[0], p2[1])
+  }
+  
+  // Restore original smoothing setting
+  ctx.imageSmoothingEnabled = oldSmoothing
+}
+
+/**
  * Draw function plots defined in a frame
  * Functions are evaluated and drawn as curves in frame coordinates
  */
@@ -1028,68 +1076,69 @@ function drawFrameFunctions(
   // Draw each function plot
   frame.functions.forEach((func: FunctionPlot) => {
     try {
+      // Enable smoothing for function plots
+      const oldSmoothing = ctx.imageSmoothingEnabled
+      ctx.imageSmoothingEnabled = true
+      
       ctx.strokeStyle = func.color
       ctx.lineWidth = 2
       ctx.globalAlpha = 0.9
       ctx.beginPath()
       
-      let firstPoint = true
-      
       // If points are provided, use them directly (for callable functions evaluated in Python)
       if (func.points && func.points.length > 0) {
+        // Collect valid points first for better smoothing
+        const validPoints: Array<{ point: Point2D; screen: Point2D }> = []
+        
         for (let i = 0; i < func.points.length; i++) {
           const [x, y] = func.points[i]
           
           // Skip invalid points (NaN, Infinity, etc.)
           if (!isFinite(x) || !isFinite(y)) {
-            // If we have a valid previous point, end the current path segment
-            // This creates a visual break at discontinuities
-            if (!firstPoint) {
-              ctx.stroke()
-              ctx.beginPath()
-              firstPoint = true
-            }
             continue
           }
           
           const pointScreen = transformToScreen([x, y])
           
-          // Check if this point is too far from the previous one (potential discontinuity)
-          // This helps detect jumps that might indicate a discontinuity
-          if (!firstPoint && i > 0) {
-            const prevPoint = func.points[i - 1]
-            const [prevX, prevY] = prevPoint
-            if (isFinite(prevX) && isFinite(prevY)) {
-              const prevScreen = transformToScreen([prevX, prevY])
-              const dx = Math.abs(pointScreen[0] - prevScreen[0])
-              const dy = Math.abs(pointScreen[1] - prevScreen[1])
-              // If the jump is very large (more than 100 pixels), break the path
-              // This handles cases where the function has a discontinuity
-              if (dx > 100 || dy > 100) {
-                ctx.stroke()
-                ctx.beginPath()
-                firstPoint = true
+          // Check for discontinuities (large jumps)
+          if (validPoints.length > 0) {
+            const prevScreen = validPoints[validPoints.length - 1].screen
+            const dx = Math.abs(pointScreen[0] - prevScreen[0])
+            const dy = Math.abs(pointScreen[1] - prevScreen[1])
+            // If the jump is very large (more than 100 pixels), break the path
+            if (dx > 100 || dy > 100) {
+              // Draw current segment and start new one
+              if (validPoints.length > 1) {
+                drawSmoothCurve(ctx, validPoints.map(p => p.screen))
               }
+              ctx.stroke()
+              ctx.beginPath()
+              validPoints.length = 0
             }
           }
           
-          if (firstPoint) {
-            ctx.moveTo(Math.round(pointScreen[0]) + 0.5, Math.round(pointScreen[1]) + 0.5)
-            firstPoint = false
+          validPoints.push({ point: [x, y], screen: pointScreen })
+        }
+        
+        // Draw the final segment
+        if (validPoints.length > 0) {
+          if (validPoints.length === 1) {
+            ctx.moveTo(Math.round(validPoints[0].screen[0]) + 0.5, Math.round(validPoints[0].screen[1]) + 0.5)
           } else {
-            ctx.lineTo(Math.round(pointScreen[0]) + 0.5, Math.round(pointScreen[1]) + 0.5)
+            drawSmoothCurve(ctx, validPoints.map(p => p.screen))
           }
         }
       } else if (func.expression) {
         // Otherwise, evaluate the expression at multiple points
-        const numPoints = func.numPoints ?? 1000 // Number of points to sample (default: 1000)
+        // Calculate optimal number of points based on range if not specified
+        const range = func.xMax - func.xMin
+        const numPoints = func.numPoints ?? Math.max(200, Math.min(2000, Math.round(range * 75)))
         const xMin = func.xMin
         const xMax = func.xMax
         const step = (xMax - xMin) / numPoints
         
-        let prevX: number | null = null
-        let prevY: number | null = null
-        let prevScreen: Point2D | null = null
+        // Collect valid points first for better smoothing
+        const validPoints: Array<{ point: Point2D; screen: Point2D }> = []
         
         for (let i = 0; i <= numPoints; i++) {
           const x = xMin + i * step
@@ -1100,63 +1149,63 @@ function drawFrameFunctions(
             y = evaluateExpression(func.expression, x)
             // Skip invalid results (NaN, Infinity, -Infinity)
             if (!isFinite(y)) {
-              // If we have a valid previous point, end the current path segment
-              // This creates a visual break at discontinuities
-              if (!firstPoint) {
-                ctx.stroke()
-                ctx.beginPath()
-                firstPoint = true
+              // If we have valid points, draw current segment and start new one
+              if (validPoints.length > 1) {
+                drawSmoothCurve(ctx, validPoints.map(p => p.screen))
               }
-              prevX = null
-              prevY = null
-              prevScreen = null
+              ctx.stroke()
+              ctx.beginPath()
+              validPoints.length = 0
               continue
             }
           } catch (e) {
             // If evaluation fails (e.g., division by zero, sqrt of negative), skip this point
-            if (!firstPoint) {
-              ctx.stroke()
-              ctx.beginPath()
-              firstPoint = true
+            if (validPoints.length > 1) {
+              drawSmoothCurve(ctx, validPoints.map(p => p.screen))
             }
-            prevX = null
-            prevY = null
-            prevScreen = null
+            ctx.stroke()
+            ctx.beginPath()
+            validPoints.length = 0
             continue
           }
           
           const pointScreen = transformToScreen([x, y])
           
           // Check if this point is too far from the previous one (potential discontinuity)
-          // This helps detect jumps that might indicate a discontinuity
-          if (!firstPoint && prevScreen !== null && prevX !== null && prevY !== null) {
+          if (validPoints.length > 0) {
+            const prevScreen = validPoints[validPoints.length - 1].screen
             const dx = Math.abs(pointScreen[0] - prevScreen[0])
             const dy = Math.abs(pointScreen[1] - prevScreen[1])
             // If the jump is very large (more than 100 pixels), break the path
-            // This handles cases where the function has a discontinuity
             if (dx > 100 || dy > 100) {
+              // Draw current segment and start new one
+              if (validPoints.length > 1) {
+                drawSmoothCurve(ctx, validPoints.map(p => p.screen))
+              }
               ctx.stroke()
               ctx.beginPath()
-              firstPoint = true
+              validPoints.length = 0
             }
           }
           
-          if (firstPoint) {
-            ctx.moveTo(Math.round(pointScreen[0]) + 0.5, Math.round(pointScreen[1]) + 0.5)
-            firstPoint = false
+          validPoints.push({ point: [x, y], screen: pointScreen })
+        }
+        
+        // Draw the final segment
+        if (validPoints.length > 0) {
+          if (validPoints.length === 1) {
+            ctx.moveTo(Math.round(validPoints[0].screen[0]) + 0.5, Math.round(validPoints[0].screen[1]) + 0.5)
           } else {
-            ctx.lineTo(Math.round(pointScreen[0]) + 0.5, Math.round(pointScreen[1]) + 0.5)
+            drawSmoothCurve(ctx, validPoints.map(p => p.screen))
           }
-          
-          // Store previous point for discontinuity detection
-          prevX = x
-          prevY = y
-          prevScreen = pointScreen
         }
       }
       
       ctx.stroke()
       ctx.globalAlpha = 1.0
+      
+      // Restore original smoothing setting
+      ctx.imageSmoothingEnabled = oldSmoothing
     } catch (error) {
       // If drawing fails, skip this function
       console.warn('[drawFrameFunctions] Failed to draw function:', func.expression || 'points', error)
@@ -1195,4 +1244,5 @@ function evaluateExpression(expression: string, x: number): number {
     throw new Error(`Failed to evaluate expression: ${expression}`)
   }
 }
+
 
