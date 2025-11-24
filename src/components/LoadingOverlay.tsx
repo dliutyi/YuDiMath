@@ -52,17 +52,17 @@ export default function LoadingOverlay() {
           return newProgress
         })
       } else {
-        // Smooth, gradual progress increase (up to 90%) - faster than before
-        const targetProgress = 90
+        // Smooth, gradual progress increase (up to 95%) - much faster
+        const targetProgress = 95
         
         setProgress((prev) => {
           if (prev >= targetProgress) {
             return prev
           }
           
-          // Smooth acceleration: start slow, speed up in middle, slow down near target
+          // Much faster progress: start quick, maintain speed
           const distanceToTarget = targetProgress - prev
-          const speed = Math.min(20 * deltaTime, distanceToTarget * 0.15) // Max 20% per second
+          const speed = Math.min(35 * deltaTime, distanceToTarget * 0.25) // Max 35% per second (was 20%)
           
           return Math.min(prev + speed, targetProgress)
         })
@@ -131,10 +131,14 @@ export default function LoadingOverlay() {
         </p>
         
         {/* Progress bar */}
-        <div className="w-full max-w-[320px] h-2 bg-bg-secondary rounded-full overflow-hidden mx-auto mb-2">
+        <div className="w-full max-w-[320px] h-2 bg-bg-secondary rounded-full overflow-hidden mx-auto mb-2" style={{ width: '100%', maxWidth: '320px' }}>
           <div 
-            className="h-full bg-primary rounded-full transition-all duration-100 ease-linear relative"
-            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+            className="h-full bg-primary rounded-full relative"
+            style={{ 
+              width: `${Math.min(100, Math.max(0, progress))}%`,
+              transition: 'none',
+              willChange: 'width'
+            }}
           >
             <div className="h-full w-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
           </div>
