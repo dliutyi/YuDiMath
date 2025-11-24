@@ -271,30 +271,40 @@ export function screenToNestedFrame(
   if (frame.parentFrameId) {
     const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
     if (parentFrame) {
-      // Step 1: Convert screen to parent's frame coordinates (recursively)
+      // Step 1: Convert screen to parent's frame coordinates (recursively, with viewport)
       const parentFramePoint = screenToNestedFrame(screenPoint, parentFrame, allFrames, rootViewport, canvasWidth, canvasHeight)
       
-      // Step 2: Convert parent frame coordinates to parent world coordinates
+      // Step 2: Convert parent frame coordinates (with viewport) to parent world coordinates
       // frameToParent applies parent's viewport pan/zoom, then transforms using base vectors
       const parentWorldPoint = frameToParent(parentFramePoint, parentFrame)
       
-      // Step 3: Convert parent world coordinates to this frame's raw coordinates
-      // parentToFrame does NOT apply viewport - it's just the coordinate transformation
-      const rawFramePoint = parentToFrame(parentWorldPoint, frame)
-      
-      // Step 4: Account for this frame's viewport to get the coordinates the user sees
-      // screenToFrame returns coordinates with viewport accounted for
-      // The rawFramePoint is what we'd get if viewport was (0,0) zoom 1
-      // We need the coordinate that, when viewport is applied, gives the same world point
-      // If raw gives world at (0,0) zoom 1, and we want world with viewport:
-      // world_raw = origin + rawU * baseI + rawV * baseJ
-      // world_viewport = origin + (u - viewport.x) * viewport.zoom * baseI + (v - viewport.y) * viewport.zoom * baseJ
-      // We want world_raw = world_viewport
-      // So: rawU = (u - viewport.x) * viewport.zoom
-      //     u = rawU / viewport.zoom + viewport.x
+      // Step 3: Convert parent world coordinates to this frame's coordinates (with viewport)
+      // We need to solve: parentWorldPoint = origin + (u - viewport.x) * viewport.zoom * baseI + (v - viewport.y) * viewport.zoom * baseJ
+      // This is the same as what screenToFrame does, but we already have the world point
+      const [originX, originY] = frame.origin
+      const [iX, iY] = frame.baseI
+      const [jX, jY] = frame.baseJ
       const { viewport: frameViewport } = frame
-      const u = rawFramePoint[0] / frameViewport.zoom + frameViewport.x
-      const v = rawFramePoint[1] / frameViewport.zoom + frameViewport.y
+      
+      // Relative to frame origin
+      const relX = parentWorldPoint[0] - originX
+      const relY = parentWorldPoint[1] - originY
+      
+      // Solve for scaledU and scaledV: relX = scaledU * iX + scaledV * jX, relY = scaledU * iY + scaledV * jY
+      // Where scaledU = (u - viewport.x) * viewport.zoom
+      const determinant = iX * jY - iY * jX
+      if (Math.abs(determinant) < 1e-10) {
+        return [0, 0]
+      }
+      
+      const scaledU = (relX * jY - relY * jX) / determinant
+      const scaledV = (relY * iX - relX * iY) / determinant
+      
+      // Convert scaled coordinates to frame coordinates with viewport
+      // scaledU = (u - viewport.x) * viewport.zoom
+      // u = scaledU / viewport.zoom + viewport.x
+      const u = scaledU / frameViewport.zoom + frameViewport.x
+      const v = scaledV / frameViewport.zoom + frameViewport.y
       
       return [u, v]
     }
