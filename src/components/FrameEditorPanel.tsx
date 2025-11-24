@@ -14,6 +14,7 @@ interface FrameEditorPanelProps {
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
   autoExecuteCode?: string | null
+  externalExecutionResult?: { success: boolean; error?: string } | null
   onFrameDelete?: (frameId: string) => void
 }
 
@@ -30,6 +31,7 @@ export default function FrameEditorPanel({
   onVectorsClear,
   onFunctionsClear,
   autoExecuteCode,
+  externalExecutionResult,
   onFrameDelete,
 }: FrameEditorPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('properties')
@@ -87,6 +89,7 @@ export default function FrameEditorPanel({
             onVectorsClear={onVectorsClear}
             onFunctionsClear={onFunctionsClear}
             autoExecuteCode={autoExecuteCode}
+            externalExecutionResult={externalExecutionResult}
           />
         )}
       </div>

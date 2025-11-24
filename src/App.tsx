@@ -143,11 +143,14 @@ function App() {
 
   const [autoExecuteCode, setAutoExecuteCode] = useState<string | null>(null)
   const [autoExecuteFrameId, setAutoExecuteFrameId] = useState<string | null>(null)
+  const [autoExecutionResult, setAutoExecutionResult] = useState<{ success: boolean; error?: string } | null>(null)
 
   // Auto-execute code when autoExecuteCode changes (works regardless of active tab)
   useEffect(() => {
     if (autoExecuteCode && autoExecuteFrameId && isReady && !isExecuting) {
       console.log('[App] Auto-executing code for frame:', autoExecuteFrameId)
+      // Clear previous execution result when starting new execution
+      setAutoExecutionResult(null)
       
       // Collect vectors and functions created during execution
       // Don't clear first - keep old ones visible for smooth transition
@@ -177,6 +180,7 @@ function App() {
       ).then((result) => {
         console.log('[App] Auto-execution result:', result.success)
         if (result.success) {
+          setAutoExecutionResult({ success: true })
           // Atomically replace old vectors/functions with new ones
           // This keeps old ones visible until new ones are ready, eliminating blinking
           flushSync(() => {
@@ -184,6 +188,10 @@ function App() {
             handleFunctionsUpdate(autoExecuteFrameId, newFunctions, true)
           })
         } else {
+          setAutoExecutionResult({
+            success: false,
+            error: result.error?.message || 'Unknown error occurred',
+          })
           // On error, clear vectors/functions to show that execution failed
           flushSync(() => {
             handleVectorsClear(autoExecuteFrameId)
@@ -195,6 +203,10 @@ function App() {
         setAutoExecuteFrameId(null)
       }).catch((error) => {
         console.error('[App] Auto-execution error:', error)
+        setAutoExecutionResult({
+          success: false,
+          error: error.message || 'Execution failed',
+        })
         // On error, clear vectors/functions
         flushSync(() => {
           handleVectorsClear(autoExecuteFrameId)
@@ -380,6 +392,7 @@ function App() {
           onVectorsClear={handleVectorsClear}
           onFunctionsClear={handleFunctionsClear}
           autoExecuteCode={autoExecuteCode}
+          externalExecutionResult={autoExecutionResult}
           onFrameDelete={handleFrameDelete}
         />
       </div>
