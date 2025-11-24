@@ -110,7 +110,7 @@ export function drawAxes(
 
   // Draw axis labels
   ctx.fillStyle = '#cbd5e1' // text-secondary
-  ctx.font = '12px sans-serif'
+  ctx.font = 'bold 12px sans-serif'
   
   const minLabelSpacingPx = 50
   const screenGridSpacing = viewport.gridStep * viewport.zoom

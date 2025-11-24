@@ -267,8 +267,8 @@ export function drawCoordinateFrame(
     ? nestedFrameToScreen([0, baseVectorScale], frame, allFrames, viewport, canvasWidth, canvasHeight)
     : frameToScreen([0, baseVectorScale], frame, viewport, canvasWidth, canvasHeight)
 
-  drawArrow(ctx, originScreen, baseIEndScreen, '#f97316', 2, 8) // Orange to match X-axis labels
-  drawArrow(ctx, originScreen, baseJEndScreen, '#10b981', 2, 8) // Green to match Y-axis labels
+  drawArrow(ctx, originScreen, baseIEndScreen, '#f97316', 3.5, 8) // Orange to match X-axis labels, thicker for base vectors
+  drawArrow(ctx, originScreen, baseJEndScreen, '#10b981', 3.5, 8) // Green to match Y-axis labels, thicker for base vectors
   
   // Draw vectors within clipped region
   drawFrameVectors(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
@@ -884,7 +884,7 @@ function drawFrameAxes(
   }
 
   // Set label colors (different from grid/axes) - use contrasting colors for each axis
-  ctx.font = '11px sans-serif'
+  ctx.font = 'bold 11px sans-serif'
   ctx.textBaseline = 'middle'
   ctx.globalAlpha = 1.0
 
