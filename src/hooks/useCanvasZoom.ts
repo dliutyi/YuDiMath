@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { ViewportState, CoordinateFrame } from '../types'
 import { screenToWorld } from '../utils/coordinates'
-import { parentToFrame } from '../utils/frameTransforms'
+import { screenToFrame } from '../utils/frameTransforms'
 
 interface UseCanvasZoomProps {
   canvasRef: React.RefObject<HTMLCanvasElement>
@@ -56,8 +56,8 @@ export function useCanvasZoom({
 
       if (zoomingFrame && onFrameViewportChange) {
         // Zooming the selected frame
-        const worldPoint = screenToWorld(mouseX, mouseY, viewport, canvasWidth, canvasHeight)
-        const framePoint = parentToFrame(worldPoint, zoomingFrame)
+        // Use screenToFrame which properly accounts for frame viewport pan/zoom
+        const framePoint = screenToFrame([mouseX, mouseY], zoomingFrame, viewport, canvasWidth, canvasHeight)
         
         const zoomFactor = Math.exp(-e.deltaY * FRAME_ZOOM_SENSITIVITY)
         const newZoom = Math.max(FRAME_MIN_ZOOM, Math.min(FRAME_MAX_ZOOM, zoomingFrame.viewport.zoom * zoomFactor))
