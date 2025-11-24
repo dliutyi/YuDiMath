@@ -677,6 +677,10 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
     # For now, try to extract expression, but if that fails, evaluate at points
     if callable(formula):
         import numpy as np
+        # IMPORTANT: Save the original callable before any modifications
+        original_callable = formula
+        extracted_expression = None
+        
         # Try to get source code first
         try:
             import inspect
@@ -696,8 +700,10 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         expr = expr[1:-1].strip()
                     # Remove newlines and extra whitespace
                     expr = ' '.join(expr.split())
-                    formula = expr
-                    print(f"[plot wrapper] Extracted expression: {repr(formula)}")
+                    extracted_expression = expr
+                    print(f"[plot wrapper] Extracted expression: {repr(extracted_expression)}")
+                    # Use extracted expression instead of callable
+                    formula = extracted_expression
                 else:
                     raise ValueError("Could not find ':' in lambda")
             else:
@@ -705,36 +711,122 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
         except Exception as e:
             print(f"[plot wrapper] Will evaluate callable at points: {e}")
             # Evaluate the function at many points and pass them directly
+            # Use the original callable, not the potentially modified formula
             try:
                 # Use num_points if provided, otherwise calculate optimal based on range
                 # Use ~75 points per unit of range, with min 200 and max 2000
                 if num_points is not None:
                     n_points = int(num_points)
                 else:
-                    range = x_max - x_min
-                    n_points = max(200, min(2000, int(range * 75)))
+                    x_range = x_max - x_min
+                    n_points = max(200, min(2000, int(x_range * 75)))
                 
                 if n_points < 2:
                     n_points = 200
                 
-                # Sample the function at many points in the range
-                x_samples = np.linspace(x_min, x_max, n_points)
-                # Evaluate function at each point, handling errors gracefully
+                # Use adaptive sampling for better capture of rapid changes
+                # Start with uniform sampling, then refine where function changes rapidly
                 points = []
+                max_depth = 8
+                min_step = (x_max - x_min) / 10000
+                
+                def sample_adaptive(x1, x2, y1_val, depth):
+                    """Recursively sample function, subdividing where it changes rapidly"""
+                    if depth > max_depth or (x2 - x1) < min_step:
+                        # Base case: evaluate at midpoint
+                        try:
+                            x = (x1 + x2) / 2
+                            y = float(original_callable(x))
+                            if np.isfinite(y):
+                                points.append([float(x), y])
+                        except:
+                            pass
+                        return
+                    
+                    try:
+                        # Evaluate at endpoints and midpoint
+                        if y1_val is None:
+                            y1_val = float(original_callable(x1))
+                        y2 = float(original_callable(x2))
+                        x_mid = (x1 + x2) / 2
+                        y_mid = float(original_callable(x_mid))
+                        
+                        if not (np.isfinite(y1_val) and np.isfinite(y2) and np.isfinite(y_mid)):
+                            return
+                        
+                        # Check if function changes rapidly (non-linear)
+                        # Use a more sensitive threshold for functions with rapid changes
+                        max_y = max(abs(y1_val), abs(y2), abs(y_mid), 1)
+                        change_ratio = abs(y_mid - y_linear) / (max_y + 1)
+                        threshold = 0.05  # 5% difference triggers subdivision (more sensitive)
+                        
+                        if change_ratio > threshold:
+                            # Function changes rapidly - subdivide and add midpoint
+                            points.append([float(x_mid), float(y_mid)])
+                            
+                            # Recursively subdivide both halves
+                            sample_adaptive(x1, x_mid, y1_val, depth + 1)
+                            sample_adaptive(x_mid, x2, y_mid, depth + 1)
+                        else:
+                            # Function is smooth - just add midpoint
+                            points.append([float(x_mid), float(y_mid)])
+                    except:
+                        # If evaluation fails, try to subdivide anyway
+                        x_mid = (x1 + x2) / 2
+                        sample_adaptive(x1, x_mid, y1_val, depth + 1)
+                        sample_adaptive(x_mid, x2, None, depth + 1)
+                
+                # First pass: uniform sampling
+                x_samples = np.linspace(x_min, x_max, n_points)
+                initial_points = []
                 for x in x_samples:
                     try:
-                        y = float(formula(x))
-                        # Only include finite values (skip NaN, Infinity, -Infinity)
+                        y = float(original_callable(x))
                         if np.isfinite(y):
                             points.append([float(x), y])
+                            initial_points.append((x, y))
+                        else:
+                            initial_points.append((x, None))
                     except (ZeroDivisionError, ValueError, OverflowError, TypeError):
-                        # Skip points where function is undefined or causes errors
-                        # This handles cases like 1/x at x=0, sqrt(x) at x<0, etc.
+                        initial_points.append((x, None))
                         continue
                     except Exception as e:
-                        # Log unexpected errors but continue
                         print(f"[plot wrapper] Warning: Error evaluating function at x={x}: {e}")
+                        initial_points.append((x, None))
                         continue
+                
+                # Second pass: adaptive refinement between consecutive valid points
+                # Check for rapid changes in function value
+                for i in range(len(initial_points) - 1):
+                    x1, y1_val = initial_points[i]
+                    x2, y2_val = initial_points[i + 1]
+                    
+                    if y1_val is not None and y2_val is not None:
+                        # Calculate the actual function change rate
+                        x_diff = abs(x2 - x1)
+                        
+                        # If x difference is significant, check if we need more detail
+                        if x_diff > (x_max - x_min) / n_points * 2:
+                            # Evaluate at midpoint to check for rapid change
+                            try:
+                                x_mid = (x1 + x2) / 2
+                                y_mid = float(formula(x_mid))
+                                
+                                if np.isfinite(y_mid):
+                                    # Check if function changes rapidly (non-linear)
+                                    y_linear = (y1_val + y2_val) / 2
+                                    change_ratio = abs(y_mid - y_linear) / (max(abs(y1_val), abs(y2_val), 1) + 1)
+                                    threshold = 0.1  # 10% difference triggers subdivision
+                                    
+                                    if change_ratio > threshold:
+                                        # Function changes rapidly - subdivide
+                                        sample_adaptive(x1, x2, y1_val, 0)
+                            except:
+                                # If evaluation fails, subdivide anyway to be safe
+                                sample_adaptive(x1, x2, y1_val, 0)
+                
+                # Sort points by x coordinate (adaptive sampling may add points out of order)
+                points.sort(key=lambda p: p[0])
                 
                 print(f"[plot wrapper] Evaluated {len(points)} points from callable function")
                 
@@ -750,14 +842,16 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 raise ValueError(f"plot() could not evaluate callable function. Error: {str(e2)}")
     
     # Call the underlying JavaScript function with all arguments
+    # Use extracted expression if available, otherwise use original formula
+    formula_to_use = extracted_expression if 'extracted_expression' in locals() and extracted_expression is not None else formula
     if color is not None and num_points is not None:
-        return _yudimath.plot(formula, x_min, x_max, color, num_points)
+        return _yudimath.plot(formula_to_use, x_min, x_max, color, num_points)
     elif color is not None:
-        return _yudimath.plot(formula, x_min, x_max, color)
+        return _yudimath.plot(formula_to_use, x_min, x_max, color)
     elif num_points is not None:
-        return _yudimath.plot(formula, x_min, x_max, None, num_points)
+        return _yudimath.plot(formula_to_use, x_min, x_max, None, num_points)
     else:
-        return _yudimath.plot(formula, x_min, x_max)
+        return _yudimath.plot(formula_to_use, x_min, x_max)
 `
       pyodide.runPython(pythonCode)
       console.log('[pythonFunctions] Functions injected via registerJsModule with keyword argument support:', functionNames)
@@ -790,6 +884,10 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
     # For now, try to extract expression, but if that fails, evaluate at points
     if callable(formula):
         import numpy as np
+        # IMPORTANT: Save the original callable before any modifications
+        original_callable = formula
+        extracted_expression = None
+        
         # Try to get source code first
         try:
             import inspect
@@ -809,8 +907,10 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         expr = expr[1:-1].strip()
                     # Remove newlines and extra whitespace
                     expr = ' '.join(expr.split())
-                    formula = expr
-                    print(f"[plot wrapper] Extracted expression: {repr(formula)}")
+                    extracted_expression = expr
+                    print(f"[plot wrapper] Extracted expression: {repr(extracted_expression)}")
+                    # Use extracted expression instead of callable
+                    formula = extracted_expression
                 else:
                     raise ValueError("Could not find ':' in lambda")
             else:
@@ -818,36 +918,122 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
         except Exception as e:
             print(f"[plot wrapper] Will evaluate callable at points: {e}")
             # Evaluate the function at many points and pass them directly
+            # Use the original callable, not the potentially modified formula
             try:
                 # Use num_points if provided, otherwise calculate optimal based on range
                 # Use ~75 points per unit of range, with min 200 and max 2000
                 if num_points is not None:
                     n_points = int(num_points)
                 else:
-                    range = x_max - x_min
-                    n_points = max(200, min(2000, int(range * 75)))
+                    x_range = x_max - x_min
+                    n_points = max(200, min(2000, int(x_range * 75)))
                 
                 if n_points < 2:
                     n_points = 200
                 
-                # Sample the function at many points in the range
-                x_samples = np.linspace(x_min, x_max, n_points)
-                # Evaluate function at each point, handling errors gracefully
+                # Use adaptive sampling for better capture of rapid changes
+                # Start with uniform sampling, then refine where function changes rapidly
                 points = []
+                max_depth = 8
+                min_step = (x_max - x_min) / 10000
+                
+                def sample_adaptive(x1, x2, y1_val, depth):
+                    """Recursively sample function, subdividing where it changes rapidly"""
+                    if depth > max_depth or (x2 - x1) < min_step:
+                        # Base case: evaluate at midpoint
+                        try:
+                            x = (x1 + x2) / 2
+                            y = float(original_callable(x))
+                            if np.isfinite(y):
+                                points.append([float(x), y])
+                        except:
+                            pass
+                        return
+                    
+                    try:
+                        # Evaluate at endpoints and midpoint
+                        if y1_val is None:
+                            y1_val = float(original_callable(x1))
+                        y2 = float(original_callable(x2))
+                        x_mid = (x1 + x2) / 2
+                        y_mid = float(original_callable(x_mid))
+                        
+                        if not (np.isfinite(y1_val) and np.isfinite(y2) and np.isfinite(y_mid)):
+                            return
+                        
+                        # Check if function changes rapidly (non-linear)
+                        # Use a more sensitive threshold for functions with rapid changes
+                        max_y = max(abs(y1_val), abs(y2), abs(y_mid), 1)
+                        change_ratio = abs(y_mid - y_linear) / (max_y + 1)
+                        threshold = 0.05  # 5% difference triggers subdivision (more sensitive)
+                        
+                        if change_ratio > threshold:
+                            # Function changes rapidly - subdivide and add midpoint
+                            points.append([float(x_mid), float(y_mid)])
+                            
+                            # Recursively subdivide both halves
+                            sample_adaptive(x1, x_mid, y1_val, depth + 1)
+                            sample_adaptive(x_mid, x2, y_mid, depth + 1)
+                        else:
+                            # Function is smooth - just add midpoint
+                            points.append([float(x_mid), float(y_mid)])
+                    except:
+                        # If evaluation fails, try to subdivide anyway
+                        x_mid = (x1 + x2) / 2
+                        sample_adaptive(x1, x_mid, y1_val, depth + 1)
+                        sample_adaptive(x_mid, x2, None, depth + 1)
+                
+                # First pass: uniform sampling
+                x_samples = np.linspace(x_min, x_max, n_points)
+                initial_points = []
                 for x in x_samples:
                     try:
-                        y = float(formula(x))
-                        # Only include finite values (skip NaN, Infinity, -Infinity)
+                        y = float(original_callable(x))
                         if np.isfinite(y):
                             points.append([float(x), y])
+                            initial_points.append((x, y))
+                        else:
+                            initial_points.append((x, None))
                     except (ZeroDivisionError, ValueError, OverflowError, TypeError):
-                        # Skip points where function is undefined or causes errors
-                        # This handles cases like 1/x at x=0, sqrt(x) at x<0, etc.
+                        initial_points.append((x, None))
                         continue
                     except Exception as e:
-                        # Log unexpected errors but continue
                         print(f"[plot wrapper] Warning: Error evaluating function at x={x}: {e}")
+                        initial_points.append((x, None))
                         continue
+                
+                # Second pass: adaptive refinement between consecutive valid points
+                # Check for rapid changes in function value
+                for i in range(len(initial_points) - 1):
+                    x1, y1_val = initial_points[i]
+                    x2, y2_val = initial_points[i + 1]
+                    
+                    if y1_val is not None and y2_val is not None:
+                        # Calculate the actual function change rate
+                        x_diff = abs(x2 - x1)
+                        
+                        # If x difference is significant, check if we need more detail
+                        if x_diff > (x_max - x_min) / n_points * 2:
+                            # Evaluate at midpoint to check for rapid change
+                            try:
+                                x_mid = (x1 + x2) / 2
+                                y_mid = float(formula(x_mid))
+                                
+                                if np.isfinite(y_mid):
+                                    # Check if function changes rapidly (non-linear)
+                                    y_linear = (y1_val + y2_val) / 2
+                                    change_ratio = abs(y_mid - y_linear) / (max(abs(y1_val), abs(y2_val), 1) + 1)
+                                    threshold = 0.1  # 10% difference triggers subdivision
+                                    
+                                    if change_ratio > threshold:
+                                        # Function changes rapidly - subdivide
+                                        sample_adaptive(x1, x2, y1_val, 0)
+                            except:
+                                # If evaluation fails, subdivide anyway to be safe
+                                sample_adaptive(x1, x2, y1_val, 0)
+                
+                # Sort points by x coordinate (adaptive sampling may add points out of order)
+                points.sort(key=lambda p: p[0])
                 
                 print(f"[plot wrapper] Evaluated {len(points)} points from callable function")
                 
@@ -862,10 +1048,12 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 print(f"[plot wrapper] Point evaluation failed: {e2}")
                 raise ValueError(f"plot() could not evaluate callable function. Error: {str(e2)}")
     
+    # Use extracted expression if available, otherwise use original formula
+    formula_to_use = extracted_expression if 'extracted_expression' in locals() and extracted_expression is not None else formula
     if color is not None:
-        return __yudimath_plot(formula, x_min, x_max, color)
+        return __yudimath_plot(formula_to_use, x_min, x_max, color)
     else:
-        return __yudimath_plot(formula, x_min, x_max)
+        return __yudimath_plot(formula_to_use, x_min, x_max)
 `
       // Set JS functions with prefixed names
       for (const name of functionNames) {
@@ -891,16 +1079,184 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
     if x_min is None or x_max is None:
         raise ValueError("plot() requires x_min and x_max arguments")
     
+    # If formula is callable, we need to evaluate it in Python and pass points
+    if callable(formula):
+        import numpy as np
+        # IMPORTANT: Save the original callable before any modifications
+        original_callable = formula
+        extracted_expression = None
+        
+        # Try to get source code first
+        try:
+            import inspect
+            source = inspect.getsource(formula)
+            print(f"[plot wrapper] Got source: {repr(source)}")
+            # Extract the expression from lambda x: expression
+            if 'lambda' in source:
+                # Find the part after 'lambda' 
+                lambda_part = source.split('lambda', 1)[1]
+                # Remove variable name(s) and colon - handle cases like "lambda x:" or "lambda x, y:"
+                if ':' in lambda_part:
+                    expr = lambda_part.split(':', 1)[1].strip()
+                    # Clean up: remove trailing commas, parentheses, whitespace, newlines
+                    expr = expr.rstrip(',').rstrip(')').rstrip().strip()
+                    # Remove any leading/trailing quotes
+                    while (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
+                        expr = expr[1:-1].strip()
+                    # Remove newlines and extra whitespace
+                    expr = ' '.join(expr.split())
+                    extracted_expression = expr
+                    print(f"[plot wrapper] Extracted expression: {repr(extracted_expression)}")
+                    # Use extracted expression instead of callable
+                    formula = extracted_expression
+                else:
+                    raise ValueError("Could not find ':' in lambda")
+            else:
+                raise ValueError("Not a lambda function")
+        except Exception as e:
+            print(f"[plot wrapper] Will evaluate callable at points: {e}")
+            # Evaluate the function at many points and pass them directly
+            # Use the original callable, not the potentially modified formula
+            try:
+                # Use num_points if provided, otherwise calculate optimal based on range
+                # Use ~75 points per unit of range, with min 200 and max 2000
+                if num_points is not None:
+                    n_points = int(num_points)
+                else:
+                    x_range = x_max - x_min
+                    n_points = max(200, min(2000, int(x_range * 75)))
+                
+                if n_points < 2:
+                    n_points = 200
+                
+                # Use adaptive sampling for better capture of rapid changes
+                # Start with uniform sampling, then refine where function changes rapidly
+                points = []
+                max_depth = 8
+                min_step = (x_max - x_min) / 10000
+                
+                def sample_adaptive(x1, x2, y1_val, depth):
+                    """Recursively sample function, subdividing where it changes rapidly"""
+                    if depth > max_depth or (x2 - x1) < min_step:
+                        # Base case: evaluate at midpoint
+                        try:
+                            x = (x1 + x2) / 2
+                            y = float(original_callable(x))
+                            if np.isfinite(y):
+                                points.append([float(x), y])
+                        except:
+                            pass
+                        return
+                    
+                    try:
+                        # Evaluate at endpoints and midpoint
+                        if y1_val is None:
+                            y1_val = float(original_callable(x1))
+                        y2 = float(original_callable(x2))
+                        x_mid = (x1 + x2) / 2
+                        y_mid = float(original_callable(x_mid))
+                        
+                        if not (np.isfinite(y1_val) and np.isfinite(y2) and np.isfinite(y_mid)):
+                            return
+                        
+                        # Check if function changes rapidly (non-linear)
+                        # Use a more sensitive threshold for functions with rapid changes
+                        max_y = max(abs(y1_val), abs(y2), abs(y_mid), 1)
+                        change_ratio = abs(y_mid - y_linear) / (max_y + 1)
+                        threshold = 0.05  # 5% difference triggers subdivision (more sensitive)
+                        
+                        if change_ratio > threshold:
+                            # Function changes rapidly - subdivide and add midpoint
+                            points.append([float(x_mid), float(y_mid)])
+                            
+                            # Recursively subdivide both halves
+                            sample_adaptive(x1, x_mid, y1_val, depth + 1)
+                            sample_adaptive(x_mid, x2, y_mid, depth + 1)
+                        else:
+                            # Function is smooth - just add midpoint
+                            points.append([float(x_mid), float(y_mid)])
+                    except:
+                        # If evaluation fails, try to subdivide anyway
+                        x_mid = (x1 + x2) / 2
+                        sample_adaptive(x1, x_mid, y1_val, depth + 1)
+                        sample_adaptive(x_mid, x2, None, depth + 1)
+                
+                # First pass: uniform sampling
+                x_samples = np.linspace(x_min, x_max, n_points)
+                initial_points = []
+                for x in x_samples:
+                    try:
+                        y = float(original_callable(x))
+                        if np.isfinite(y):
+                            points.append([float(x), y])
+                            initial_points.append((x, y))
+                        else:
+                            initial_points.append((x, None))
+                    except (ZeroDivisionError, ValueError, OverflowError, TypeError):
+                        initial_points.append((x, None))
+                        continue
+                    except Exception as e:
+                        print(f"[plot wrapper] Warning: Error evaluating function at x={x}: {e}")
+                        initial_points.append((x, None))
+                        continue
+                
+                # Second pass: adaptive refinement between consecutive valid points
+                # Check for rapid changes in function value
+                for i in range(len(initial_points) - 1):
+                    x1, y1_val = initial_points[i]
+                    x2, y2_val = initial_points[i + 1]
+                    
+                    if y1_val is not None and y2_val is not None:
+                        # Calculate the actual function change rate
+                        x_diff = abs(x2 - x1)
+                        
+                        # If x difference is significant, check if we need more detail
+                        if x_diff > (x_max - x_min) / n_points * 2:
+                            # Evaluate at midpoint to check for rapid change
+                            try:
+                                x_mid = (x1 + x2) / 2
+                                y_mid = float(formula(x_mid))
+                                
+                                if np.isfinite(y_mid):
+                                    # Check if function changes rapidly (non-linear)
+                                    y_linear = (y1_val + y2_val) / 2
+                                    change_ratio = abs(y_mid - y_linear) / (max(abs(y1_val), abs(y2_val), 1) + 1)
+                                    threshold = 0.1  # 10% difference triggers subdivision
+                                    
+                                    if change_ratio > threshold:
+                                        # Function changes rapidly - subdivide
+                                        sample_adaptive(x1, x2, y1_val, 0)
+                            except:
+                                # If evaluation fails, subdivide anyway to be safe
+                                sample_adaptive(x1, x2, y1_val, 0)
+                
+                # Sort points by x coordinate (adaptive sampling may add points out of order)
+                points.sort(key=lambda p: p[0])
+                
+                print(f"[plot wrapper] Evaluated {len(points)} points from callable function")
+                
+                # Convert points to a JavaScript-compatible format (list of lists)
+                # Pyodide will handle the conversion, but we ensure it's a plain Python list
+                points_list = [[float(p[0]), float(p[1])] for p in points]
+                
+                # Pass points directly to JavaScript - use plot_points function
+                return __yudimath_plot_points(points_list, x_min, x_max, color if color is not None else None, n_points)
+                    
+            except Exception as e2:
+                print(f"[plot wrapper] Point evaluation failed: {e2}")
+                raise ValueError(f"plot() could not evaluate callable function. Error: {str(e2)}")
+    
     # Call the underlying JavaScript function with all arguments
-    # Handle all combinations of color and num_points
+    # Use extracted expression if available, otherwise use original formula
+    formula_to_use = extracted_expression if 'extracted_expression' in locals() and extracted_expression is not None else formula
     if color is not None and num_points is not None:
-        return __yudimath_plot(formula, x_min, x_max, color, num_points)
+        return __yudimath_plot(formula_to_use, x_min, x_max, color, num_points)
     elif color is not None:
-        return __yudimath_plot(formula, x_min, x_max, color)
+        return __yudimath_plot(formula_to_use, x_min, x_max, color)
     elif num_points is not None:
-        return __yudimath_plot(formula, x_min, x_max, None, num_points)
+        return __yudimath_plot(formula_to_use, x_min, x_max, None, num_points)
     else:
-        return __yudimath_plot(formula, x_min, x_max)
+        return __yudimath_plot(formula_to_use, x_min, x_max)
 `
       for (const name of functionNames) {
         pyodide.globals.set(`__yudimath_${name}`, jsFunctions[name])

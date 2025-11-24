@@ -1132,71 +1132,169 @@ function drawFrameFunctions(
         // Otherwise, evaluate the expression at multiple points
         // Calculate optimal number of points based on range if not specified
         const range = func.xMax - func.xMin
-        const numPoints = func.numPoints ?? Math.max(200, Math.min(2000, Math.round(range * 75)))
+        const baseNumPoints = func.numPoints ?? Math.max(200, Math.min(2000, Math.round(range * 100)))
         const xMin = func.xMin
         const xMax = func.xMax
-        const step = (xMax - xMin) / numPoints
+        const expression = func.expression // Type guard: we know expression exists here
         
-        // Collect valid points first for better smoothing
+        // Use adaptive sampling: collect points with adaptive density
+        // This helps capture rapid changes in functions like 1/tan(exp(x))
         const validPoints: Array<{ point: Point2D; screen: Point2D }> = []
+        const maxDepth = 8 // Maximum recursion depth for adaptive sampling
+        const minStep = (xMax - xMin) / 10000 // Minimum step size to prevent infinite recursion
         
-        for (let i = 0; i <= numPoints; i++) {
-          const x = xMin + i * step
-          
-          // Evaluate the function expression
-          let y: number
-          try {
-            y = evaluateExpression(func.expression, x)
-            // Skip invalid results (NaN, Infinity, -Infinity)
-            if (!isFinite(y)) {
-              // If we have valid points, draw current segment and start new one
-              if (validPoints.length > 1) {
-                drawSmoothCurve(ctx, validPoints.map(p => p.screen))
+        // Adaptive sampling function
+        const sampleAdaptive = (x1: number, x2: number, y1: number | null, depth: number) => {
+          if (depth > maxDepth || (x2 - x1) < minStep) {
+            // Base case: evaluate at midpoint
+            try {
+              const x = (x1 + x2) / 2
+              const y = evaluateExpression(expression, x)
+              if (isFinite(y)) {
+                const pointScreen = transformToScreen([x, y])
+                validPoints.push({ point: [x, y], screen: pointScreen })
               }
-              ctx.stroke()
-              ctx.beginPath()
-              validPoints.length = 0
-              continue
+            } catch (e) {
+              // Skip invalid points
+            }
+            return
+          }
+          
+          // Evaluate at endpoints and midpoint
+          let y1_val = y1
+          let y2: number
+          let yMid: number
+          
+          try {
+            if (y1_val === null) {
+              y1_val = evaluateExpression(expression, x1)
+            }
+            y2 = evaluateExpression(expression, x2)
+            const xMid = (x1 + x2) / 2
+            yMid = evaluateExpression(expression, xMid)
+            
+            // Check if all are finite
+            if (!isFinite(y1_val) || !isFinite(y2) || !isFinite(yMid)) {
+              return
+            }
+            
+            // Calculate linear interpolation at midpoint
+            const yLinear = (y1_val + y2) / 2
+            
+            // Check if the actual value differs significantly from linear interpolation
+            // This indicates rapid change - need more sampling
+            const changeRatio = Math.abs(yMid - yLinear) / (Math.max(Math.abs(y1_val), Math.abs(y2), 1) + 1)
+            const threshold = 0.1 // 10% difference triggers subdivision
+            
+            if (changeRatio > threshold) {
+              // Function changes rapidly - subdivide
+              sampleAdaptive(x1, xMid, y1_val, depth + 1)
+              sampleAdaptive(xMid, x2, yMid, depth + 1)
+            } else {
+              // Function is smooth - just add midpoint
+              const pointScreen = transformToScreen([xMid, yMid])
+              validPoints.push({ point: [xMid, yMid], screen: pointScreen })
             }
           } catch (e) {
-            // If evaluation fails (e.g., division by zero, sqrt of negative), skip this point
-            if (validPoints.length > 1) {
-              drawSmoothCurve(ctx, validPoints.map(p => p.screen))
-            }
-            ctx.stroke()
-            ctx.beginPath()
-            validPoints.length = 0
-            continue
+            // If evaluation fails, try to subdivide anyway
+            const xMid = (x1 + x2) / 2
+            sampleAdaptive(x1, xMid, y1_val, depth + 1)
+            sampleAdaptive(xMid, x2, null, depth + 1)
           }
+        }
+        
+        // Start with uniform sampling, then refine adaptively
+        const initialStep = (xMax - xMin) / baseNumPoints
+        const initialPoints: Array<{ x: number; y: number | null }> = []
+        
+        // First pass: uniform sampling
+        for (let i = 0; i <= baseNumPoints; i++) {
+          const x = xMin + i * initialStep
+          try {
+            const y = evaluateExpression(expression, x)
+            if (isFinite(y)) {
+              const pointScreen = transformToScreen([x, y])
+              validPoints.push({ point: [x, y], screen: pointScreen })
+              initialPoints.push({ x, y })
+            } else {
+              initialPoints.push({ x, y: null })
+            }
+          } catch (e) {
+            initialPoints.push({ x, y: null })
+          }
+        }
+        
+        // Second pass: adaptive refinement between consecutive valid points
+        // Check for rapid changes in function value, not just screen distance
+        for (let i = 0; i < initialPoints.length - 1; i++) {
+          const p1 = initialPoints[i]
+          const p2 = initialPoints[i + 1]
           
-          const pointScreen = transformToScreen([x, y])
+          if (p1.y !== null && p2.y !== null) {
+            // Calculate the actual function change rate
+            const xDiff = Math.abs(p2.x - p1.x)
+            
+            // If x difference is significant, check if we need more detail
+            if (xDiff > (xMax - xMin) / baseNumPoints * 2) {
+              // Evaluate at midpoint to check for rapid change
+              try {
+                const xMid = (p1.x + p2.x) / 2
+                const yMid = evaluateExpression(expression, xMid)
+                
+                if (isFinite(yMid)) {
+                  // Check if function changes rapidly (non-linear)
+                  const yLinear = (p1.y + p2.y) / 2
+                  const changeRatio = Math.abs(yMid - yLinear) / (Math.max(Math.abs(p1.y), Math.abs(p2.y), 1) + 1)
+                  const threshold = 0.1 // 10% difference triggers subdivision
+                  
+                  if (changeRatio > threshold) {
+                    // Function changes rapidly - subdivide
+                    sampleAdaptive(p1.x, p2.x, p1.y, 0)
+                  }
+                }
+              } catch (e) {
+                // If evaluation fails, subdivide anyway to be safe
+                sampleAdaptive(p1.x, p2.x, p1.y, 0)
+              }
+            }
+          }
+        }
+        
+        // Sort points by x coordinate (adaptive sampling may add points out of order)
+        validPoints.sort((a, b) => a.point[0] - b.point[0])
+        
+        // Draw the curve, handling discontinuities
+        let segmentPoints: Point2D[] = []
+        for (let i = 0; i < validPoints.length; i++) {
+          const current = validPoints[i]
           
-          // Check if this point is too far from the previous one (potential discontinuity)
-          if (validPoints.length > 0) {
-            const prevScreen = validPoints[validPoints.length - 1].screen
-            const dx = Math.abs(pointScreen[0] - prevScreen[0])
-            const dy = Math.abs(pointScreen[1] - prevScreen[1])
-            // If the jump is very large (more than 100 pixels), break the path
+          // Check for discontinuities
+          if (segmentPoints.length > 0) {
+            const prevScreen = transformToScreen(validPoints[i - 1].point)
+            const dx = Math.abs(current.screen[0] - prevScreen[0])
+            const dy = Math.abs(current.screen[1] - prevScreen[1])
+            
             if (dx > 100 || dy > 100) {
-              // Draw current segment and start new one
-              if (validPoints.length > 1) {
-                drawSmoothCurve(ctx, validPoints.map(p => p.screen))
+              // Large jump - draw current segment and start new one
+              if (segmentPoints.length > 1) {
+                drawSmoothCurve(ctx, segmentPoints.map(p => transformToScreen(p)))
               }
               ctx.stroke()
               ctx.beginPath()
-              validPoints.length = 0
+              segmentPoints = []
             }
           }
           
-          validPoints.push({ point: [x, y], screen: pointScreen })
+          segmentPoints.push(current.point)
         }
         
         // Draw the final segment
-        if (validPoints.length > 0) {
-          if (validPoints.length === 1) {
-            ctx.moveTo(Math.round(validPoints[0].screen[0]) + 0.5, Math.round(validPoints[0].screen[1]) + 0.5)
+        if (segmentPoints.length > 0) {
+          if (segmentPoints.length === 1) {
+            const screen = transformToScreen(segmentPoints[0])
+            ctx.moveTo(screen[0], screen[1])
           } else {
-            drawSmoothCurve(ctx, validPoints.map(p => p.screen))
+            drawSmoothCurve(ctx, segmentPoints.map(p => transformToScreen(p)))
           }
         }
       }
