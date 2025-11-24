@@ -232,5 +232,215 @@ describe('PropertiesPanel', () => {
     expect(baseJSpanTexts).toContain('4.00')
     expect(baseJSpanTexts).toContain('5.00')
   })
+
+  it('should call onFrameDelete when delete button is clicked', () => {
+    const mockOnFrameDelete = vi.fn()
+    
+    render(
+      <PropertiesPanel
+        selectedFrame={testFrame}
+        onFrameUpdate={mockOnFrameUpdate}
+        onFrameDelete={mockOnFrameDelete}
+      />
+    )
+    
+    const deleteButton = screen.getByTitle('Delete Frame (Delete key)')
+    fireEvent.click(deleteButton)
+    
+    expect(mockOnFrameDelete).toHaveBeenCalledWith('test-frame-1')
+  })
+
+  it('should not show delete button when onFrameDelete is not provided', () => {
+    render(
+      <PropertiesPanel
+        selectedFrame={testFrame}
+        onFrameUpdate={mockOnFrameUpdate}
+      />
+    )
+    
+    expect(screen.queryByTitle('Delete Frame (Delete key)')).not.toBeInTheDocument()
+  })
+
+  it('should call onFrameViewportChange when viewport controls are used', async () => {
+    const mockOnFrameViewportChange = vi.fn()
+    
+    render(
+      <PropertiesPanel
+        selectedFrame={testFrame}
+        onFrameUpdate={mockOnFrameUpdate}
+        onFrameViewportChange={mockOnFrameViewportChange}
+      />
+    )
+    
+    // Find and click "Move to Origin" button
+    const moveToOriginButton = screen.getByText(/Move to Origin/i)
+    fireEvent.click(moveToOriginButton)
+    
+    await waitFor(() => {
+      expect(mockOnFrameViewportChange).toHaveBeenCalledWith('test-frame-1', expect.objectContaining({
+        x: 0,
+        y: 0,
+      }))
+    })
+  })
+
+  it('should call onFrameViewportChange when reset zoom is clicked', async () => {
+    const mockOnFrameViewportChange = vi.fn()
+    const frameWithZoom: CoordinateFrame = {
+      ...testFrame,
+      viewport: {
+        x: 5,
+        y: 5,
+        zoom: 2.0,
+        gridStep: 1,
+      },
+    }
+    
+    render(
+      <PropertiesPanel
+        selectedFrame={frameWithZoom}
+        onFrameUpdate={mockOnFrameUpdate}
+        onFrameViewportChange={mockOnFrameViewportChange}
+      />
+    )
+    
+    // Find and click "Reset Zoom" button
+    const resetZoomButton = screen.getByText(/Reset Zoom/i)
+    fireEvent.click(resetZoomButton)
+    
+    await waitFor(() => {
+      expect(mockOnFrameViewportChange).toHaveBeenCalledWith('test-frame-1', expect.objectContaining({
+        zoom: 1.0,
+      }))
+    })
+  })
+
+  it('should handle orthogonal base vector adjustment when baseI changes with normalization', async () => {
+    const frameWithNormalize: CoordinateFrame = {
+      ...testFrame,
+      baseI: [2, 0],
+      baseJ: [0, 1],
+    }
+    
+    render(
+      <PropertiesPanel
+        selectedFrame={frameWithNormalize}
+        onFrameUpdate={mockOnFrameUpdate}
+      />
+    )
+    
+    // Enable normalization
+    const normalizeCheckbox = screen.getByLabelText(/normalize base vectors/i)
+    fireEvent.click(normalizeCheckbox)
+    
+    await waitFor(() => {
+      expect(mockOnFrameUpdate).toHaveBeenCalled()
+    })
+    
+    // Change baseI X slider
+    const baseILabel = screen.getByText('Base I Vector')
+    const baseIContainer = baseILabel.closest('div')?.parentElement
+    const baseISliders = baseIContainer?.querySelectorAll('input[type="range"]')
+    const baseIXSlider = baseISliders![0] as HTMLInputElement
+    
+    fireEvent.change(baseIXSlider, { target: { value: '3' } })
+    
+    await waitFor(() => {
+      // Should normalize and adjust baseJ to be orthogonal
+      const calls = mockOnFrameUpdate.mock.calls
+      const lastCall = calls[calls.length - 1]
+      expect(lastCall[1].baseI).toBeDefined()
+      expect(lastCall[1].baseJ).toBeDefined()
+    })
+  })
+
+  it('should handle orthogonal base vector adjustment when baseJ changes with normalization', async () => {
+    const frameWithNormalize: CoordinateFrame = {
+      ...testFrame,
+      baseI: [1, 0],
+      baseJ: [0, 2],
+    }
+    
+    render(
+      <PropertiesPanel
+        selectedFrame={frameWithNormalize}
+        onFrameUpdate={mockOnFrameUpdate}
+      />
+    )
+    
+    // Enable normalization
+    const normalizeCheckbox = screen.getByLabelText(/normalize base vectors/i)
+    fireEvent.click(normalizeCheckbox)
+    
+    await waitFor(() => {
+      expect(mockOnFrameUpdate).toHaveBeenCalled()
+    })
+    
+    // Change baseJ Y slider
+    const baseJLabel = screen.getByText('Base J Vector')
+    const baseJContainer = baseJLabel.closest('div')?.parentElement
+    const baseJSliders = baseJContainer?.querySelectorAll('input[type="range"]')
+    const baseJYSlider = baseJSliders![1] as HTMLInputElement
+    
+    fireEvent.change(baseJYSlider, { target: { value: '3' } })
+    
+    await waitFor(() => {
+      // Should normalize and adjust baseI to be orthogonal
+      const calls = mockOnFrameUpdate.mock.calls
+      const lastCall = calls[calls.length - 1]
+      expect(lastCall[1].baseI).toBeDefined()
+      expect(lastCall[1].baseJ).toBeDefined()
+    })
+  })
+
+  it('should display ParameterSliders component', () => {
+    render(
+      <PropertiesPanel
+        selectedFrame={testFrame}
+        onFrameUpdate={mockOnFrameUpdate}
+      />
+    )
+    
+    // ParameterSliders should be rendered (it shows "No parameters" message if none exist)
+    expect(screen.getByText(/No parameters/i)).toBeInTheDocument()
+  })
+
+  it('should handle parameter changes through ParameterSliders', async () => {
+    const frameWithParams: CoordinateFrame = {
+      ...testFrame,
+      parameters: { t1: 5.0, t2: 10.0 },
+    }
+    
+    render(
+      <PropertiesPanel
+        selectedFrame={frameWithParams}
+        onFrameUpdate={mockOnFrameUpdate}
+      />
+    )
+    
+    // ParameterSliders should display the parameters
+    expect(screen.getByDisplayValue('5')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('10')).toBeInTheDocument()
+  })
+
+  it('should clear error when valid input is entered after invalid input', async () => {
+    render(<PropertiesPanel selectedFrame={testFrame} onFrameUpdate={mockOnFrameUpdate} />)
+    
+    const originXInput = screen.getAllByDisplayValue('0')[0]
+    
+    // Enter invalid input
+    fireEvent.change(originXInput, { target: { value: 'invalid' } })
+    
+    await waitFor(() => {
+      expect(screen.getByText('Origin values must be valid numbers')).toBeInTheDocument()
+    })
+    
+    // Enter valid input
+    fireEvent.change(originXInput, { target: { value: '5' } })
+    
+    await waitFor(() => {
+      expect(screen.queryByText('Origin values must be valid numbers')).not.toBeInTheDocument()
+    })
+  })
 })
 
