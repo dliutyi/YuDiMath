@@ -6,26 +6,59 @@ export default function LoadingOverlay() {
   const [progress, setProgress] = useState(0)
   const [fadeOut, setFadeOut] = useState(false)
 
-  // Simulate progress while loading
+  // Simulate smooth progress while loading
   useEffect(() => {
-    if (isReady) {
-      setProgress(100)
-      // Fade out after a brief delay
-      setTimeout(() => setFadeOut(true), 300)
-      return
+    let animationFrameId: number | null = null
+    let lastUpdate = Date.now()
+    
+    const animate = () => {
+      const now = Date.now()
+      const deltaTime = (now - lastUpdate) / 1000 // seconds
+      lastUpdate = now
+      
+      if (isReady) {
+        // Smoothly animate to 100% when ready
+        setProgress((prev) => {
+          if (prev >= 100) {
+            // Fade out after reaching 100%
+            setTimeout(() => setFadeOut(true), 300)
+            return 100
+          }
+          
+          const targetProgress = 100
+          const distanceToTarget = targetProgress - prev
+          // Ease out: slow down as we approach 100%
+          const speed = Math.min(30 * deltaTime, distanceToTarget * 0.15)
+          
+          return Math.min(prev + speed, 100)
+        })
+      } else {
+        // Smooth, gradual progress increase (up to 85%)
+        const targetProgress = 85
+        
+        setProgress((prev) => {
+          if (prev >= targetProgress) {
+            return prev
+          }
+          
+          // Smooth acceleration: start slow, speed up in middle, slow down near target
+          const distanceToTarget = targetProgress - prev
+          const speed = Math.min(12 * deltaTime, distanceToTarget * 0.08) // Max 12% per second, but slow down as we approach target
+          
+          return Math.min(prev + speed, targetProgress)
+        })
+      }
+      
+      animationFrameId = requestAnimationFrame(animate)
     }
-
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        // Gradually increase progress, but don't go to 100% until ready
-        if (prev < 90) {
-          return Math.min(prev + Math.random() * 5, 90)
-        }
-        return prev
-      })
-    }, 500)
-
-    return () => clearInterval(interval)
+    
+    animationFrameId = requestAnimationFrame(animate)
+    
+    return () => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId)
+      }
+    }
   }, [isReady])
 
   if (fadeOut) {
@@ -54,10 +87,10 @@ export default function LoadingOverlay() {
         </div>
         
         {/* Loading text */}
-        <h2 className="text-3xl font-bold text-text-primary mb-2">
+        <h2 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
           YuDiMath
         </h2>
-        <p className="text-lg text-text-secondary mb-6">
+        <p className="text-lg font-medium text-text-primary mb-6">
           Initializing Python runtime...
         </p>
         
@@ -72,12 +105,12 @@ export default function LoadingOverlay() {
         </div>
         
         {/* Progress percentage */}
-        <p className="text-sm text-text-secondary mb-4">
+        <p className="text-base font-semibold text-text-primary mb-4">
           {Math.round(progress)}%
         </p>
         
         {/* Helpful message */}
-        <p className="text-xs text-text-secondary/80 max-w-md mx-auto">
+        <p className="text-sm text-text-secondary max-w-md mx-auto">
           {progress < 30 
             ? 'Downloading Python runtime...' 
             : progress < 70 
