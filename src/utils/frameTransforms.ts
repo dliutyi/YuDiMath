@@ -271,27 +271,94 @@ export function screenToNestedFrame(
   if (frame.parentFrameId) {
     const parentFrame = allFrames.find(f => f.id === frame.parentFrameId)
     if (parentFrame) {
-      // Step 1: Convert screen to parent's frame coordinates (recursively, with viewport)
-      const parentFramePoint = screenToNestedFrame(screenPoint, parentFrame, allFrames, rootViewport, canvasWidth, canvasHeight)
+      // The inverse of nestedFrameToScreen:
+      // nestedFrameToScreen does:
+      //   1. frame coords (with viewport) -> frameToParent -> parent world
+      //   2. parent world -> parentToFrame -> parent frame coords (raw, no viewport)
+      //   3. recursively call nestedFrameToScreen(parentFramePointRaw, parentFrame)
+      //      which eventually calls frameToScreen(parentFramePointRaw, parentFrame, ...)
+      //
+      // CRITICAL ISSUE: nestedFrameToScreen passes RAW coords to frameToScreen, but frameToScreen
+      // expects coords WITH viewport. This causes frameToScreen to incorrectly apply viewport
+      // to raw coords. We need to account for this in the inverse.
+      //
+      // To invert correctly, we need to:
+      //   1. Convert screen -> root world (using root viewport zoom)
+      //   2. For each parent in chain (bottom to top):
+      //      a. Convert world -> parent frame coords (raw) using parentToFrame
+      //      b. Apply parent viewport to get the world that frameToScreen would produce
+      //   3. Convert final parent world -> this frame coords (with viewport)
       
-      // Step 2: Convert parent frame coordinates (with viewport) to parent world coordinates
-      // frameToParent applies parent's viewport pan/zoom, then transforms using base vectors
-      const parentWorldPoint = frameToParent(parentFramePoint, parentFrame)
+      // Step 1: Convert screen to root world (accounting for root viewport zoom)
+      const centerX = canvasWidth / 2
+      const centerY = canvasHeight / 2
+      let currentWorld: Point2D = [
+        rootViewport.x + (screenPoint[0] - centerX) / rootViewport.zoom,
+        rootViewport.y - (screenPoint[1] - centerY) / rootViewport.zoom
+      ]
       
-      // Step 3: Convert parent world coordinates to this frame's coordinates (with viewport)
-      // We need to solve: parentWorldPoint = origin + (u - viewport.x) * viewport.zoom * baseI + (v - viewport.y) * viewport.zoom * baseJ
-      // This is the same as what screenToFrame does, but we already have the world point
+      // Step 2: Build the chain of frames from root to parent
+      const frameChain: CoordinateFrame[] = []
+      let f: CoordinateFrame | undefined = parentFrame
+      while (f) {
+        frameChain.unshift(f) // Add to beginning to get root-to-parent order
+        f = f.parentFrameId ? allFrames.find(fr => fr.id === f!.parentFrameId) : undefined
+      }
+      
+      // Step 3: Convert through each frame in the chain (accounting for viewport zoom and base vectors)
+      // We need to invert the transformation that nestedFrameToScreen does:
+      // nestedFrameToScreen: frame coords (with viewport) -> frameToParent -> parent world -> parentToFrame -> raw coords -> recursive
+      // At base case: raw coords -> frameToScreen (which treats raw as if they have viewport) -> world -> screen
+      //
+      // To invert, we need to:
+      // 1. Start with world point
+      // 2. For each parent frame (bottom to top):
+      //    a. Convert world -> raw frame coords (using parentToFrame - accounts for base vector distortion)
+      //    b. Apply viewport transformation to get the world that frameToScreen would produce
+      //      (frameToScreen does: (rawU - viewport.x) * viewport.zoom, then transforms using base vectors)
+      for (const chainFrame of frameChain) {
+        // Convert world to frame coords (raw, no viewport) - this accounts for base vector distortion/rotation
+        // parentToFrame uses determinant to solve for coordinates, handling non-orthogonal base vectors
+        const frameCoordsRaw = parentToFrame(currentWorld, chainFrame)
+        
+        // Now we need to apply the viewport transformation that frameToScreen would do
+        // frameToScreen receives raw coords and does:
+        //   1. frameU = rawU - viewport.x (subtract pan)
+        //   2. scaledU = frameU * viewport.zoom (apply zoom)
+        //   3. world = origin + scaledU * baseI + scaledV * baseJ (transform using base vectors)
+        const { viewport: chainViewport } = chainFrame
+        const [originX, originY] = chainFrame.origin
+        const [iX, iY] = chainFrame.baseI
+        const [jX, jY] = chainFrame.baseJ
+        
+        // Apply viewport transformation: (rawU - viewport.x) * viewport.zoom
+        const frameU = frameCoordsRaw[0] - chainViewport.x
+        const frameV = frameCoordsRaw[1] - chainViewport.y
+        const scaledU = frameU * chainViewport.zoom
+        const scaledV = frameV * chainViewport.zoom
+        
+        // Transform to world using base vectors (accounts for rotation/distortion/skew)
+        // This is the inverse of what frameToScreen does
+        currentWorld = [
+          originX + scaledU * iX + scaledV * jX,
+          originY + scaledU * iY + scaledV * jY
+        ]
+      }
+      
+      // Step 4: Convert final parent world to this frame coords (with viewport)
+      // This is the same as screenToFrame but we already have the world point
       const [originX, originY] = frame.origin
       const [iX, iY] = frame.baseI
       const [jX, jY] = frame.baseJ
       const { viewport: frameViewport } = frame
       
       // Relative to frame origin
-      const relX = parentWorldPoint[0] - originX
-      const relY = parentWorldPoint[1] - originY
+      const relX = currentWorld[0] - originX
+      const relY = currentWorld[1] - originY
       
       // Solve for scaledU and scaledV: relX = scaledU * iX + scaledV * jX, relY = scaledU * iY + scaledV * jY
       // Where scaledU = (u - viewport.x) * viewport.zoom
+      // This accounts for base vector distortion (rotation/skew)
       const determinant = iX * jY - iY * jX
       if (Math.abs(determinant) < 1e-10) {
         return [0, 0]
