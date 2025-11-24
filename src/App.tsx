@@ -418,7 +418,16 @@ function App() {
     }
 
     // Prevent browser zoom with Ctrl/Cmd + wheel
+    // BUT allow canvas zoom to work (canvas handles its own wheel events)
     const handleWheel = (e: WheelEvent) => {
+      // Check if the event is on the canvas - if so, let it through for canvas zoom
+      const target = e.target as HTMLElement
+      if (target?.tagName === 'CANVAS' || target?.closest('[data-canvas-container]')) {
+        // This is a canvas wheel event - let the canvas handler deal with it
+        return
+      }
+      
+      // For non-canvas areas, prevent browser zoom with Ctrl/Cmd + wheel
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault()
         e.stopPropagation()

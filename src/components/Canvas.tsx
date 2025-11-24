@@ -838,6 +838,7 @@ function Canvas({
   return (
     <div
       ref={containerRef}
+      data-canvas-container
       className="w-full h-full bg-bg-primary relative overflow-hidden"
       style={{ minHeight: '400px' }}
     >
