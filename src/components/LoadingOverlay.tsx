@@ -10,6 +10,7 @@ export default function LoadingOverlay() {
   useEffect(() => {
     let animationFrameId: number | null = null
     let lastUpdate = Date.now()
+    let fadeOutTimeout: ReturnType<typeof setTimeout> | null = null
     
     const animate = () => {
       const now = Date.now()
@@ -20,20 +21,33 @@ export default function LoadingOverlay() {
         // Smoothly animate to 100% when ready
         setProgress((prev) => {
           if (prev >= 100) {
-            // Fade out after reaching 100%
-            setTimeout(() => setFadeOut(true), 300)
+            // Schedule fade out only once when we reach 100%
+            if (fadeOutTimeout === null) {
+              fadeOutTimeout = setTimeout(() => {
+                setFadeOut(true)
+              }, 300)
+            }
             return 100
           }
           
           const targetProgress = 100
           const distanceToTarget = targetProgress - prev
-          // Ease out: slow down as we approach 100%
-          const speed = Math.min(30 * deltaTime, distanceToTarget * 0.15)
+          // Ease out: slow down as we approach 100% (faster than before)
+          const speed = Math.min(40 * deltaTime, distanceToTarget * 0.2)
           
-          return Math.min(prev + speed, 100)
+          const newProgress = Math.min(prev + speed, 100)
+          
+          // If we just reached 100%, schedule fade out
+          if (newProgress >= 100 && fadeOutTimeout === null) {
+            fadeOutTimeout = setTimeout(() => {
+              setFadeOut(true)
+            }, 300)
+          }
+          
+          return newProgress
         })
       } else {
-        // Smooth, gradual progress increase (up to 85%)
+        // Smooth, gradual progress increase (up to 85%) - faster than before
         const targetProgress = 85
         
         setProgress((prev) => {
@@ -41,9 +55,9 @@ export default function LoadingOverlay() {
             return prev
           }
           
-          // Smooth acceleration: start slow, speed up in middle, slow down near target
+          // Smooth acceleration: start slow, speed up in middle, slow down near target (faster)
           const distanceToTarget = targetProgress - prev
-          const speed = Math.min(12 * deltaTime, distanceToTarget * 0.08) // Max 12% per second, but slow down as we approach target
+          const speed = Math.min(18 * deltaTime, distanceToTarget * 0.12) // Max 18% per second (was 12%), but slow down as we approach target
           
           return Math.min(prev + speed, targetProgress)
         })
@@ -57,6 +71,9 @@ export default function LoadingOverlay() {
     return () => {
       if (animationFrameId !== null) {
         cancelAnimationFrame(animationFrameId)
+      }
+      if (fadeOutTimeout !== null) {
+        clearTimeout(fadeOutTimeout)
       }
     }
   }, [isReady])
