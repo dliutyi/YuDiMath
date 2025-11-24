@@ -10,6 +10,7 @@ import { generateCode } from './utils/codeGenerator'
 import { usePyScript } from './hooks/usePyScript'
 import { useWorkspace } from './hooks/useWorkspace'
 import { downloadWorkspace, importWorkspaceFromFile } from './utils/exportImport'
+import { debounce } from './utils/debounce'
 import type { ViewportState, CoordinateFrame, Vector, FunctionPlot, WorkspaceState } from './types'
 
 const MIN_ZOOM = 5.0
@@ -72,9 +73,11 @@ function App() {
     workspace.updateFrameViewport(frameId, newViewport)
   }
 
-  const handleFrameUpdate = (frameId: string, updates: Partial<CoordinateFrame>) => {
-    let codeToExecute: string | null = null
-    
+  // Debounced code generation only for rapid changes (e.g., typing in inputs)
+  // For sliders, execute immediately for smooth, live feel
+  const debouncedCodeGenerationRef = useRef<Map<string, ReturnType<typeof debounce>>>(new Map())
+
+  const handleFrameUpdate = useCallback((frameId: string, updates: Partial<CoordinateFrame>) => {
     // Find the current frame to get its code
     const currentFrame = workspace.frames.find(f => f.id === frameId)
     if (!currentFrame) return
@@ -86,30 +89,60 @@ function App() {
     
     // If origin, base vectors, or parameters changed, regenerate code while preserving user code
     if (updates.origin || updates.baseI || updates.baseJ || updates.parameters) {
-      updatedFrame.code = generateCode(updatedFrame, currentFrame.code)
-      codeToExecute = updatedFrame.code
+      // For sliders (parameters, baseI, baseJ), execute immediately for smooth feel
+      // For text inputs (origin), use debounce to avoid excessive execution while typing
+      const isSliderChange = updates.parameters !== undefined || updates.baseI !== undefined || updates.baseJ !== undefined
       
-      // Trigger auto-execution for any of these changes
-      console.log('[App] Triggering auto-execution for frame:', frameId, 'Reason:', {
-        origin: !!updates.origin,
-        baseI: !!updates.baseI,
-        baseJ: !!updates.baseJ,
-        parameters: !!updates.parameters
-      })
+      if (isSliderChange) {
+        // Immediate execution for sliders - smooth and live
+        const regeneratedCode = generateCode(updatedFrame, currentFrame.code)
+        const finalFrame = { ...updatedFrame, code: regeneratedCode }
+        
+        // Update frame with regenerated code
+        workspace.updateFrame(frameId, finalFrame)
+        
+        // Trigger auto-execution immediately
+        flushSync(() => {
+          setAutoExecuteCode(regeneratedCode)
+          setAutoExecuteFrameId(frameId)
+        })
+        
+        console.log('[App] Immediate execution for slider change, frame:', frameId)
+      } else {
+        // Debounced execution for text inputs (origin) - avoid execution on every keystroke
+        if (!debouncedCodeGenerationRef.current.has(frameId)) {
+          const debouncedFn = debounce((frameId: string, frame: CoordinateFrame, existingCode: string) => {
+            const regeneratedCode = generateCode(frame, existingCode)
+            const finalFrame = { ...frame, code: regeneratedCode }
+            
+            // Update the frame with regenerated code
+            workspace.updateFrame(frameId, finalFrame)
+            
+            // Trigger auto-execution after state update
+            flushSync(() => {
+              setAutoExecuteCode(regeneratedCode)
+              setAutoExecuteFrameId(frameId)
+            })
+            
+            console.log('[App] Executing code after debounced generation for frame:', frameId)
+          }, 300) // 300ms debounce for text inputs
+          debouncedCodeGenerationRef.current.set(frameId, debouncedFn)
+        }
+        
+        // Use debounced function for text inputs
+        const debouncedFn = debouncedCodeGenerationRef.current.get(frameId)!
+        debouncedFn(frameId, updatedFrame, currentFrame.code)
+        
+        // Update frame immediately (without code) for responsive UI
+        workspace.updateFrame(frameId, updatedFrame)
+        
+        console.log('[App] Triggering debounced code generation for text input, frame:', frameId)
+      }
+    } else {
+      // For non-code-related updates, update immediately
+      workspace.updateFrame(frameId, updatedFrame)
     }
-    
-    // Update the frame
-    workspace.updateFrame(frameId, updatedFrame)
-    
-    // Trigger auto-execution after state update
-    if (codeToExecute) {
-      // Use setTimeout to ensure state update completes first
-      setTimeout(() => {
-        setAutoExecuteCode(codeToExecute)
-        setAutoExecuteFrameId(frameId)
-      }, 0)
-    }
-  }
+  }, [workspace])
 
   const handleCodeChange = (frameId: string, code: string) => {
     handleFrameUpdate(frameId, { code })
@@ -147,10 +180,31 @@ function App() {
 
   // Auto-execute code when autoExecuteCode changes (works regardless of active tab)
   useEffect(() => {
-    if (autoExecuteCode && autoExecuteFrameId && isReady && !isExecuting) {
-      console.log('[App] Auto-executing code for frame:', autoExecuteFrameId)
-      // Clear previous execution result when starting new execution
-      setAutoExecutionResult(null)
+    console.log('[App] Auto-execution effect triggered:', {
+      autoExecuteCode: !!autoExecuteCode,
+      autoExecuteCodeLength: autoExecuteCode?.length,
+      autoExecuteFrameId,
+      isReady,
+      isExecuting,
+      shouldExecute: !!(autoExecuteCode && autoExecuteFrameId && isReady && !isExecuting)
+    })
+    
+    // Wait for execution to finish if it's currently running
+    if (autoExecuteCode && autoExecuteFrameId && isReady) {
+      if (isExecuting) {
+        console.log('[App] Execution in progress, waiting...')
+        // Don't execute yet - wait for current execution to finish
+        return
+      }
+      
+      console.log('[App] Starting auto-execution for frame:', autoExecuteFrameId, 'Code length:', autoExecuteCode.length)
+      
+      // Store the code and frameId to execute (in case they change during execution)
+      const codeToExecute = autoExecuteCode
+      const frameIdToExecute = autoExecuteFrameId
+      
+      // Don't clear previous execution result here - let it persist until we know the new result
+      // This ensures errors remain visible until we have a new result
       
       // Collect vectors and functions created during execution
       // Don't clear first - keep old ones visible for smooth transition
@@ -160,9 +214,10 @@ function App() {
       // Generate unique IDs for vectors and functions
       const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
+      console.log('[App] Calling executeCode...')
       executeCode(
-        autoExecuteCode,
-        autoExecuteFrameId,
+        codeToExecute,
+        frameIdToExecute,
         // onVectorCreated callback
         (vector) => {
           newVectors.push({
@@ -178,43 +233,79 @@ function App() {
           })
         }
       ).then((result) => {
-        console.log('[App] Auto-execution result:', result.success)
+        console.log('[App] Auto-execution result received:', {
+          success: result.success,
+          error: result.error,
+          errorMessage: result.error?.message,
+          errorType: result.error?.type,
+          errorString: result.error?.toString(),
+        })
+        
         if (result.success) {
+          console.log('[App] Setting SUCCESS result')
+          // On success, set success result (this will clear any previous errors)
           setAutoExecutionResult({ success: true })
           // Atomically replace old vectors/functions with new ones
           // This keeps old ones visible until new ones are ready, eliminating blinking
           flushSync(() => {
-            handleVectorsUpdate(autoExecuteFrameId, newVectors, true)
-            handleFunctionsUpdate(autoExecuteFrameId, newFunctions, true)
+            handleVectorsUpdate(frameIdToExecute, newVectors, true)
+            handleFunctionsUpdate(frameIdToExecute, newFunctions, true)
           })
         } else {
-          setAutoExecutionResult({
-            success: false,
-            error: result.error?.message || 'Unknown error occurred',
-          })
+          // On error, set error result (this will be displayed)
+          const errorMessage = result.error?.message || 
+                              (typeof result.error === 'string' ? result.error : result.error?.toString()) || 
+                              'Unknown error occurred'
+          console.error('[App] Setting ERROR result:', errorMessage)
+          console.error('[App] Full error object:', result.error)
+          
+          const errorResult = {
+            success: false as const,
+            error: errorMessage,
+          }
+          console.log('[App] Error result object before setState:', errorResult)
+          console.log('[App] Calling setAutoExecutionResult with:', JSON.stringify(errorResult))
+          setAutoExecutionResult(errorResult)
+          
+          // Verify it was set
+          setTimeout(() => {
+            console.log('[App] After setAutoExecutionResult - checking state...')
+          }, 0)
+          
           // On error, clear vectors/functions to show that execution failed
           flushSync(() => {
-            handleVectorsClear(autoExecuteFrameId)
-            handleFunctionsClear(autoExecuteFrameId)
+            handleVectorsClear(frameIdToExecute)
+            handleFunctionsClear(frameIdToExecute)
           })
         }
         // Clear auto-execute trigger after execution
+        console.log('[App] Clearing auto-execute triggers after execution')
         setAutoExecuteCode(null)
         setAutoExecuteFrameId(null)
       }).catch((error) => {
-        console.error('[App] Auto-execution error:', error)
+        console.error('[App] Auto-execution exception caught:', error)
+        const errorMessage = error?.message || error?.toString() || 'Execution failed'
+        console.error('[App] Setting ERROR result from catch:', errorMessage)
         setAutoExecutionResult({
           success: false,
-          error: error.message || 'Execution failed',
+          error: errorMessage,
         })
         // On error, clear vectors/functions
         flushSync(() => {
-          handleVectorsClear(autoExecuteFrameId)
-          handleFunctionsClear(autoExecuteFrameId)
+          handleVectorsClear(frameIdToExecute)
+          handleFunctionsClear(frameIdToExecute)
         })
         // Clear auto-execute trigger even on error
+        console.log('[App] Clearing auto-execute triggers after error')
         setAutoExecuteCode(null)
         setAutoExecuteFrameId(null)
+      })
+    } else {
+      console.log('[App] Auto-execution skipped - conditions not met:', {
+        hasCode: !!autoExecuteCode,
+        hasFrameId: !!autoExecuteFrameId,
+        isReady,
+        isExecuting,
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -227,6 +318,8 @@ function App() {
     // Clear auto-execute trigger after execution
     setAutoExecuteCode(null)
     setAutoExecuteFrameId(null)
+    // Don't clear external execution result here - let CodePanel handle it
+    // Manual execution results are stored in localExecutionResult in CodePanel
   }
 
   const handleExportWorkspace = () => {
@@ -443,7 +536,6 @@ function App() {
           onFunctionsUpdate={handleFunctionsUpdate}
           onVectorsClear={handleVectorsClear}
           onFunctionsClear={handleFunctionsClear}
-          autoExecuteCode={autoExecuteCode}
           externalExecutionResult={autoExecutionResult}
           onFrameDelete={handleFrameDelete}
         />

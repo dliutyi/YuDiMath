@@ -29,39 +29,39 @@
   white-space: pre !important;
   word-wrap: normal !important;
   overflow-wrap: normal !important;
-  overflow-x: auto !important;
-  overflow-y: auto !important;
   box-sizing: border-box !important;
   width: 100% !important;
   height: 100% !important;
-  scrollbar-width: thin !important;
-  scrollbar-color: rgba(148, 163, 184, 0.3) transparent !important;
 }
 
 /* Webkit scrollbar styling */
 .code-editor-textarea::-webkit-scrollbar,
 .code-editor-pre::-webkit-scrollbar,
-.properties-panel-scrollable::-webkit-scrollbar {
+.properties-panel-scrollable::-webkit-scrollbar,
+.code-editor-error-message::-webkit-scrollbar {
   width: 8px !important;
   height: 8px !important;
 }
 
 .code-editor-textarea::-webkit-scrollbar-track,
 .code-editor-pre::-webkit-scrollbar-track,
-.properties-panel-scrollable::-webkit-scrollbar-track {
+.properties-panel-scrollable::-webkit-scrollbar-track,
+.code-editor-error-message::-webkit-scrollbar-track {
   background: transparent !important;
 }
 
 .code-editor-textarea::-webkit-scrollbar-thumb,
 .code-editor-pre::-webkit-scrollbar-thumb,
-.properties-panel-scrollable::-webkit-scrollbar-thumb {
+.properties-panel-scrollable::-webkit-scrollbar-thumb,
+.code-editor-error-message::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.3) !important;
   border-radius: 4px !important;
 }
 
 .code-editor-textarea::-webkit-scrollbar-thumb:hover,
 .code-editor-pre::-webkit-scrollbar-thumb:hover,
-.properties-panel-scrollable::-webkit-scrollbar-thumb:hover {
+.properties-panel-scrollable::-webkit-scrollbar-thumb:hover,
+.code-editor-error-message::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.5) !important;
 }
 
@@ -73,6 +73,12 @@
   overscroll-behavior: contain !important;
 }
 
+/* Error message scrollbar styling - match code editor */
+.code-editor-error-message {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent !important;
+}
+
 .code-editor-textarea {
   background: transparent !important;
   color: transparent !important; /* Make text transparent so only highlighted version shows */
@@ -82,6 +88,9 @@
   z-index: 1 !important;
   -webkit-font-smoothing: antialiased !important;
   -moz-osx-font-smoothing: grayscale !important;
+  overflow: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent !important;
 }
 
 .code-editor-textarea::placeholder {
@@ -104,7 +113,9 @@
   z-index: 0 !important;
   -webkit-font-smoothing: antialiased !important;
   -moz-osx-font-smoothing: grayscale !important;
-  overflow: hidden !important; /* Pre should not scroll, textarea does */
+  overflow: auto !important; /* Pre needs to scroll with textarea */
+  scrollbar-width: none !important; /* Hide pre scrollbar - textarea shows it */
+  -ms-overflow-style: none !important;
 }
 
 /* Ensure code inside pre has same styling */

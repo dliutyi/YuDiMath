@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import type { CoordinateFrame } from '../types'
 
 interface ParameterSlidersProps {
@@ -32,7 +32,7 @@ function getNextParameterName(existingParameters: Record<string, number>): strin
   return `t${maxNum + 1}`
 }
 
-export default function ParameterSliders({
+function ParameterSliders({
   selectedFrame,
   onParameterChange,
 }: ParameterSlidersProps) {
@@ -144,4 +144,6 @@ export default function ParameterSliders({
     </div>
   )
 }
+
+export default memo(ParameterSliders)
 

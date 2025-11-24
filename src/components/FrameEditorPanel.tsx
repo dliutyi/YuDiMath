@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, memo } from 'react'
 import PropertiesPanel from './PropertiesPanel'
 import CodePanel from './CodePanel'
 import type { CoordinateFrame, ViewportState, Vector, FunctionPlot } from '../types'
@@ -13,14 +13,13 @@ interface FrameEditorPanelProps {
   onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[], replace?: boolean) => void
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
-  autoExecuteCode?: string | null
   externalExecutionResult?: { success: boolean; error?: string } | null
   onFrameDelete?: (frameId: string) => void
 }
 
 type TabType = 'properties' | 'code'
 
-export default function FrameEditorPanel({
+function FrameEditorPanel({
   selectedFrame,
   onFrameUpdate,
   onFrameViewportChange,
@@ -30,11 +29,31 @@ export default function FrameEditorPanel({
   onFunctionsUpdate,
   onVectorsClear,
   onFunctionsClear,
-  autoExecuteCode,
   externalExecutionResult,
   onFrameDelete,
 }: FrameEditorPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('properties')
+  const [hasExecutionError, setHasExecutionError] = useState(false)
+  
+  // Reset error state when frame changes
+  useEffect(() => {
+    setHasExecutionError(false)
+  }, [selectedFrame?.id])
+  
+  // Clear error state when external execution succeeds or is cleared
+  useEffect(() => {
+    if (!externalExecutionResult || (externalExecutionResult && externalExecutionResult.success)) {
+      // Clear manual execution error when auto-execution succeeds or is cleared
+      // This ensures the badge disappears when execution succeeds
+      setHasExecutionError(false)
+    }
+  }, [externalExecutionResult])
+  
+  // Determine if there's an error from either manual or auto execution
+  // Badge shows if:
+  // - Manual execution has an error (hasExecutionError is true), OR
+  // - Auto-execution has an error (externalExecutionResult exists and success is false)
+  const hasError = hasExecutionError || (externalExecutionResult && !externalExecutionResult.success)
 
   if (!selectedFrame) {
     return null
@@ -59,13 +78,18 @@ export default function FrameEditorPanel({
         </button>
         <button
           onClick={() => setActiveTab('code')}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
             activeTab === 'code'
               ? 'text-primary border-b-2 border-primary bg-bg-primary/50'
               : 'text-text-secondary hover:text-text-primary hover:bg-bg-primary/30'
           }`}
         >
           Code Editor
+          {hasError && (
+            <span className="ml-2 px-1.5 py-0.5 text-xs font-normal rounded bg-error text-white">
+              (1)
+            </span>
+          )}
         </button>
       </div>
 
@@ -88,12 +112,14 @@ export default function FrameEditorPanel({
             onFunctionsUpdate={onFunctionsUpdate}
             onVectorsClear={onVectorsClear}
             onFunctionsClear={onFunctionsClear}
-            autoExecuteCode={autoExecuteCode}
             externalExecutionResult={externalExecutionResult}
+            onExecutionErrorChange={setHasExecutionError}
           />
         )}
       </div>
     </div>
   )
 }
+
+export default memo(FrameEditorPanel)
 

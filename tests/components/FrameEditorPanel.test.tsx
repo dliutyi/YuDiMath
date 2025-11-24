@@ -13,10 +13,9 @@ vi.mock('../../src/components/PropertiesPanel', () => ({
 }))
 
 vi.mock('../../src/components/CodePanel', () => ({
-  default: vi.fn(({ selectedFrame, onCodeChange, autoExecuteCode, externalExecutionResult }) => (
+  default: vi.fn(({ selectedFrame, onCodeChange, externalExecutionResult }) => (
     <div data-testid="code-panel">
       Code Panel - Frame: {selectedFrame?.id}
-      {autoExecuteCode && <span data-testid="auto-execute-code">{autoExecuteCode}</span>}
       {externalExecutionResult && (
         <span data-testid="execution-result">
           {externalExecutionResult.success ? 'Success' : 'Error'}
@@ -182,20 +181,7 @@ describe('FrameEditorPanel', () => {
     expect(screen.getByText(`Code Panel - Frame: ${mockFrame.id}`)).toBeInTheDocument()
   })
 
-  it('should pass autoExecuteCode to CodePanel', () => {
-    render(
-      <FrameEditorPanel
-        selectedFrame={mockFrame}
-        onFrameUpdate={mockOnFrameUpdate}
-        onCodeChange={mockOnCodeChange}
-        autoExecuteCode="test code"
-      />
-    )
-    
-    fireEvent.click(screen.getByText('Code Editor'))
-    
-    expect(screen.getByTestId('auto-execute-code')).toHaveTextContent('test code')
-  })
+  // Note: autoExecuteCode prop was removed - execution is now handled internally via externalExecutionResult
 
   it('should pass externalExecutionResult to CodePanel', () => {
     const executionResult = { success: false, error: 'Test error' }

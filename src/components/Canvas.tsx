@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, memo, useMemo } from 'react'
 import type { ViewportState, CoordinateFrame, Point2D } from '../types'
 import { worldToScreen, screenToWorld, isPointInPolygon } from '../utils/coordinates'
 import { drawCoordinateFrame, parentToFrame, nestedFrameToScreen } from './CoordinateFrame'
@@ -26,7 +26,7 @@ interface CanvasProps {
   onFrameViewportChange?: (frameId: string, viewport: ViewportState) => void
 }
 
-export default function Canvas({
+function Canvas({
   viewport,
   onViewportChange,
   width,
@@ -68,6 +68,12 @@ export default function Canvas({
     height,
     onFrameCreated,
   })
+
+  // Memoize top-level frames to avoid recalculating on every render
+  const topLevelFrames = useMemo(
+    () => frames.filter(f => f.parentFrameId === null),
+    [frames]
+  )
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -112,7 +118,6 @@ export default function Canvas({
     drawAxes(ctx, viewport, canvasWidth, canvasHeight)
 
     // Draw existing frames (only top-level frames, children are drawn recursively)
-    const topLevelFrames = frames.filter(f => f.parentFrameId === null)
     topLevelFrames.forEach((frame) => {
       drawCoordinateFrame(ctx, frame, viewport, canvasWidth, canvasHeight, frames, selectedFrameId, 0)
     })
@@ -200,7 +205,7 @@ export default function Canvas({
       }
     }
 
-  }, [viewport, width, height, frames, selectedFrameId, drawingRect])
+  }, [viewport, width, height, topLevelFrames, frames, selectedFrameId, drawingRect])
 
   useEffect(() => {
     // Use requestAnimationFrame to ensure DOM is ready
@@ -851,6 +856,8 @@ export default function Canvas({
     </div>
   )
 }
+
+export default memo(Canvas)
 
 
 /**

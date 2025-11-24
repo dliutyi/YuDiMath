@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import type { CoordinateFrame, Point2D, ViewportState } from '../types'
 import { areVectorsCollinear, normalizeVector, vectorMagnitude, orthogonalVector } from '../utils/vectorUtils'
 import ParameterSliders from './ParameterSliders'
@@ -11,7 +11,7 @@ interface PropertiesPanelProps {
   onFrameDelete?: (frameId: string) => void
 }
 
-export default function PropertiesPanel({
+function PropertiesPanel({
   selectedFrame,
   onFrameUpdate,
   onFrameViewportChange,
@@ -543,3 +543,5 @@ export default function PropertiesPanel({
     </div>
   )
 }
+
+export default memo(PropertiesPanel)
