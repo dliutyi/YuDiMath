@@ -1,16 +1,32 @@
 import { usePyScript } from '../hooks/usePyScript'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export default function LoadingOverlay() {
   const { isReady } = usePyScript()
   const [progress, setProgress] = useState(0)
   const [fadeOut, setFadeOut] = useState(false)
+  const fadeOutTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Handle fade-out when progress reaches 100% and isReady
+  useEffect(() => {
+    if (isReady && progress >= 100 && fadeOutTimeoutRef.current === null) {
+      fadeOutTimeoutRef.current = setTimeout(() => {
+        setFadeOut(true)
+      }, 300)
+    }
+    
+    return () => {
+      if (fadeOutTimeoutRef.current !== null) {
+        clearTimeout(fadeOutTimeoutRef.current)
+        fadeOutTimeoutRef.current = null
+      }
+    }
+  }, [isReady, progress])
 
   // Simulate smooth progress while loading
   useEffect(() => {
     let animationFrameId: number | null = null
     let lastUpdate = Date.now()
-    let fadeOutTimeout: ReturnType<typeof setTimeout> | null = null
     
     const animate = () => {
       const now = Date.now()
@@ -21,12 +37,6 @@ export default function LoadingOverlay() {
         // Smoothly animate to 100% when ready
         setProgress((prev) => {
           if (prev >= 100) {
-            // Schedule fade out only once when we reach 100%
-            if (fadeOutTimeout === null) {
-              fadeOutTimeout = setTimeout(() => {
-                setFadeOut(true)
-              }, 300)
-            }
             return 100
           }
           
@@ -35,16 +45,7 @@ export default function LoadingOverlay() {
           // Ease out: slow down as we approach 100% (faster than before)
           const speed = Math.min(40 * deltaTime, distanceToTarget * 0.2)
           
-          const newProgress = Math.min(prev + speed, 100)
-          
-          // If we just reached 100%, schedule fade out
-          if (newProgress >= 100 && fadeOutTimeout === null) {
-            fadeOutTimeout = setTimeout(() => {
-              setFadeOut(true)
-            }, 300)
-          }
-          
-          return newProgress
+          return Math.min(prev + speed, 100)
         })
       } else {
         // Smooth, gradual progress increase (up to 85%) - faster than before
@@ -71,9 +72,6 @@ export default function LoadingOverlay() {
     return () => {
       if (animationFrameId !== null) {
         cancelAnimationFrame(animationFrameId)
-      }
-      if (fadeOutTimeout !== null) {
-        clearTimeout(fadeOutTimeout)
       }
     }
   }, [isReady])
