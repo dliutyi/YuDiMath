@@ -23,7 +23,8 @@ interface UsePyScriptReturn {
     onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void,
     canvasWidth?: number,
     canvasHeight?: number,
-    pixelsPerUnit?: number
+    pixelsPerUnit?: number,
+    isSliderChange?: boolean
   ) => Promise<{ success: boolean; error?: PyScriptError; result?: any; functionCalls: Array<{ name: string; args: unknown[]; frameId: string }> }>
   isExecuting: boolean
 }
@@ -45,9 +46,21 @@ let executionQueue: Array<{
   canvasWidth?: number
   canvasHeight?: number
   pixelsPerUnit?: number
+  isSliderChange?: boolean
 }> = []
 let isProcessingQueue = false
 const EXECUTION_DELAY_MS = 0 // No delay - execute immediately for better responsiveness
+
+// Function to clear queued executions for a specific frame (used for slider changes)
+export function clearQueuedExecutionsForFrame(frameId: string): void {
+  // Remove all queued executions for this frame
+  const beforeLength = executionQueue.length
+  executionQueue = executionQueue.filter(item => item.frameId !== frameId)
+  const removed = beforeLength - executionQueue.length
+  if (removed > 0) {
+    console.log(`[usePyScript] Cleared ${removed} queued executions for frame ${frameId}`)
+  }
+}
 
 // Export reset function for testing
 export function resetPyodideState() {
@@ -212,16 +225,6 @@ export function usePyScript(): UsePyScriptReturn {
       try {
         setIsExecuting(true)
 
-        // Set up function context for this execution with canvas info
-        setupFunctionContext(
-          item.frameId,
-          item.onVectorCreated,
-          item.onFunctionCreated,
-          item.canvasWidth,
-          item.canvasHeight,
-          item.pixelsPerUnit
-        )
-
         // Use the global Pyodide instance
         const pyodide = globalPyodideInstance
 
@@ -229,17 +232,46 @@ export function usePyScript(): UsePyScriptReturn {
           throw new Error('Pyodide is not ready yet. Please wait for it to finish loading.')
         }
 
-        // Update canvas info in Pyodide before execution (for screen-resolution-aware sampling)
-        updateCanvasInfoInPyodide(pyodide)
+        // For slider changes, use minimal setup to reduce overhead
+        if (item.isSliderChange) {
+          // Minimal setup for sliders - just update canvas info
+          updateCanvasInfoInPyodide(pyodide, true)
+          // Set up minimal function context (skip some overhead)
+          setupFunctionContext(
+            item.frameId,
+            item.onVectorCreated,
+            item.onFunctionCreated,
+            item.canvasWidth,
+            item.canvasHeight,
+            item.pixelsPerUnit
+          )
+        } else {
+          // Full setup for non-slider executions
+          setupFunctionContext(
+            item.frameId,
+            item.onVectorCreated,
+            item.onFunctionCreated,
+            item.canvasWidth,
+            item.canvasHeight,
+            item.pixelsPerUnit
+          )
+          // Update canvas info in Pyodide before execution (for screen-resolution-aware sampling)
+          updateCanvasInfoInPyodide(pyodide, false)
+        }
 
         // Execute the code
-        console.log('[usePyScript] Executing Python code for frame:', item.frameId)
+        // Skip logging for slider changes to reduce overhead
+        if (!item.isSliderChange) {
+          console.log('[usePyScript] Executing Python code for frame:', item.frameId)
+        }
         const result = await pyodide.runPythonAsync(item.code)
-        console.log('[usePyScript] Code executed successfully')
-
+        
         // Get captured function calls
         const functionCalls = getCapturedCalls()
-        console.log('[usePyScript] Captured function calls:', functionCalls)
+        if (!item.isSliderChange) {
+          console.log('[usePyScript] Code executed successfully')
+          console.log('[usePyScript] Captured function calls:', functionCalls)
+        }
 
         clearFunctionContext()
         
@@ -288,7 +320,8 @@ export function usePyScript(): UsePyScriptReturn {
       onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void,
       canvasWidth?: number,
       canvasHeight?: number,
-      pixelsPerUnit?: number
+      pixelsPerUnit?: number,
+      isSliderChange?: boolean
     ): Promise<{ success: boolean; error?: PyScriptError; result?: any; functionCalls: Array<{ name: string; args: unknown[]; frameId: string }> }> => {
       if (!isReady) {
         return {
@@ -313,6 +346,7 @@ export function usePyScript(): UsePyScriptReturn {
             canvasWidth,
             canvasHeight,
             pixelsPerUnit,
+            isSliderChange: isSliderChange || false,
           })
 
         // Start processing the queue if not already processing

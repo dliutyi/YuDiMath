@@ -7,7 +7,7 @@ import LoadingOverlay from './components/LoadingOverlay'
 import Modal from './components/Modal'
 import ErrorBoundary from './components/ErrorBoundary'
 import { generateCode } from './utils/codeGenerator'
-import { usePyScript } from './hooks/usePyScript'
+import { usePyScript, clearQueuedExecutionsForFrame } from './hooks/usePyScript'
 import { useWorkspace } from './hooks/useWorkspace'
 import { downloadWorkspace, importWorkspaceFromFile } from './utils/exportImport'
 import { debounce } from './utils/debounce'
@@ -94,20 +94,41 @@ function App() {
       const isSliderChange = updates.parameters !== undefined || updates.baseI !== undefined || updates.baseJ !== undefined
       
       if (isSliderChange) {
-        // Immediate execution for sliders - smooth and live
+        // Ultra-fast execution for sliders - minimal delay for maximum responsiveness
+        // 15ms debounce for smooth response
         const regeneratedCode = generateCode(updatedFrame, currentFrame.code)
-        const finalFrame = { ...updatedFrame, code: regeneratedCode }
         
-        // Update frame with regenerated code
-        workspace.updateFrame(frameId, finalFrame)
+        // Update frame immediately (without code) for responsive UI
+        workspace.updateFrame(frameId, updatedFrame)
         
-        // Trigger auto-execution immediately
-        flushSync(() => {
-          setAutoExecuteCode(regeneratedCode)
-          setAutoExecuteFrameId(frameId)
-        })
+        // Clear any queued executions for this frame to prevent backlog
+        clearQueuedExecutionsForFrame(frameId)
         
-        console.log('[App] Immediate execution for slider change, frame:', frameId)
+        // Use debounced execution for sliders to prevent queue buildup
+        if (!debouncedCodeGenerationRef.current.has(frameId + '_slider')) {
+          const debouncedFn = debounce((frameId: string, code: string) => {
+            // Clear queue again right before execution to ensure we're not queuing behind old executions
+            clearQueuedExecutionsForFrame(frameId)
+            
+            // Update frame with regenerated code
+            workspace.updateFrame(frameId, { code })
+            
+            // Trigger auto-execution (mark as slider-triggered to bypass throttling)
+            // Use requestAnimationFrame for smoother UI updates
+            requestAnimationFrame(() => {
+              isSliderTriggeredRef.current = true
+              flushSync(() => {
+                setAutoExecuteCode(code)
+                setAutoExecuteFrameId(frameId)
+              })
+            })
+          }, 15) // 15ms debounce - smooth response
+          debouncedCodeGenerationRef.current.set(frameId + '_slider', debouncedFn)
+        }
+        
+        // Use debounced function for sliders
+        const debouncedFn = debouncedCodeGenerationRef.current.get(frameId + '_slider')!
+        debouncedFn(frameId, regeneratedCode)
       } else {
         // Debounced execution for text inputs (origin) - avoid execution on every keystroke
         if (!debouncedCodeGenerationRef.current.has(frameId)) {
@@ -176,6 +197,7 @@ function App() {
 
   const [autoExecuteCode, setAutoExecuteCode] = useState<string | null>(null)
   const [autoExecuteFrameId, setAutoExecuteFrameId] = useState<string | null>(null)
+  const isSliderTriggeredRef = useRef<boolean>(false) // Track if execution is slider-triggered
   const [autoExecutionResult, setAutoExecutionResult] = useState<{ success: boolean; error?: string } | null>(null)
 
   // Viewport-based caching: only recalculate when viewport changes significantly
@@ -223,8 +245,13 @@ function App() {
     
     // Skip only if viewport hasn't changed AND we executed recently (but never skip zoom changes)
     // Also skip if this is the first execution (oldKey is empty)
+    // BUT: Always execute if this is slider-triggered (bypass throttling for smooth slider experience)
+    const isSliderTriggered = isSliderTriggeredRef.current
     if (oldKey === '') {
       // First execution - always run
+    } else if (isSliderTriggered) {
+      // Slider-triggered - always execute immediately for smooth experience
+      isSliderTriggeredRef.current = false // Reset flag
     } else if (!zoomChanged && viewportKey === viewportCacheKeyRef.current && (now - lastExecutionTimeRef.current) < THROTTLE_MS) {
       return // Skip execution - viewport hasn't changed enough
     }
@@ -292,6 +319,8 @@ function App() {
       // This is critical for high-frequency functions
       
       console.log('[App] Calling executeCode with pixelsPerUnit:', pixelsPerUnit)
+      const isSliderTriggered = isSliderTriggeredRef.current
+      isSliderTriggeredRef.current = false // Reset flag
       executeCode(
         codeToExecute,
         frameIdToExecute,
@@ -311,7 +340,8 @@ function App() {
         },
         estimatedCanvasWidth,
         estimatedCanvasHeight,
-        pixelsPerUnit
+        pixelsPerUnit,
+        isSliderTriggered
       ).then((result) => {
         // Update cache and execution time
         viewportCacheKeyRef.current = viewportKey

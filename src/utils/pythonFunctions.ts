@@ -628,16 +628,20 @@ export function createPythonFunctionWrapper(name: string): PythonFunctionCallbac
 /**
  * Update canvas info in Pyodide (called before each execution if canvas info is available)
  */
-export function updateCanvasInfoInPyodide(pyodide: any): void {
+export function updateCanvasInfoInPyodide(pyodide: any, isSliderChange: boolean = false): void {
   if (canvasInfo) {
     pyodide.globals.set('__yudimath_canvas_width', canvasInfo.canvasWidth)
     pyodide.globals.set('__yudimath_canvas_height', canvasInfo.canvasHeight)
-    pyodide.globals.set('__yudimath_pixels_per_unit', canvasInfo.pixelsPerUnit)
+    // For slider changes, use lighter sampling (reduce pixels_per_unit to make it faster)
+    const pixelsPerUnit = isSliderChange ? Math.min(canvasInfo.pixelsPerUnit, 50) : canvasInfo.pixelsPerUnit
+    pyodide.globals.set('__yudimath_pixels_per_unit', pixelsPerUnit)
+    pyodide.globals.set('__yudimath_is_slider_change', isSliderChange)
   } else {
     // Default values if canvas info not available
     pyodide.globals.set('__yudimath_canvas_width', 1920)
     pyodide.globals.set('__yudimath_canvas_height', 1080)
-    pyodide.globals.set('__yudimath_pixels_per_unit', 100)  // Default: 100 pixels per unit
+    pyodide.globals.set('__yudimath_pixels_per_unit', isSliderChange ? 50 : 100)
+    pyodide.globals.set('__yudimath_is_slider_change', isSliderChange)
   }
 }
 
@@ -672,11 +676,13 @@ try:
     _canvas_width = __yudimath_canvas_width
     _canvas_height = __yudimath_canvas_height
     _pixels_per_unit = __yudimath_pixels_per_unit
+    _is_slider_change = __yudimath_is_slider_change
 except:
     # Fallback if not available
     _canvas_width = 1920
     _canvas_height = 1080
     _pixels_per_unit = 100
+    _is_slider_change = False
 
 # Wrapper for draw() that handles keyword arguments and numpy arrays
 def draw(vector, color=None):
@@ -751,7 +757,15 @@ def plot(formula, x_min=None, x_max=None, color=None):
                 # When zoomed in (high pixels_per_unit), we need more points to capture detail
                 # CRITICAL: Use even more points per pixel when very zoomed in to ensure smooth curves
                 # This ensures we capture all oscillations visible on screen
-                if _pixels_per_unit > 200:
+                # BUT: Use lighter sampling for slider changes to keep sliders smooth and live
+                if _is_slider_change:
+                    # Slider change - use MINIMAL sampling for maximum speed
+                    # This keeps sliders smooth and responsive
+                    # Use uniform sampling only - no adaptive refinement
+                    points_per_pixel = 0.2  # Extremely light - 0.2 points per pixel for maximum speed
+                    initial_n = max(100, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 250)  # Very low cap for maximum speed
+                elif _pixels_per_unit > 200:
                     # Extremely zoomed in - use extremely dense sampling
                     points_per_pixel = 8.0  # Increased from 5.0
                     initial_n = max(5000, int(pixels_covered * points_per_pixel))
@@ -929,7 +943,12 @@ def plot(formula, x_min=None, x_max=None, color=None):
                         
                         # Adaptive thresholds based on zoom level
                         # Higher pixels_per_unit = more zoomed in = need more sensitive thresholds
-                        if _pixels_per_unit > 100:
+                        # Use much less sensitive thresholds for slider changes to speed things up
+                        if _is_slider_change:
+                            # Slider change - use much less sensitive thresholds for speed
+                            error_threshold = 0.005  # 0.5% error threshold (much less sensitive)
+                            slope_threshold = 200  # Much higher slope change threshold
+                        elif _pixels_per_unit > 100:
                             # Very zoomed in - extremely sensitive
                             error_threshold = 0.0001  # 0.01% error threshold
                             slope_threshold = 20  # Lower slope change threshold
@@ -996,6 +1015,22 @@ def plot(formula, x_min=None, x_max=None, color=None):
                 # Pixel-perfect initial sampling: one point per screen pixel column
                 x_samples = np.linspace(x_min, x_max, initial_n)
                 
+                # For sliders, use ultra-fast path - minimal overhead
+                if _is_slider_change:
+                    # Ultra-fast path for sliders - no tracking, no logging, direct evaluation
+                    for x in x_samples:
+                        y = evaluate_with_cache(x)
+                        if y is not None:
+                            points.append([float(x), y])
+                    # Immediate return for sliders - no adaptive sampling, no logging
+                    if len(points) > 0:
+                        points.sort(key=lambda p: p[0])
+                        points_list = [[float(p[0]), float(p[1])] for p in points]
+                        return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None)
+                    else:
+                        return _yudimath.plot_points([], x_min, x_max, color if color is not None else None)
+                
+                # Full path for non-slider executions
                 initial_points = []
                 valid_count = 0
                 error_count = 0
@@ -1024,31 +1059,33 @@ def plot(formula, x_min=None, x_max=None, color=None):
                 
                 # Second pass: adaptive refinement between consecutive pixel samples
                 # This ensures we capture all oscillations and discontinuities
-                # CRITICAL: When zoomed in, we need to be more aggressive with refinement
-                for i in range(len(initial_points) - 1):
-                    x1, y1_val = initial_points[i]
-                    x2, y2_val = initial_points[i + 1]
-                    
-                    # Calculate gap size in world coordinates
-                    x_diff = x2 - x1
-                    
-                    # Always refine between pixel samples to catch rapid changes
-                    # But be more aggressive when zoomed in (higher pixels_per_unit)
-                    if _pixels_per_unit > 200:
-                        # Extremely zoomed in - refine ALL gaps, no matter how small
-                        sample_adaptive(x1, x2, y1_val, 0)
-                    elif _pixels_per_unit > 100:
-                        # Very zoomed in - refine even tiny gaps
-                        if x_diff > pixel_size_x * 0.05:  # Refine if gap > 0.05 pixels (very small)
+                # Only for non-slider executions
+                    # Only do second pass refinement for non-slider executions
+                    # CRITICAL: When zoomed in, we need to be more aggressive with refinement
+                    for i in range(len(initial_points) - 1):
+                        x1, y1_val = initial_points[i]
+                        x2, y2_val = initial_points[i + 1]
+                        
+                        # Calculate gap size in world coordinates
+                        x_diff = x2 - x1
+                        
+                        # Always refine between pixel samples to catch rapid changes
+                        # But be more aggressive when zoomed in (higher pixels_per_unit)
+                        if _pixels_per_unit > 200:
+                            # Extremely zoomed in - refine ALL gaps, no matter how small
                             sample_adaptive(x1, x2, y1_val, 0)
-                    elif _pixels_per_unit > 50:
-                        # Moderately zoomed in
-                        if x_diff > pixel_size_x * 0.2:  # Refine if gap > 0.2 pixels
-                            sample_adaptive(x1, x2, y1_val, 0)
-                    else:
-                        # Normal zoom - refine if gap is significant
-                        if x_diff > pixel_size_x * 1.0:  # Refine if gap > 1.0 pixels
-                            sample_adaptive(x1, x2, y1_val, 0)
+                        elif _pixels_per_unit > 100:
+                            # Very zoomed in - refine even tiny gaps
+                            if x_diff > pixel_size_x * 0.05:  # Refine if gap > 0.05 pixels (very small)
+                                sample_adaptive(x1, x2, y1_val, 0)
+                        elif _pixels_per_unit > 50:
+                            # Moderately zoomed in
+                            if x_diff > pixel_size_x * 0.2:  # Refine if gap > 0.2 pixels
+                                sample_adaptive(x1, x2, y1_val, 0)
+                        else:
+                            # Normal zoom - refine if gap is significant
+                            if x_diff > pixel_size_x * 1.0:  # Refine if gap > 1.0 pixels
+                                sample_adaptive(x1, x2, y1_val, 0)
                 
                 # Sort points by x coordinate (adaptive sampling may add points out of order)
                 points.sort(key=lambda p: p[0])
@@ -1219,7 +1256,15 @@ def plot(formula, x_min=None, x_max=None, color=None):
                 # When zoomed in (high pixels_per_unit), we need more points to capture detail
                 # CRITICAL: Use even more points per pixel when very zoomed in to ensure smooth curves
                 # This ensures we capture all oscillations visible on screen
-                if _pixels_per_unit > 200:
+                # BUT: Use lighter sampling for slider changes to keep sliders smooth and live
+                if _is_slider_change:
+                    # Slider change - use MINIMAL sampling for maximum speed
+                    # This keeps sliders smooth and responsive
+                    # Use uniform sampling only - no adaptive refinement
+                    points_per_pixel = 0.2  # Extremely light - 0.2 points per pixel for maximum speed
+                    initial_n = max(100, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 250)  # Very low cap for maximum speed
+                elif _pixels_per_unit > 200:
                     # Extremely zoomed in - use extremely dense sampling
                     points_per_pixel = 8.0  # Increased from 5.0
                     initial_n = max(5000, int(pixels_covered * points_per_pixel))
@@ -1397,7 +1442,12 @@ def plot(formula, x_min=None, x_max=None, color=None):
                         
                         # Adaptive thresholds based on zoom level
                         # Higher pixels_per_unit = more zoomed in = need more sensitive thresholds
-                        if _pixels_per_unit > 100:
+                        # Use much less sensitive thresholds for slider changes to speed things up
+                        if _is_slider_change:
+                            # Slider change - use much less sensitive thresholds for speed
+                            error_threshold = 0.005  # 0.5% error threshold (much less sensitive)
+                            slope_threshold = 200  # Much higher slope change threshold
+                        elif _pixels_per_unit > 100:
                             # Very zoomed in - extremely sensitive
                             error_threshold = 0.0001  # 0.01% error threshold
                             slope_threshold = 20  # Lower slope change threshold
@@ -1464,6 +1514,22 @@ def plot(formula, x_min=None, x_max=None, color=None):
                 # Pixel-perfect initial sampling: one point per screen pixel column
                 x_samples = np.linspace(x_min, x_max, initial_n)
                 
+                # For sliders, use ultra-fast path - minimal overhead
+                if _is_slider_change:
+                    # Ultra-fast path for sliders - no tracking, no logging, direct evaluation
+                    for x in x_samples:
+                        y = evaluate_with_cache(x)
+                        if y is not None:
+                            points.append([float(x), y])
+                    # Immediate return for sliders - no adaptive sampling, no logging
+                    if len(points) > 0:
+                        points.sort(key=lambda p: p[0])
+                        points_list = [[float(p[0]), float(p[1])] for p in points]
+                        return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None)
+                    else:
+                        return _yudimath.plot_points([], x_min, x_max, color if color is not None else None)
+                
+                # Full path for non-slider executions
                 initial_points = []
                 valid_count = 0
                 error_count = 0
@@ -1492,31 +1558,33 @@ def plot(formula, x_min=None, x_max=None, color=None):
                 
                 # Second pass: adaptive refinement between consecutive pixel samples
                 # This ensures we capture all oscillations and discontinuities
-                # CRITICAL: When zoomed in, we need to be more aggressive with refinement
-                for i in range(len(initial_points) - 1):
-                    x1, y1_val = initial_points[i]
-                    x2, y2_val = initial_points[i + 1]
-                    
-                    # Calculate gap size in world coordinates
-                    x_diff = x2 - x1
-                    
-                    # Always refine between pixel samples to catch rapid changes
-                    # But be more aggressive when zoomed in (higher pixels_per_unit)
-                    if _pixels_per_unit > 200:
-                        # Extremely zoomed in - refine ALL gaps, no matter how small
-                        sample_adaptive(x1, x2, y1_val, 0)
-                    elif _pixels_per_unit > 100:
-                        # Very zoomed in - refine even tiny gaps
-                        if x_diff > pixel_size_x * 0.05:  # Refine if gap > 0.05 pixels (very small)
+                # Only for non-slider executions
+                    # Only do second pass refinement for non-slider executions
+                    # CRITICAL: When zoomed in, we need to be more aggressive with refinement
+                    for i in range(len(initial_points) - 1):
+                        x1, y1_val = initial_points[i]
+                        x2, y2_val = initial_points[i + 1]
+                        
+                        # Calculate gap size in world coordinates
+                        x_diff = x2 - x1
+                        
+                        # Always refine between pixel samples to catch rapid changes
+                        # But be more aggressive when zoomed in (higher pixels_per_unit)
+                        if _pixels_per_unit > 200:
+                            # Extremely zoomed in - refine ALL gaps, no matter how small
                             sample_adaptive(x1, x2, y1_val, 0)
-                    elif _pixels_per_unit > 50:
-                        # Moderately zoomed in
-                        if x_diff > pixel_size_x * 0.2:  # Refine if gap > 0.2 pixels
-                            sample_adaptive(x1, x2, y1_val, 0)
-                    else:
-                        # Normal zoom - refine if gap is significant
-                        if x_diff > pixel_size_x * 1.0:  # Refine if gap > 1.0 pixels
-                            sample_adaptive(x1, x2, y1_val, 0)
+                        elif _pixels_per_unit > 100:
+                            # Very zoomed in - refine even tiny gaps
+                            if x_diff > pixel_size_x * 0.05:  # Refine if gap > 0.05 pixels (very small)
+                                sample_adaptive(x1, x2, y1_val, 0)
+                        elif _pixels_per_unit > 50:
+                            # Moderately zoomed in
+                            if x_diff > pixel_size_x * 0.2:  # Refine if gap > 0.2 pixels
+                                sample_adaptive(x1, x2, y1_val, 0)
+                        else:
+                            # Normal zoom - refine if gap is significant
+                            if x_diff > pixel_size_x * 1.0:  # Refine if gap > 1.0 pixels
+                                sample_adaptive(x1, x2, y1_val, 0)
                 
                 # Sort points by x coordinate (adaptive sampling may add points out of order)
                 points.sort(key=lambda p: p[0])
@@ -1682,7 +1750,15 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 # When zoomed in (high pixels_per_unit), we need more points to capture detail
                 # CRITICAL: Use even more points per pixel when very zoomed in to ensure smooth curves
                 # This ensures we capture all oscillations visible on screen
-                if _pixels_per_unit > 200:
+                # BUT: Use lighter sampling for slider changes to keep sliders smooth and live
+                if _is_slider_change:
+                    # Slider change - use MINIMAL sampling for maximum speed
+                    # This keeps sliders smooth and responsive
+                    # Use uniform sampling only - no adaptive refinement
+                    points_per_pixel = 0.2  # Extremely light - 0.2 points per pixel for maximum speed
+                    initial_n = max(100, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 250)  # Very low cap for maximum speed
+                elif _pixels_per_unit > 200:
                     # Extremely zoomed in - use extremely dense sampling
                     points_per_pixel = 8.0  # Increased from 5.0
                     initial_n = max(5000, int(pixels_covered * points_per_pixel))
@@ -1860,7 +1936,12 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         
                         # Adaptive thresholds based on zoom level
                         # Higher pixels_per_unit = more zoomed in = need more sensitive thresholds
-                        if _pixels_per_unit > 100:
+                        # Use much less sensitive thresholds for slider changes to speed things up
+                        if _is_slider_change:
+                            # Slider change - use much less sensitive thresholds for speed
+                            error_threshold = 0.005  # 0.5% error threshold (much less sensitive)
+                            slope_threshold = 200  # Much higher slope change threshold
+                        elif _pixels_per_unit > 100:
                             # Very zoomed in - extremely sensitive
                             error_threshold = 0.0001  # 0.01% error threshold
                             slope_threshold = 20  # Lower slope change threshold
@@ -1927,6 +2008,22 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 # Pixel-perfect initial sampling: one point per screen pixel column
                 x_samples = np.linspace(x_min, x_max, initial_n)
                 
+                # For sliders, use ultra-fast path - minimal overhead
+                if _is_slider_change:
+                    # Ultra-fast path for sliders - no tracking, no logging, direct evaluation
+                    for x in x_samples:
+                        y = evaluate_with_cache(x)
+                        if y is not None:
+                            points.append([float(x), y])
+                    # Immediate return for sliders - no adaptive sampling, no logging
+                    if len(points) > 0:
+                        points.sort(key=lambda p: p[0])
+                        points_list = [[float(p[0]), float(p[1])] for p in points]
+                        return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None)
+                    else:
+                        return _yudimath.plot_points([], x_min, x_max, color if color is not None else None)
+                
+                # Full path for non-slider executions
                 initial_points = []
                 valid_count = 0
                 error_count = 0
@@ -1955,31 +2052,33 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 
                 # Second pass: adaptive refinement between consecutive pixel samples
                 # This ensures we capture all oscillations and discontinuities
-                # CRITICAL: When zoomed in, we need to be more aggressive with refinement
-                for i in range(len(initial_points) - 1):
-                    x1, y1_val = initial_points[i]
-                    x2, y2_val = initial_points[i + 1]
-                    
-                    # Calculate gap size in world coordinates
-                    x_diff = x2 - x1
-                    
-                    # Always refine between pixel samples to catch rapid changes
-                    # But be more aggressive when zoomed in (higher pixels_per_unit)
-                    if _pixels_per_unit > 200:
-                        # Extremely zoomed in - refine ALL gaps, no matter how small
-                        sample_adaptive(x1, x2, y1_val, 0)
-                    elif _pixels_per_unit > 100:
-                        # Very zoomed in - refine even tiny gaps
-                        if x_diff > pixel_size_x * 0.05:  # Refine if gap > 0.05 pixels (very small)
+                # Only for non-slider executions
+                    # Only do second pass refinement for non-slider executions
+                    # CRITICAL: When zoomed in, we need to be more aggressive with refinement
+                    for i in range(len(initial_points) - 1):
+                        x1, y1_val = initial_points[i]
+                        x2, y2_val = initial_points[i + 1]
+                        
+                        # Calculate gap size in world coordinates
+                        x_diff = x2 - x1
+                        
+                        # Always refine between pixel samples to catch rapid changes
+                        # But be more aggressive when zoomed in (higher pixels_per_unit)
+                        if _pixels_per_unit > 200:
+                            # Extremely zoomed in - refine ALL gaps, no matter how small
                             sample_adaptive(x1, x2, y1_val, 0)
-                    elif _pixels_per_unit > 50:
-                        # Moderately zoomed in
-                        if x_diff > pixel_size_x * 0.2:  # Refine if gap > 0.2 pixels
-                            sample_adaptive(x1, x2, y1_val, 0)
-                    else:
-                        # Normal zoom - refine if gap is significant
-                        if x_diff > pixel_size_x * 1.0:  # Refine if gap > 1.0 pixels
-                            sample_adaptive(x1, x2, y1_val, 0)
+                        elif _pixels_per_unit > 100:
+                            # Very zoomed in - refine even tiny gaps
+                            if x_diff > pixel_size_x * 0.05:  # Refine if gap > 0.05 pixels (very small)
+                                sample_adaptive(x1, x2, y1_val, 0)
+                        elif _pixels_per_unit > 50:
+                            # Moderately zoomed in
+                            if x_diff > pixel_size_x * 0.2:  # Refine if gap > 0.2 pixels
+                                sample_adaptive(x1, x2, y1_val, 0)
+                        else:
+                            # Normal zoom - refine if gap is significant
+                            if x_diff > pixel_size_x * 1.0:  # Refine if gap > 1.0 pixels
+                                sample_adaptive(x1, x2, y1_val, 0)
                 
                 # Sort points by x coordinate (adaptive sampling may add points out of order)
                 points.sort(key=lambda p: p[0])
