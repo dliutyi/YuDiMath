@@ -4,6 +4,7 @@ import {
   clearFunctionContext,
   getCapturedCalls,
   injectFunctionsIntoPyodide,
+  updateCanvasInfoInPyodide,
 } from '../utils/pythonFunctions'
 import type { Vector, FunctionPlot } from '../types'
 
@@ -19,7 +20,10 @@ interface UsePyScriptReturn {
     code: string,
     frameId: string,
     onVectorCreated: (vector: Omit<Vector, 'id'>) => void,
-    onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void
+    onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void,
+    canvasWidth?: number,
+    canvasHeight?: number,
+    pixelsPerUnit?: number
   ) => Promise<{ success: boolean; error?: PyScriptError; result?: any; functionCalls: Array<{ name: string; args: unknown[]; frameId: string }> }>
   isExecuting: boolean
 }
@@ -38,9 +42,12 @@ let executionQueue: Array<{
   frameId: string
   onVectorCreated: (vector: Omit<Vector, 'id'>) => void
   onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void
+  canvasWidth?: number
+  canvasHeight?: number
+  pixelsPerUnit?: number
 }> = []
 let isProcessingQueue = false
-const EXECUTION_DELAY_MS = 3 // Wait 3ms after previous execution completes
+const EXECUTION_DELAY_MS = 0 // No delay - execute immediately for better responsiveness
 
 // Export reset function for testing
 export function resetPyodideState() {
@@ -205,8 +212,15 @@ export function usePyScript(): UsePyScriptReturn {
       try {
         setIsExecuting(true)
 
-        // Set up function context for this execution
-        setupFunctionContext(item.frameId, item.onVectorCreated, item.onFunctionCreated)
+        // Set up function context for this execution with canvas info
+        setupFunctionContext(
+          item.frameId,
+          item.onVectorCreated,
+          item.onFunctionCreated,
+          item.canvasWidth,
+          item.canvasHeight,
+          item.pixelsPerUnit
+        )
 
         // Use the global Pyodide instance
         const pyodide = globalPyodideInstance
@@ -214,6 +228,9 @@ export function usePyScript(): UsePyScriptReturn {
         if (!pyodide) {
           throw new Error('Pyodide is not ready yet. Please wait for it to finish loading.')
         }
+
+        // Update canvas info in Pyodide before execution (for screen-resolution-aware sampling)
+        updateCanvasInfoInPyodide(pyodide)
 
         // Execute the code
         console.log('[usePyScript] Executing Python code for frame:', item.frameId)
@@ -268,7 +285,10 @@ export function usePyScript(): UsePyScriptReturn {
       code: string,
       frameId: string,
       onVectorCreated: (vector: Omit<Vector, 'id'>) => void,
-      onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void
+      onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void,
+      canvasWidth?: number,
+      canvasHeight?: number,
+      pixelsPerUnit?: number
     ): Promise<{ success: boolean; error?: PyScriptError; result?: any; functionCalls: Array<{ name: string; args: unknown[]; frameId: string }> }> => {
       if (!isReady) {
         return {
@@ -281,16 +301,19 @@ export function usePyScript(): UsePyScriptReturn {
         }
       }
 
-      // Queue the execution
-      return new Promise((resolve, reject) => {
-        executionQueue.push({
-          resolve,
-          reject,
-          code,
-          frameId,
-          onVectorCreated,
-          onFunctionCreated,
-        })
+        // Queue the execution
+        return new Promise((resolve, reject) => {
+          executionQueue.push({
+            resolve,
+            reject,
+            code,
+            frameId,
+            onVectorCreated,
+            onFunctionCreated,
+            canvasWidth,
+            canvasHeight,
+            pixelsPerUnit,
+          })
 
         // Start processing the queue if not already processing
         processQueue()

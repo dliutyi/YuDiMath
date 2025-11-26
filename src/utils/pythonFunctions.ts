@@ -45,6 +45,15 @@ let storeVectorFn: ((vector: Omit<Vector, 'id'>) => void) | null = null
 let storeFunctionFn: ((func: Omit<FunctionPlot, 'id'>) => void) | null = null
 
 /**
+ * Canvas and viewport information for screen-resolution-aware sampling
+ */
+let canvasInfo: {
+  canvasWidth: number
+  canvasHeight: number
+  pixelsPerUnit: number  // Approximate pixels per unit in frame coordinates
+} | null = null
+
+/**
  * Validate and convert a numpy array or list to Point2D
  */
 function toPoint2D(value: unknown): Point2D {
@@ -235,7 +244,6 @@ const plotImplementation: FunctionImplementation = (args, _frameId, _storeVector
   const xMinArg = args[1]
   const xMaxArg = args[2]
   const colorArg = args.length > 3 ? args[3] : undefined
-  const numPointsArg = args.length > 4 ? args[4] : undefined
   
   console.log('[plotImplementation] formulaArg:', formulaArg, 'type:', typeof formulaArg, 'isCallable:', isCallable(formulaArg))
   
@@ -282,21 +290,12 @@ const plotImplementation: FunctionImplementation = (args, _frameId, _storeVector
   }
   
   const color = validateColor(colorArg)
-  
-  // Validate numPoints if provided
-  let numPoints: number | undefined = undefined
-  if (numPointsArg !== undefined) {
-    numPoints = typeof numPointsArg === 'number' ? numPointsArg : parseInt(String(numPointsArg), 10)
-    if (isNaN(numPoints) || numPoints < 2 || !Number.isInteger(numPoints)) {
-      throw new Error('plot() num_points must be an integer >= 2')
-    }
-  }
-  
+
   // Calculate optimal number of points based on range
   // Use ~50-100 points per unit of range, with min 200 and max 2000
   const range = xMax - xMin
-  const optimalPoints = numPoints ?? Math.max(200, Math.min(2000, Math.round(range * 75)))
-  
+  const optimalPoints = Math.max(200, Math.min(2000, Math.round(range * 75)))
+
   const functionPlot: Omit<FunctionPlot, 'id'> = {
     expression: formulaString,
     xMin,
@@ -322,7 +321,6 @@ const plotPointsImplementation: FunctionImplementation = (args, _frameId, _store
   const xMinArg = args[1]
   const xMaxArg = args[2]
   const colorArg = args.length > 3 ? args[3] : undefined
-  const numPointsArg = args.length > 4 ? args[4] : undefined
   
   // Validate points - should be an array of [x, y] pairs
   // Pyodide may pass this as a Pyodide list/array object, so we need to convert it
@@ -409,22 +407,13 @@ const plotPointsImplementation: FunctionImplementation = (args, _frameId, _store
   }
   
   const color = validateColor(colorArg)
-  
-  // Validate numPoints if provided
-  let numPoints: number | undefined = undefined
-  if (numPointsArg !== undefined) {
-    numPoints = typeof numPointsArg === 'number' ? numPointsArg : parseInt(String(numPointsArg), 10)
-    if (isNaN(numPoints) || numPoints < 2 || !Number.isInteger(numPoints)) {
-      throw new Error('plot_points() num_points must be an integer >= 2')
-    }
-  }
-  
+
   const functionPlot: Omit<FunctionPlot, 'id'> = {
     points, // Store points directly
     xMin,
     xMax,
     color,
-    numPoints: numPoints ?? points.length, // Use actual number of points if not specified
+    numPoints: points.length, // Use actual number of points
   }
   
   console.log('[plotPointsImplementation] Storing function plot with', points.length, 'points')
@@ -466,16 +455,29 @@ export function initializeFunctions(): void {
  * @param frameId The ID of the frame where functions will be called
  * @param onVectorCreated Callback to store a vector
  * @param onFunctionCreated Callback to store a function plot
+ * @param canvasWidth Optional canvas width for screen-resolution-aware sampling
+ * @param canvasHeight Optional canvas height for screen-resolution-aware sampling
+ * @param pixelsPerUnit Optional pixels per unit in frame coordinates for optimal sampling
  */
 export function setupFunctionContext(
   frameId: string,
   onVectorCreated: (vector: Omit<Vector, 'id'>) => void,
-  onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void
+  onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void,
+  canvasWidth?: number,
+  canvasHeight?: number,
+  pixelsPerUnit?: number
 ): void {
   currentFrameId = frameId
   storeVectorFn = onVectorCreated
   storeFunctionFn = onFunctionCreated
   capturedCalls = []
+  
+  // Store canvas info for screen-resolution-aware sampling
+  if (canvasWidth && canvasHeight && pixelsPerUnit) {
+    canvasInfo = { canvasWidth, canvasHeight, pixelsPerUnit }
+  } else {
+    canvasInfo = null
+  }
 }
 
 /**
@@ -486,6 +488,7 @@ export function clearFunctionContext(): void {
   storeVectorFn = null
   storeFunctionFn = null
   capturedCalls = []
+  canvasInfo = null
 }
 
 /**
@@ -576,7 +579,7 @@ export function createPythonFunctionWrapper(name: string): PythonFunctionCallbac
         args.push(keywords.color)
       }
     } else if (name === 'plot') {
-      // plot(formula, x_min, x_max, color?, num_points?)
+      // plot(formula, x_min, x_max, color?)
       // Handle keyword arguments for plot
       // If we have formula but missing x_min/x_max, get from keywords
       if (args.length === 1 && 'x_min' in keywords && 'x_max' in keywords) {
@@ -592,14 +595,6 @@ export function createPythonFunctionWrapper(name: string): PythonFunctionCallbac
           args.push(keywords.x_min)
           if (second !== undefined) args.push(second)
         }
-      }
-      // Add color if provided as keyword
-      if ('color' in keywords) {
-        args.push(keywords.color)
-      }
-      // Add num_points if provided as keyword and is valid
-      if ('num_points' in keywords && keywords.num_points !== undefined) {
-        args.push(keywords.num_points)
       }
       // Add color if provided as keyword
       if ('color' in keywords) {
@@ -630,6 +625,22 @@ export function createPythonFunctionWrapper(name: string): PythonFunctionCallbac
  * Inject all registered functions into Pyodide's Python context
  * @param pyodide The Pyodide instance
  */
+/**
+ * Update canvas info in Pyodide (called before each execution if canvas info is available)
+ */
+export function updateCanvasInfoInPyodide(pyodide: any): void {
+  if (canvasInfo) {
+    pyodide.globals.set('__yudimath_canvas_width', canvasInfo.canvasWidth)
+    pyodide.globals.set('__yudimath_canvas_height', canvasInfo.canvasHeight)
+    pyodide.globals.set('__yudimath_pixels_per_unit', canvasInfo.pixelsPerUnit)
+  } else {
+    // Default values if canvas info not available
+    pyodide.globals.set('__yudimath_canvas_width', 1920)
+    pyodide.globals.set('__yudimath_canvas_height', 1080)
+    pyodide.globals.set('__yudimath_pixels_per_unit', 100)  // Default: 100 pixels per unit
+  }
+}
+
 export function injectFunctionsIntoPyodide(pyodide: any): void {
   // Create a Python module that exposes all registered functions
   const functionNames = getRegisteredFunctionNames()
@@ -639,11 +650,14 @@ export function injectFunctionsIntoPyodide(pyodide: any): void {
   for (const name of functionNames) {
     jsFunctions[name] = createPythonFunctionWrapper(name)
   }
-  
+
   try {
     // Use registerJsModule to make functions available as a Python module
     if (typeof pyodide.registerJsModule === 'function') {
       pyodide.registerJsModule('__yudimath_functions', jsFunctions)
+      
+      // Initialize canvas info with defaults
+      updateCanvasInfoInPyodide(pyodide)
       
       // Create Python wrapper functions that handle keyword arguments properly
       // These wrappers convert keyword arguments to positional arguments for the JS functions
@@ -652,6 +666,17 @@ export function injectFunctionsIntoPyodide(pyodide: any): void {
 # Inject predefined functions into global scope
 import __yudimath_functions as _yudimath
 import numpy as np
+
+# Canvas information for screen-resolution-aware sampling (updated before each execution)
+try:
+    _canvas_width = __yudimath_canvas_width
+    _canvas_height = __yudimath_canvas_height
+    _pixels_per_unit = __yudimath_pixels_per_unit
+except:
+    # Fallback if not available
+    _canvas_width = 1920
+    _canvas_height = 1080
+    _pixels_per_unit = 100
 
 # Wrapper for draw() that handles keyword arguments and numpy arrays
 def draw(vector, color=None):
@@ -668,7 +693,7 @@ def draw(vector, color=None):
         return _yudimath.draw(vector)
 
 # Wrapper for plot() that handles keyword arguments and callables
-def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
+def plot(formula, x_min=None, x_max=None, color=None):
     # Handle both positional and keyword arguments
     if x_min is None or x_max is None:
         raise ValueError("plot() requires x_min and x_max arguments")
@@ -713,65 +738,159 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
             # Evaluate the function at many points and pass them directly
             # Use the original callable, not the potentially modified formula
             try:
-                # Use num_points if provided, otherwise calculate optimal based on range
-                # Use ~75 points per unit of range, with min 200 and max 2000
-                if num_points is not None:
-                    n_points = int(num_points)
+                # For callable functions, we can't analyze the expression, so we must use dense sampling
+                # to handle high-frequency functions. Use a conservative approach: always sample densely.
+                x_range = x_max - x_min
+                
+                # Intelligent adaptive sampling - automatically determines optimal density
+                # Algorithm: Start with moderate sampling, then recursively subdivide based on error
+                
+                pixels_covered = x_range * _pixels_per_unit
+                
+                # Initial sampling: adapt to zoom level
+                # When zoomed in (high pixels_per_unit), we need more points to capture detail
+                # CRITICAL: Use even more points per pixel when very zoomed in to ensure smooth curves
+                # This ensures we capture all oscillations visible on screen
+                if _pixels_per_unit > 200:
+                    # Extremely zoomed in - use extremely dense sampling
+                    points_per_pixel = 8.0  # Increased from 5.0
+                    initial_n = max(5000, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 30000)  # Increased cap
+                elif _pixels_per_unit > 100:
+                    # Very zoomed in - use very dense sampling
+                    points_per_pixel = 6.0  # Increased from 5.0
+                    initial_n = max(3000, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 25000)  # Increased cap
+                elif _pixels_per_unit > 50:
+                    # Moderately zoomed in
+                    points_per_pixel = 5.0  # Increased from 4.5
+                    initial_n = max(2000, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 15000)  # Increased cap
                 else:
-                    x_range = x_max - x_min
-                    n_points = max(200, min(2000, int(x_range * 75)))
+                    # Normal zoom
+                    points_per_pixel = 4.0
+                    initial_n = max(1000, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 6000)
                 
-                if n_points < 2:
-                    n_points = 200
-                
-                # Use adaptive sampling for better capture of rapid changes
-                # Start with uniform sampling, then refine where function changes rapidly
+                # Initialize
                 points = []
-                max_depth = 8
-                min_step = (x_max - x_min) / 10000
+                estimated_freq = 0.0
+                max_slope = 0.0
+                
+                # Adaptive parameters - more aggressive when zoomed in
+                # When zoomed in, we can see more detail, so use deeper recursion
+                # But balance with performance - don't go too deep
+                if _pixels_per_unit > 100:
+                    # Very zoomed in - use very aggressive sampling
+                    max_depth = 30  # Increased from 25
+                    min_step = (x_max - x_min) / 100000000  # Even finer (100M divisions)
+                elif _pixels_per_unit > 50:
+                    # Moderately zoomed in
+                    max_depth = 25
+                    min_step = (x_max - x_min) / 50000000  # 50M divisions
+                else:
+                    max_depth = 22
+                    min_step = (x_max - x_min) / 10000000  # Very fine
+                
+                # Pixel size in world coordinates - used to determine if we need more samples
+                pixel_size_x = x_range / pixels_covered if pixels_covered > 0 else x_range / 1000
+                
+                # Memoization cache to avoid redundant function evaluations (major performance boost)
+                eval_cache = {}
+                cache_hits = 0
+                cache_misses = 0
+                
+                def evaluate_with_cache(x):
+                    """Evaluate function with memoization for performance"""
+                    # Round to avoid floating point precision issues in cache
+                    x_key = round(x, 12)
+                    if x_key in eval_cache:
+                        nonlocal cache_hits
+                        cache_hits += 1
+                        return eval_cache[x_key]
+                    nonlocal cache_misses
+                    cache_misses += 1
+                    try:
+                        y = float(original_callable(x))
+                        if np.isfinite(y):
+                            eval_cache[x_key] = y
+                            return y
+                        else:
+                            eval_cache[x_key] = None
+                            return None
+                    except:
+                        eval_cache[x_key] = None
+                        return None
                 
                 def sample_adaptive(x1, x2, y1_val, depth):
                     """Recursively sample function, subdividing where it changes rapidly"""
+                    # Base case: interval too small or max depth reached
                     if depth > max_depth or (x2 - x1) < min_step:
-                        # Base case: evaluate at midpoint
-                        try:
-                            x = (x1 + x2) / 2
-                            y = float(original_callable(x))
-                            if np.isfinite(y):
-                                points.append([float(x), y])
-                        except:
-                            pass
+                        # Add midpoint if we don't have it yet
+                        x = (x1 + x2) / 2
+                        y = evaluate_with_cache(x)
+                        if y is not None:
+                            points.append([float(x), y])
+                        return
+                    
+                    # If interval is smaller than a pixel, we're done (pixel-perfect)
+                    # This prevents infinite recursion
+                    if (x2 - x1) < pixel_size_x * 0.5:
                         return
                     
                     try:
                         # Evaluate at endpoints, midpoint, and quarter points for better derivative estimation
+                        # Handle invalid points gracefully - don't skip entire intervals
+                        # Use cached evaluation for performance
                         if y1_val is None:
-                            y1_val = float(original_callable(x1))
-                        y2 = float(original_callable(x2))
-                        x_mid = (x1 + x2) / 2
-                        y_mid = float(original_callable(x_mid))
+                            y1_val = evaluate_with_cache(x1)
                         
-                        if not (np.isfinite(y1_val) and np.isfinite(y2) and np.isfinite(y_mid)):
+                        y2 = evaluate_with_cache(x2)
+                        
+                        x_mid = (x1 + x2) / 2
+                        y_mid = evaluate_with_cache(x_mid)
+                        
+                        # If all three points are invalid, try to subdivide anyway to find valid regions
+                        if y1_val is None and y2 is None and y_mid is None:
+                            # All invalid - subdivide to search for valid regions
+                            sample_adaptive(x1, x_mid, None, depth + 1)
+                            sample_adaptive(x_mid, x2, None, depth + 1)
+                            return
+                        
+                        # If we have at least one valid point, continue with adaptive sampling
+                        valid_points = [(x1, y1_val), (x_mid, y_mid), (x2, y2)]
+                        valid_points = [(x, y) for x, y in valid_points if y is not None and np.isfinite(y)]
+                        
+                        if len(valid_points) < 2:
+                            # Not enough valid points - subdivide to find more
+                            sample_adaptive(x1, x_mid, y1_val, depth + 1)
+                            sample_adaptive(x_mid, x2, y_mid, depth + 1)
                             return
                         
                         # Evaluate at quarter points for better curvature estimation
                         x_q1 = (x1 + x_mid) / 2
                         x_q3 = (x_mid + x2) / 2
-                        y_q1 = None
-                        y_q3 = None
-                        try:
-                            y_q1 = float(original_callable(x_q1))
-                            y_q3 = float(original_callable(x_q3))
-                        except:
-                            pass
+                        y_q1 = evaluate_with_cache(x_q1)
+                        y_q3 = evaluate_with_cache(x_q3)
                         
-                        # Calculate linear interpolation at midpoint
-                        y_linear = (y1_val + y2) / 2
+                        # Calculate linear interpolation at midpoint (use available valid points)
+                        if y1_val is not None and y2 is not None:
+                            y_linear = (y1_val + y2) / 2
+                        elif y1_val is not None and y_mid is not None:
+                            y_linear = y_mid  # Use midpoint as approximation
+                        elif y2 is not None and y_mid is not None:
+                            y_linear = y_mid
+                        else:
+                            y_linear = y_mid if y_mid is not None else (y1_val if y1_val is not None else y2)
                         
                         # Estimate first derivative (slope) at endpoints
                         dx = x2 - x1
-                        slope1 = (y_mid - y1_val) / (x_mid - x1) if (x_mid - x1) > 0 else 0
-                        slope2 = (y2 - y_mid) / (x2 - x_mid) if (x2 - x_mid) > 0 else 0
+                        slope1 = 0
+                        slope2 = 0
+                        if y1_val is not None and y_mid is not None and (x_mid - x1) > 0:
+                            slope1 = (y_mid - y1_val) / (x_mid - x1)
+                        if y_mid is not None and y2 is not None and (x2 - x_mid) > 0:
+                            slope2 = (y2 - y_mid) / (x2 - x_mid)
                         
                         # Estimate second derivative (curvature) if quarter points are available
                         curvature = 0
@@ -784,8 +903,16 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                             curvature = abs(slope2 - slope1) / dx if dx > 0 else 0
                         
                         # Calculate error metric: combination of deviation from linear and curvature
-                        max_y = max(abs(y1_val), abs(y2), abs(y_mid), 1)
-                        linear_error = abs(y_mid - y_linear) / (max_y + 1)
+                        # Use only valid y values for max_y calculation
+                        valid_y_values = [abs(y) for y in [y1_val, y2, y_mid] if y is not None and np.isfinite(y)]
+                        max_y = max(valid_y_values) if valid_y_values else 1
+                        
+                        # Calculate linear error only if we have valid midpoint
+                        if y_mid is not None and np.isfinite(y_mid) and y_linear is not None:
+                            linear_error = abs(y_mid - y_linear) / (max_y + 1)
+                        else:
+                            # If midpoint is invalid but endpoints are valid, assume high error (discontinuity)
+                            linear_error = 1.0 if (y1_val is not None and y2 is not None) else 0.0
                         
                         # Normalize curvature by function scale and x-range
                         normalized_curvature = curvature * dx * dx / (max_y + 1) if max_y > 0 else 0
@@ -794,16 +921,58 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         # Curvature is weighted less since it's a second-order effect
                         combined_error = linear_error + normalized_curvature * 0.3
                         
-                        # Adaptive threshold: more sensitive for smaller ranges
-                        range_scale = max(1, (x_max - x_min) / 10)
-                        threshold = 0.03 / range_scale  # More sensitive for smaller ranges
+                        # Aggressive error detection for high-quality rendering
+                        # Prioritize quality for high-frequency functions
+                        # ADAPTIVE THRESHOLDS: More sensitive when zoomed in (higher pixels_per_unit)
+                        # When zoomed in, smaller errors become visible, so use lower thresholds
+                        should_subdivide = False
                         
-                        # Also check for rapid slope change
-                        slope_change_ratio = abs(slope2 - slope1) / (abs(slope1) + abs(slope2) + 1)
+                        # Adaptive thresholds based on zoom level
+                        # Higher pixels_per_unit = more zoomed in = need more sensitive thresholds
+                        if _pixels_per_unit > 100:
+                            # Very zoomed in - extremely sensitive
+                            error_threshold = 0.0001  # 0.01% error threshold
+                            slope_threshold = 20  # Lower slope change threshold
+                        elif _pixels_per_unit > 50:
+                            # Moderately zoomed in - very sensitive
+                            error_threshold = 0.0002  # 0.02% error threshold
+                            slope_threshold = 30
+                        else:
+                            # Normal zoom - standard sensitivity
+                            error_threshold = 0.0005  # 0.05% error threshold
+                            slope_threshold = 50
                         
-                        if combined_error > threshold or slope_change_ratio > 0.5:
-                            # Function changes rapidly or has high curvature - subdivide and add all points
-                            points.append([float(x_mid), float(y_mid)])
+                        if y1_val is not None and y2 is not None and y_mid is not None:
+                            # Linear interpolation error check
+                            y_linear = (y1_val + y2) / 2
+                            error = abs(y_mid - y_linear)
+                            y_magnitude = max(abs(y1_val), abs(y2), abs(y_mid), 1)
+                            
+                            # Normalized error - use adaptive threshold based on zoom
+                            normalized_error = error / y_magnitude if y_magnitude > 0 else 0
+                            should_subdivide = normalized_error > error_threshold
+                            
+                            # Also check for rapid slope change (indicates high frequency)
+                            if not should_subdivide:
+                                slope1 = (y_mid - y1_val) / (x_mid - x1) if (x_mid - x1) > 0 else 0
+                                slope2 = (y2 - y_mid) / (x2 - x_mid) if (x2 - x_mid) > 0 else 0
+                                slope_change = abs(slope2 - slope1)
+                                # If slope changes significantly, subdivide (adaptive threshold)
+                                if slope_change > slope_threshold:
+                                    should_subdivide = True
+                        else:
+                            should_subdivide = True  # Always subdivide around discontinuities
+                        
+                        # Detect discontinuities - critical for functions like 1/tan(exp(x))
+                        has_discontinuity = (y1_val is None) != (y2 is None) or (y_mid is None and (y1_val is not None or y2 is not None))
+                        if has_discontinuity:
+                            should_subdivide = True
+                        
+                        if should_subdivide:
+                            # Function changes rapidly, has high curvature, or has discontinuities - subdivide
+                            # Add valid points
+                            if y_mid is not None and np.isfinite(y_mid):
+                                points.append([float(x_mid), float(y_mid)])
                             
                             # Add quarter points if they're valid
                             if y_q1 is not None and np.isfinite(y_q1):
@@ -815,80 +984,71 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                             sample_adaptive(x1, x_mid, y1_val, depth + 1)
                             sample_adaptive(x_mid, x2, y_mid, depth + 1)
                         else:
-                            # Function is smooth - just add midpoint
-                            points.append([float(x_mid), float(y_mid)])
+                            # Function is smooth - just add midpoint if valid
+                            if y_mid is not None and np.isfinite(y_mid):
+                                points.append([float(x_mid), float(y_mid)])
                     except:
                         # If evaluation fails, try to subdivide anyway
                         x_mid = (x1 + x2) / 2
                         sample_adaptive(x1, x_mid, y1_val, depth + 1)
                         sample_adaptive(x_mid, x2, None, depth + 1)
                 
-                # First pass: uniform sampling
-                x_samples = np.linspace(x_min, x_max, n_points)
+                # Pixel-perfect initial sampling: one point per screen pixel column
+                x_samples = np.linspace(x_min, x_max, initial_n)
+                
                 initial_points = []
                 valid_count = 0
                 error_count = 0
+                
+                # First pass: batch evaluate all points using cached evaluation
                 for x in x_samples:
-                    try:
-                        y = float(original_callable(x))
-                        if np.isfinite(y):
-                            points.append([float(x), y])
-                            initial_points.append((x, y))
-                            valid_count += 1
-                        else:
-                            initial_points.append((x, None))
-                            error_count += 1
-                    except (ZeroDivisionError, ValueError, OverflowError, TypeError) as e:
+                    y = evaluate_with_cache(x)
+                    if y is not None:
+                        points.append([float(x), y])
+                        initial_points.append((x, y))
+                        valid_count += 1
+                    else:
                         initial_points.append((x, None))
                         error_count += 1
-                        continue
-                    except Exception as e:
-                        print(f"[plot wrapper] Warning: Error evaluating function at x={x}: {e}")
-                        initial_points.append((x, None))
-                        error_count += 1
-                        continue
                 
-                print(f"[plot wrapper] Initial sampling: {valid_count} valid, {error_count} errors out of {n_points} points")
+                print(f"[plot wrapper] Initial pixel-perfect sampling: {valid_count} valid, {error_count} errors out of {initial_n} points")
+                print(f"[plot wrapper] Cache stats: {cache_hits} hits, {cache_misses} misses (hit rate: {cache_hits/(cache_hits+cache_misses)*100:.1f}%)" if (cache_hits + cache_misses) > 0 else "[plot wrapper] Cache stats: no evaluations yet")
                 
-                # If we got very few valid points, the function might be mostly undefined
-                # In this case, skip adaptive sampling and just use what we have
+                # If we got very few valid points, try fallback
                 if valid_count < 2:
-                    print(f"[plot wrapper] Only {valid_count} valid points found, skipping adaptive sampling")
+                    print(f"[plot wrapper] Only {valid_count} valid points found, trying fallback")
                     if len(points) > 0:
                         points.sort(key=lambda p: p[0])
                         points_list = [[float(p[0]), float(p[1])] for p in points]
-                        return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None, n_points)
-                    # If still no points, will be caught by fallback below
+                        return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None)
                 
-                # Second pass: adaptive refinement between consecutive valid points
-                # Check for rapid changes in function value
+                # Second pass: adaptive refinement between consecutive pixel samples
+                # This ensures we capture all oscillations and discontinuities
+                # CRITICAL: When zoomed in, we need to be more aggressive with refinement
                 for i in range(len(initial_points) - 1):
                     x1, y1_val = initial_points[i]
                     x2, y2_val = initial_points[i + 1]
                     
-                    if y1_val is not None and y2_val is not None:
-                        # Calculate the actual function change rate
-                        x_diff = abs(x2 - x1)
-                        
-                        # If x difference is significant, check if we need more detail
-                        if x_diff > (x_max - x_min) / n_points * 2:
-                            # Evaluate at midpoint to check for rapid change
-                            try:
-                                x_mid = (x1 + x2) / 2
-                                y_mid = float(original_callable(x_mid))
-                                
-                                if np.isfinite(y_mid):
-                                    # Check if function changes rapidly (non-linear)
-                                    y_linear = (y1_val + y2_val) / 2
-                                    change_ratio = abs(y_mid - y_linear) / (max(abs(y1_val), abs(y2_val), 1) + 1)
-                                    threshold = 0.1  # 10% difference triggers subdivision
-                                    
-                                    if change_ratio > threshold:
-                                        # Function changes rapidly - subdivide
-                                        sample_adaptive(x1, x2, y1_val, 0)
-                            except:
-                                # If evaluation fails, subdivide anyway to be safe
-                                sample_adaptive(x1, x2, y1_val, 0)
+                    # Calculate gap size in world coordinates
+                    x_diff = x2 - x1
+                    
+                    # Always refine between pixel samples to catch rapid changes
+                    # But be more aggressive when zoomed in (higher pixels_per_unit)
+                    if _pixels_per_unit > 200:
+                        # Extremely zoomed in - refine ALL gaps, no matter how small
+                        sample_adaptive(x1, x2, y1_val, 0)
+                    elif _pixels_per_unit > 100:
+                        # Very zoomed in - refine even tiny gaps
+                        if x_diff > pixel_size_x * 0.05:  # Refine if gap > 0.05 pixels (very small)
+                            sample_adaptive(x1, x2, y1_val, 0)
+                    elif _pixels_per_unit > 50:
+                        # Moderately zoomed in
+                        if x_diff > pixel_size_x * 0.2:  # Refine if gap > 0.2 pixels
+                            sample_adaptive(x1, x2, y1_val, 0)
+                    else:
+                        # Normal zoom - refine if gap is significant
+                        if x_diff > pixel_size_x * 1.0:  # Refine if gap > 1.0 pixels
+                            sample_adaptive(x1, x2, y1_val, 0)
                 
                 # Sort points by x coordinate (adaptive sampling may add points out of order)
                 points.sort(key=lambda p: p[0])
@@ -901,7 +1061,7 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                     # Try a simpler approach: just evaluate at evenly spaced points
                     # Use a denser grid for fallback to increase chances of finding valid points
                     fallback_points = []
-                    fallback_n = max(200, min(500, n_points * 2))  # Use more points for fallback
+                    fallback_n = max(200, min(500, initial_n * 2))  # Use more points for fallback
                     error_count = 0
                     success_count = 0
                     last_error = None
@@ -937,10 +1097,11 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         points = fallback_points
                         print(f"[plot wrapper] Fallback collected {len(points)} points (had {error_count} errors, last success at x={last_success_x})")
                     else:
-                        # Try one more time with even denser sampling and different strategy
+                        # Try one more time with even denser sampling
                         print(f"[plot wrapper] Fallback failed, trying ultra-dense sampling")
                         ultra_dense_points = []
-                        ultra_n = 1000  # Very dense
+                        # Use very dense sampling for difficult functions
+                        ultra_n = 5000  # Very dense
                         for x in np.linspace(x_min, x_max, ultra_n):
                             try:
                                 y = float(original_callable(x))
@@ -964,7 +1125,7 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 points_list = [[float(p[0]), float(p[1])] for p in points]
                 
                 # Pass points directly to JavaScript - use plot_points function
-                return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None, n_points)
+                return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None)
                     
             except Exception as e2:
                 print(f"[plot wrapper] Point evaluation failed: {e2}")
@@ -973,12 +1134,8 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
     # Call the underlying JavaScript function with all arguments
     # Use extracted expression if available, otherwise use original formula
     formula_to_use = extracted_expression if 'extracted_expression' in locals() and extracted_expression is not None else formula
-    if color is not None and num_points is not None:
-        return _yudimath.plot(formula_to_use, x_min, x_max, color, num_points)
-    elif color is not None:
+    if color is not None:
         return _yudimath.plot(formula_to_use, x_min, x_max, color)
-    elif num_points is not None:
-        return _yudimath.plot(formula_to_use, x_min, x_max, None, num_points)
     else:
         return _yudimath.plot(formula_to_use, x_min, x_max)
 `
@@ -1005,7 +1162,7 @@ def draw(vector, color=None):
         return __yudimath_draw(vector)
 
 # Wrapper for plot() that handles keyword arguments and callables
-def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
+def plot(formula, x_min=None, x_max=None, color=None):
     if x_min is None or x_max is None:
         raise ValueError("plot() requires x_min and x_max arguments")
     
@@ -1049,65 +1206,159 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
             # Evaluate the function at many points and pass them directly
             # Use the original callable, not the potentially modified formula
             try:
-                # Use num_points if provided, otherwise calculate optimal based on range
-                # Use ~75 points per unit of range, with min 200 and max 2000
-                if num_points is not None:
-                    n_points = int(num_points)
+                # For callable functions, we can't analyze the expression, so we must use dense sampling
+                # to handle high-frequency functions. Use a conservative approach: always sample densely.
+                x_range = x_max - x_min
+                
+                # Intelligent adaptive sampling - automatically determines optimal density
+                # Algorithm: Start with moderate sampling, then recursively subdivide based on error
+                
+                pixels_covered = x_range * _pixels_per_unit
+                
+                # Initial sampling: adapt to zoom level
+                # When zoomed in (high pixels_per_unit), we need more points to capture detail
+                # CRITICAL: Use even more points per pixel when very zoomed in to ensure smooth curves
+                # This ensures we capture all oscillations visible on screen
+                if _pixels_per_unit > 200:
+                    # Extremely zoomed in - use extremely dense sampling
+                    points_per_pixel = 8.0  # Increased from 5.0
+                    initial_n = max(5000, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 30000)  # Increased cap
+                elif _pixels_per_unit > 100:
+                    # Very zoomed in - use very dense sampling
+                    points_per_pixel = 6.0  # Increased from 5.0
+                    initial_n = max(3000, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 25000)  # Increased cap
+                elif _pixels_per_unit > 50:
+                    # Moderately zoomed in
+                    points_per_pixel = 5.0  # Increased from 4.5
+                    initial_n = max(2000, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 15000)  # Increased cap
                 else:
-                    x_range = x_max - x_min
-                    n_points = max(200, min(2000, int(x_range * 75)))
+                    # Normal zoom
+                    points_per_pixel = 4.0
+                    initial_n = max(1000, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 6000)
                 
-                if n_points < 2:
-                    n_points = 200
-                
-                # Use adaptive sampling for better capture of rapid changes
-                # Start with uniform sampling, then refine where function changes rapidly
+                # Initialize
                 points = []
-                max_depth = 8
-                min_step = (x_max - x_min) / 10000
+                estimated_freq = 0.0
+                max_slope = 0.0
+                
+                # Adaptive parameters - more aggressive when zoomed in
+                # When zoomed in, we can see more detail, so use deeper recursion
+                # But balance with performance - don't go too deep
+                if _pixels_per_unit > 100:
+                    # Very zoomed in - use very aggressive sampling
+                    max_depth = 30  # Increased from 25
+                    min_step = (x_max - x_min) / 100000000  # Even finer (100M divisions)
+                elif _pixels_per_unit > 50:
+                    # Moderately zoomed in
+                    max_depth = 25
+                    min_step = (x_max - x_min) / 50000000  # 50M divisions
+                else:
+                    max_depth = 22
+                    min_step = (x_max - x_min) / 10000000  # Very fine
+                
+                # Pixel size in world coordinates - used to determine if we need more samples
+                pixel_size_x = x_range / pixels_covered if pixels_covered > 0 else x_range / 1000
+                
+                # Memoization cache to avoid redundant function evaluations (major performance boost)
+                eval_cache = {}
+                cache_hits = 0
+                cache_misses = 0
+                
+                def evaluate_with_cache(x):
+                    """Evaluate function with memoization for performance"""
+                    # Round to avoid floating point precision issues in cache
+                    x_key = round(x, 12)
+                    if x_key in eval_cache:
+                        nonlocal cache_hits
+                        cache_hits += 1
+                        return eval_cache[x_key]
+                    nonlocal cache_misses
+                    cache_misses += 1
+                    try:
+                        y = float(original_callable(x))
+                        if np.isfinite(y):
+                            eval_cache[x_key] = y
+                            return y
+                        else:
+                            eval_cache[x_key] = None
+                            return None
+                    except:
+                        eval_cache[x_key] = None
+                        return None
                 
                 def sample_adaptive(x1, x2, y1_val, depth):
                     """Recursively sample function, subdividing where it changes rapidly"""
+                    # Base case: interval too small or max depth reached
                     if depth > max_depth or (x2 - x1) < min_step:
-                        # Base case: evaluate at midpoint
-                        try:
-                            x = (x1 + x2) / 2
-                            y = float(original_callable(x))
-                            if np.isfinite(y):
-                                points.append([float(x), y])
-                        except:
-                            pass
+                        # Add midpoint if we don't have it yet
+                        x = (x1 + x2) / 2
+                        y = evaluate_with_cache(x)
+                        if y is not None:
+                            points.append([float(x), y])
+                        return
+                    
+                    # If interval is smaller than a pixel, we're done (pixel-perfect)
+                    # This prevents infinite recursion
+                    if (x2 - x1) < pixel_size_x * 0.5:
                         return
                     
                     try:
                         # Evaluate at endpoints, midpoint, and quarter points for better derivative estimation
+                        # Handle invalid points gracefully - don't skip entire intervals
+                        # Use cached evaluation for performance
                         if y1_val is None:
-                            y1_val = float(original_callable(x1))
-                        y2 = float(original_callable(x2))
-                        x_mid = (x1 + x2) / 2
-                        y_mid = float(original_callable(x_mid))
+                            y1_val = evaluate_with_cache(x1)
                         
-                        if not (np.isfinite(y1_val) and np.isfinite(y2) and np.isfinite(y_mid)):
+                        y2 = evaluate_with_cache(x2)
+                        
+                        x_mid = (x1 + x2) / 2
+                        y_mid = evaluate_with_cache(x_mid)
+                        
+                        # If all three points are invalid, try to subdivide anyway to find valid regions
+                        if y1_val is None and y2 is None and y_mid is None:
+                            # All invalid - subdivide to search for valid regions
+                            sample_adaptive(x1, x_mid, None, depth + 1)
+                            sample_adaptive(x_mid, x2, None, depth + 1)
+                            return
+                        
+                        # If we have at least one valid point, continue with adaptive sampling
+                        valid_points = [(x1, y1_val), (x_mid, y_mid), (x2, y2)]
+                        valid_points = [(x, y) for x, y in valid_points if y is not None and np.isfinite(y)]
+                        
+                        if len(valid_points) < 2:
+                            # Not enough valid points - subdivide to find more
+                            sample_adaptive(x1, x_mid, y1_val, depth + 1)
+                            sample_adaptive(x_mid, x2, y_mid, depth + 1)
                             return
                         
                         # Evaluate at quarter points for better curvature estimation
                         x_q1 = (x1 + x_mid) / 2
                         x_q3 = (x_mid + x2) / 2
-                        y_q1 = None
-                        y_q3 = None
-                        try:
-                            y_q1 = float(original_callable(x_q1))
-                            y_q3 = float(original_callable(x_q3))
-                        except:
-                            pass
+                        y_q1 = evaluate_with_cache(x_q1)
+                        y_q3 = evaluate_with_cache(x_q3)
                         
-                        # Calculate linear interpolation at midpoint
-                        y_linear = (y1_val + y2) / 2
+                        # Calculate linear interpolation at midpoint (use available valid points)
+                        if y1_val is not None and y2 is not None:
+                            y_linear = (y1_val + y2) / 2
+                        elif y1_val is not None and y_mid is not None:
+                            y_linear = y_mid  # Use midpoint as approximation
+                        elif y2 is not None and y_mid is not None:
+                            y_linear = y_mid
+                        else:
+                            y_linear = y_mid if y_mid is not None else (y1_val if y1_val is not None else y2)
                         
                         # Estimate first derivative (slope) at endpoints
                         dx = x2 - x1
-                        slope1 = (y_mid - y1_val) / (x_mid - x1) if (x_mid - x1) > 0 else 0
-                        slope2 = (y2 - y_mid) / (x2 - x_mid) if (x2 - x_mid) > 0 else 0
+                        slope1 = 0
+                        slope2 = 0
+                        if y1_val is not None and y_mid is not None and (x_mid - x1) > 0:
+                            slope1 = (y_mid - y1_val) / (x_mid - x1)
+                        if y_mid is not None and y2 is not None and (x2 - x_mid) > 0:
+                            slope2 = (y2 - y_mid) / (x2 - x_mid)
                         
                         # Estimate second derivative (curvature) if quarter points are available
                         curvature = 0
@@ -1120,8 +1371,16 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                             curvature = abs(slope2 - slope1) / dx if dx > 0 else 0
                         
                         # Calculate error metric: combination of deviation from linear and curvature
-                        max_y = max(abs(y1_val), abs(y2), abs(y_mid), 1)
-                        linear_error = abs(y_mid - y_linear) / (max_y + 1)
+                        # Use only valid y values for max_y calculation
+                        valid_y_values = [abs(y) for y in [y1_val, y2, y_mid] if y is not None and np.isfinite(y)]
+                        max_y = max(valid_y_values) if valid_y_values else 1
+                        
+                        # Calculate linear error only if we have valid midpoint
+                        if y_mid is not None and np.isfinite(y_mid) and y_linear is not None:
+                            linear_error = abs(y_mid - y_linear) / (max_y + 1)
+                        else:
+                            # If midpoint is invalid but endpoints are valid, assume high error (discontinuity)
+                            linear_error = 1.0 if (y1_val is not None and y2 is not None) else 0.0
                         
                         # Normalize curvature by function scale and x-range
                         normalized_curvature = curvature * dx * dx / (max_y + 1) if max_y > 0 else 0
@@ -1130,16 +1389,58 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         # Curvature is weighted less since it's a second-order effect
                         combined_error = linear_error + normalized_curvature * 0.3
                         
-                        # Adaptive threshold: more sensitive for smaller ranges
-                        range_scale = max(1, (x_max - x_min) / 10)
-                        threshold = 0.03 / range_scale  # More sensitive for smaller ranges
+                        # Aggressive error detection for high-quality rendering
+                        # Prioritize quality for high-frequency functions
+                        # ADAPTIVE THRESHOLDS: More sensitive when zoomed in (higher pixels_per_unit)
+                        # When zoomed in, smaller errors become visible, so use lower thresholds
+                        should_subdivide = False
                         
-                        # Also check for rapid slope change
-                        slope_change_ratio = abs(slope2 - slope1) / (abs(slope1) + abs(slope2) + 1)
+                        # Adaptive thresholds based on zoom level
+                        # Higher pixels_per_unit = more zoomed in = need more sensitive thresholds
+                        if _pixels_per_unit > 100:
+                            # Very zoomed in - extremely sensitive
+                            error_threshold = 0.0001  # 0.01% error threshold
+                            slope_threshold = 20  # Lower slope change threshold
+                        elif _pixels_per_unit > 50:
+                            # Moderately zoomed in - very sensitive
+                            error_threshold = 0.0002  # 0.02% error threshold
+                            slope_threshold = 30
+                        else:
+                            # Normal zoom - standard sensitivity
+                            error_threshold = 0.0005  # 0.05% error threshold
+                            slope_threshold = 50
                         
-                        if combined_error > threshold or slope_change_ratio > 0.5:
-                            # Function changes rapidly or has high curvature - subdivide and add all points
-                            points.append([float(x_mid), float(y_mid)])
+                        if y1_val is not None and y2 is not None and y_mid is not None:
+                            # Linear interpolation error check
+                            y_linear = (y1_val + y2) / 2
+                            error = abs(y_mid - y_linear)
+                            y_magnitude = max(abs(y1_val), abs(y2), abs(y_mid), 1)
+                            
+                            # Normalized error - use adaptive threshold based on zoom
+                            normalized_error = error / y_magnitude if y_magnitude > 0 else 0
+                            should_subdivide = normalized_error > error_threshold
+                            
+                            # Also check for rapid slope change (indicates high frequency)
+                            if not should_subdivide:
+                                slope1 = (y_mid - y1_val) / (x_mid - x1) if (x_mid - x1) > 0 else 0
+                                slope2 = (y2 - y_mid) / (x2 - x_mid) if (x2 - x_mid) > 0 else 0
+                                slope_change = abs(slope2 - slope1)
+                                # If slope changes significantly, subdivide (adaptive threshold)
+                                if slope_change > slope_threshold:
+                                    should_subdivide = True
+                        else:
+                            should_subdivide = True  # Always subdivide around discontinuities
+                        
+                        # Detect discontinuities - critical for functions like 1/tan(exp(x))
+                        has_discontinuity = (y1_val is None) != (y2 is None) or (y_mid is None and (y1_val is not None or y2 is not None))
+                        if has_discontinuity:
+                            should_subdivide = True
+                        
+                        if should_subdivide:
+                            # Function changes rapidly, has high curvature, or has discontinuities - subdivide
+                            # Add valid points
+                            if y_mid is not None and np.isfinite(y_mid):
+                                points.append([float(x_mid), float(y_mid)])
                             
                             # Add quarter points if they're valid
                             if y_q1 is not None and np.isfinite(y_q1):
@@ -1151,80 +1452,71 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                             sample_adaptive(x1, x_mid, y1_val, depth + 1)
                             sample_adaptive(x_mid, x2, y_mid, depth + 1)
                         else:
-                            # Function is smooth - just add midpoint
-                            points.append([float(x_mid), float(y_mid)])
+                            # Function is smooth - just add midpoint if valid
+                            if y_mid is not None and np.isfinite(y_mid):
+                                points.append([float(x_mid), float(y_mid)])
                     except:
                         # If evaluation fails, try to subdivide anyway
                         x_mid = (x1 + x2) / 2
                         sample_adaptive(x1, x_mid, y1_val, depth + 1)
                         sample_adaptive(x_mid, x2, None, depth + 1)
                 
-                # First pass: uniform sampling
-                x_samples = np.linspace(x_min, x_max, n_points)
+                # Pixel-perfect initial sampling: one point per screen pixel column
+                x_samples = np.linspace(x_min, x_max, initial_n)
+                
                 initial_points = []
                 valid_count = 0
                 error_count = 0
+                
+                # First pass: batch evaluate all points using cached evaluation
                 for x in x_samples:
-                    try:
-                        y = float(original_callable(x))
-                        if np.isfinite(y):
-                            points.append([float(x), y])
-                            initial_points.append((x, y))
-                            valid_count += 1
-                        else:
-                            initial_points.append((x, None))
-                            error_count += 1
-                    except (ZeroDivisionError, ValueError, OverflowError, TypeError) as e:
+                    y = evaluate_with_cache(x)
+                    if y is not None:
+                        points.append([float(x), y])
+                        initial_points.append((x, y))
+                        valid_count += 1
+                    else:
                         initial_points.append((x, None))
                         error_count += 1
-                        continue
-                    except Exception as e:
-                        print(f"[plot wrapper] Warning: Error evaluating function at x={x}: {e}")
-                        initial_points.append((x, None))
-                        error_count += 1
-                        continue
                 
-                print(f"[plot wrapper] Initial sampling: {valid_count} valid, {error_count} errors out of {n_points} points")
+                print(f"[plot wrapper] Initial pixel-perfect sampling: {valid_count} valid, {error_count} errors out of {initial_n} points")
+                print(f"[plot wrapper] Cache stats: {cache_hits} hits, {cache_misses} misses (hit rate: {cache_hits/(cache_hits+cache_misses)*100:.1f}%)" if (cache_hits + cache_misses) > 0 else "[plot wrapper] Cache stats: no evaluations yet")
                 
-                # If we got very few valid points, the function might be mostly undefined
-                # In this case, skip adaptive sampling and just use what we have
+                # If we got very few valid points, try fallback
                 if valid_count < 2:
-                    print(f"[plot wrapper] Only {valid_count} valid points found, skipping adaptive sampling")
+                    print(f"[plot wrapper] Only {valid_count} valid points found, trying fallback")
                     if len(points) > 0:
                         points.sort(key=lambda p: p[0])
                         points_list = [[float(p[0]), float(p[1])] for p in points]
-                        return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None, n_points)
-                    # If still no points, will be caught by fallback below
+                        return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None)
                 
-                # Second pass: adaptive refinement between consecutive valid points
-                # Check for rapid changes in function value
+                # Second pass: adaptive refinement between consecutive pixel samples
+                # This ensures we capture all oscillations and discontinuities
+                # CRITICAL: When zoomed in, we need to be more aggressive with refinement
                 for i in range(len(initial_points) - 1):
                     x1, y1_val = initial_points[i]
                     x2, y2_val = initial_points[i + 1]
                     
-                    if y1_val is not None and y2_val is not None:
-                        # Calculate the actual function change rate
-                        x_diff = abs(x2 - x1)
-                        
-                        # If x difference is significant, check if we need more detail
-                        if x_diff > (x_max - x_min) / n_points * 2:
-                            # Evaluate at midpoint to check for rapid change
-                            try:
-                                x_mid = (x1 + x2) / 2
-                                y_mid = float(original_callable(x_mid))
-                                
-                                if np.isfinite(y_mid):
-                                    # Check if function changes rapidly (non-linear)
-                                    y_linear = (y1_val + y2_val) / 2
-                                    change_ratio = abs(y_mid - y_linear) / (max(abs(y1_val), abs(y2_val), 1) + 1)
-                                    threshold = 0.1  # 10% difference triggers subdivision
-                                    
-                                    if change_ratio > threshold:
-                                        # Function changes rapidly - subdivide
-                                        sample_adaptive(x1, x2, y1_val, 0)
-                            except:
-                                # If evaluation fails, subdivide anyway to be safe
-                                sample_adaptive(x1, x2, y1_val, 0)
+                    # Calculate gap size in world coordinates
+                    x_diff = x2 - x1
+                    
+                    # Always refine between pixel samples to catch rapid changes
+                    # But be more aggressive when zoomed in (higher pixels_per_unit)
+                    if _pixels_per_unit > 200:
+                        # Extremely zoomed in - refine ALL gaps, no matter how small
+                        sample_adaptive(x1, x2, y1_val, 0)
+                    elif _pixels_per_unit > 100:
+                        # Very zoomed in - refine even tiny gaps
+                        if x_diff > pixel_size_x * 0.05:  # Refine if gap > 0.05 pixels (very small)
+                            sample_adaptive(x1, x2, y1_val, 0)
+                    elif _pixels_per_unit > 50:
+                        # Moderately zoomed in
+                        if x_diff > pixel_size_x * 0.2:  # Refine if gap > 0.2 pixels
+                            sample_adaptive(x1, x2, y1_val, 0)
+                    else:
+                        # Normal zoom - refine if gap is significant
+                        if x_diff > pixel_size_x * 1.0:  # Refine if gap > 1.0 pixels
+                            sample_adaptive(x1, x2, y1_val, 0)
                 
                 # Sort points by x coordinate (adaptive sampling may add points out of order)
                 points.sort(key=lambda p: p[0])
@@ -1237,7 +1529,7 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                     # Try a simpler approach: just evaluate at evenly spaced points
                     # Use a denser grid for fallback to increase chances of finding valid points
                     fallback_points = []
-                    fallback_n = max(200, min(500, n_points * 2))  # Use more points for fallback
+                    fallback_n = max(200, min(500, initial_n * 2))  # Use more points for fallback
                     error_count = 0
                     success_count = 0
                     last_error = None
@@ -1273,10 +1565,11 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         points = fallback_points
                         print(f"[plot wrapper] Fallback collected {len(points)} points (had {error_count} errors, last success at x={last_success_x})")
                     else:
-                        # Try one more time with even denser sampling and different strategy
+                        # Try one more time with even denser sampling
                         print(f"[plot wrapper] Fallback failed, trying ultra-dense sampling")
                         ultra_dense_points = []
-                        ultra_n = 1000  # Very dense
+                        # Use very dense sampling for difficult functions
+                        ultra_n = 5000  # Very dense
                         for x in np.linspace(x_min, x_max, ultra_n):
                             try:
                                 y = float(original_callable(x))
@@ -1300,7 +1593,7 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 points_list = [[float(p[0]), float(p[1])] for p in points]
                 
                 # Pass points directly to JavaScript - use plot_points function
-                return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None, n_points)
+                return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None)
                     
             except Exception as e2:
                 print(f"[plot wrapper] Point evaluation failed: {e2}")
@@ -1376,65 +1669,159 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
             # Evaluate the function at many points and pass them directly
             # Use the original callable, not the potentially modified formula
             try:
-                # Use num_points if provided, otherwise calculate optimal based on range
-                # Use ~75 points per unit of range, with min 200 and max 2000
-                if num_points is not None:
-                    n_points = int(num_points)
+                # For callable functions, we can't analyze the expression, so we must use dense sampling
+                # to handle high-frequency functions. Use a conservative approach: always sample densely.
+                x_range = x_max - x_min
+                
+                # Intelligent adaptive sampling - automatically determines optimal density
+                # Algorithm: Start with moderate sampling, then recursively subdivide based on error
+                
+                pixels_covered = x_range * _pixels_per_unit
+                
+                # Initial sampling: adapt to zoom level
+                # When zoomed in (high pixels_per_unit), we need more points to capture detail
+                # CRITICAL: Use even more points per pixel when very zoomed in to ensure smooth curves
+                # This ensures we capture all oscillations visible on screen
+                if _pixels_per_unit > 200:
+                    # Extremely zoomed in - use extremely dense sampling
+                    points_per_pixel = 8.0  # Increased from 5.0
+                    initial_n = max(5000, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 30000)  # Increased cap
+                elif _pixels_per_unit > 100:
+                    # Very zoomed in - use very dense sampling
+                    points_per_pixel = 6.0  # Increased from 5.0
+                    initial_n = max(3000, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 25000)  # Increased cap
+                elif _pixels_per_unit > 50:
+                    # Moderately zoomed in
+                    points_per_pixel = 5.0  # Increased from 4.5
+                    initial_n = max(2000, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 15000)  # Increased cap
                 else:
-                    x_range = x_max - x_min
-                    n_points = max(200, min(2000, int(x_range * 75)))
+                    # Normal zoom
+                    points_per_pixel = 4.0
+                    initial_n = max(1000, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 6000)
                 
-                if n_points < 2:
-                    n_points = 200
-                
-                # Use adaptive sampling for better capture of rapid changes
-                # Start with uniform sampling, then refine where function changes rapidly
+                # Initialize
                 points = []
-                max_depth = 8
-                min_step = (x_max - x_min) / 10000
+                estimated_freq = 0.0
+                max_slope = 0.0
+                
+                # Adaptive parameters - more aggressive when zoomed in
+                # When zoomed in, we can see more detail, so use deeper recursion
+                # But balance with performance - don't go too deep
+                if _pixels_per_unit > 100:
+                    # Very zoomed in - use very aggressive sampling
+                    max_depth = 30  # Increased from 25
+                    min_step = (x_max - x_min) / 100000000  # Even finer (100M divisions)
+                elif _pixels_per_unit > 50:
+                    # Moderately zoomed in
+                    max_depth = 25
+                    min_step = (x_max - x_min) / 50000000  # 50M divisions
+                else:
+                    max_depth = 22
+                    min_step = (x_max - x_min) / 10000000  # Very fine
+                
+                # Pixel size in world coordinates - used to determine if we need more samples
+                pixel_size_x = x_range / pixels_covered if pixels_covered > 0 else x_range / 1000
+                
+                # Memoization cache to avoid redundant function evaluations (major performance boost)
+                eval_cache = {}
+                cache_hits = 0
+                cache_misses = 0
+                
+                def evaluate_with_cache(x):
+                    """Evaluate function with memoization for performance"""
+                    # Round to avoid floating point precision issues in cache
+                    x_key = round(x, 12)
+                    if x_key in eval_cache:
+                        nonlocal cache_hits
+                        cache_hits += 1
+                        return eval_cache[x_key]
+                    nonlocal cache_misses
+                    cache_misses += 1
+                    try:
+                        y = float(original_callable(x))
+                        if np.isfinite(y):
+                            eval_cache[x_key] = y
+                            return y
+                        else:
+                            eval_cache[x_key] = None
+                            return None
+                    except:
+                        eval_cache[x_key] = None
+                        return None
                 
                 def sample_adaptive(x1, x2, y1_val, depth):
                     """Recursively sample function, subdividing where it changes rapidly"""
+                    # Base case: interval too small or max depth reached
                     if depth > max_depth or (x2 - x1) < min_step:
-                        # Base case: evaluate at midpoint
-                        try:
-                            x = (x1 + x2) / 2
-                            y = float(original_callable(x))
-                            if np.isfinite(y):
-                                points.append([float(x), y])
-                        except:
-                            pass
+                        # Add midpoint if we don't have it yet
+                        x = (x1 + x2) / 2
+                        y = evaluate_with_cache(x)
+                        if y is not None:
+                            points.append([float(x), y])
+                        return
+                    
+                    # If interval is smaller than a pixel, we're done (pixel-perfect)
+                    # This prevents infinite recursion
+                    if (x2 - x1) < pixel_size_x * 0.5:
                         return
                     
                     try:
                         # Evaluate at endpoints, midpoint, and quarter points for better derivative estimation
+                        # Handle invalid points gracefully - don't skip entire intervals
+                        # Use cached evaluation for performance
                         if y1_val is None:
-                            y1_val = float(original_callable(x1))
-                        y2 = float(original_callable(x2))
-                        x_mid = (x1 + x2) / 2
-                        y_mid = float(original_callable(x_mid))
+                            y1_val = evaluate_with_cache(x1)
                         
-                        if not (np.isfinite(y1_val) and np.isfinite(y2) and np.isfinite(y_mid)):
+                        y2 = evaluate_with_cache(x2)
+                        
+                        x_mid = (x1 + x2) / 2
+                        y_mid = evaluate_with_cache(x_mid)
+                        
+                        # If all three points are invalid, try to subdivide anyway to find valid regions
+                        if y1_val is None and y2 is None and y_mid is None:
+                            # All invalid - subdivide to search for valid regions
+                            sample_adaptive(x1, x_mid, None, depth + 1)
+                            sample_adaptive(x_mid, x2, None, depth + 1)
+                            return
+                        
+                        # If we have at least one valid point, continue with adaptive sampling
+                        valid_points = [(x1, y1_val), (x_mid, y_mid), (x2, y2)]
+                        valid_points = [(x, y) for x, y in valid_points if y is not None and np.isfinite(y)]
+                        
+                        if len(valid_points) < 2:
+                            # Not enough valid points - subdivide to find more
+                            sample_adaptive(x1, x_mid, y1_val, depth + 1)
+                            sample_adaptive(x_mid, x2, y_mid, depth + 1)
                             return
                         
                         # Evaluate at quarter points for better curvature estimation
                         x_q1 = (x1 + x_mid) / 2
                         x_q3 = (x_mid + x2) / 2
-                        y_q1 = None
-                        y_q3 = None
-                        try:
-                            y_q1 = float(original_callable(x_q1))
-                            y_q3 = float(original_callable(x_q3))
-                        except:
-                            pass
+                        y_q1 = evaluate_with_cache(x_q1)
+                        y_q3 = evaluate_with_cache(x_q3)
                         
-                        # Calculate linear interpolation at midpoint
-                        y_linear = (y1_val + y2) / 2
+                        # Calculate linear interpolation at midpoint (use available valid points)
+                        if y1_val is not None and y2 is not None:
+                            y_linear = (y1_val + y2) / 2
+                        elif y1_val is not None and y_mid is not None:
+                            y_linear = y_mid  # Use midpoint as approximation
+                        elif y2 is not None and y_mid is not None:
+                            y_linear = y_mid
+                        else:
+                            y_linear = y_mid if y_mid is not None else (y1_val if y1_val is not None else y2)
                         
                         # Estimate first derivative (slope) at endpoints
                         dx = x2 - x1
-                        slope1 = (y_mid - y1_val) / (x_mid - x1) if (x_mid - x1) > 0 else 0
-                        slope2 = (y2 - y_mid) / (x2 - x_mid) if (x2 - x_mid) > 0 else 0
+                        slope1 = 0
+                        slope2 = 0
+                        if y1_val is not None and y_mid is not None and (x_mid - x1) > 0:
+                            slope1 = (y_mid - y1_val) / (x_mid - x1)
+                        if y_mid is not None and y2 is not None and (x2 - x_mid) > 0:
+                            slope2 = (y2 - y_mid) / (x2 - x_mid)
                         
                         # Estimate second derivative (curvature) if quarter points are available
                         curvature = 0
@@ -1447,8 +1834,16 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                             curvature = abs(slope2 - slope1) / dx if dx > 0 else 0
                         
                         # Calculate error metric: combination of deviation from linear and curvature
-                        max_y = max(abs(y1_val), abs(y2), abs(y_mid), 1)
-                        linear_error = abs(y_mid - y_linear) / (max_y + 1)
+                        # Use only valid y values for max_y calculation
+                        valid_y_values = [abs(y) for y in [y1_val, y2, y_mid] if y is not None and np.isfinite(y)]
+                        max_y = max(valid_y_values) if valid_y_values else 1
+                        
+                        # Calculate linear error only if we have valid midpoint
+                        if y_mid is not None and np.isfinite(y_mid) and y_linear is not None:
+                            linear_error = abs(y_mid - y_linear) / (max_y + 1)
+                        else:
+                            # If midpoint is invalid but endpoints are valid, assume high error (discontinuity)
+                            linear_error = 1.0 if (y1_val is not None and y2 is not None) else 0.0
                         
                         # Normalize curvature by function scale and x-range
                         normalized_curvature = curvature * dx * dx / (max_y + 1) if max_y > 0 else 0
@@ -1457,16 +1852,58 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         # Curvature is weighted less since it's a second-order effect
                         combined_error = linear_error + normalized_curvature * 0.3
                         
-                        # Adaptive threshold: more sensitive for smaller ranges
-                        range_scale = max(1, (x_max - x_min) / 10)
-                        threshold = 0.03 / range_scale  # More sensitive for smaller ranges
+                        # Aggressive error detection for high-quality rendering
+                        # Prioritize quality for high-frequency functions
+                        # ADAPTIVE THRESHOLDS: More sensitive when zoomed in (higher pixels_per_unit)
+                        # When zoomed in, smaller errors become visible, so use lower thresholds
+                        should_subdivide = False
                         
-                        # Also check for rapid slope change
-                        slope_change_ratio = abs(slope2 - slope1) / (abs(slope1) + abs(slope2) + 1)
+                        # Adaptive thresholds based on zoom level
+                        # Higher pixels_per_unit = more zoomed in = need more sensitive thresholds
+                        if _pixels_per_unit > 100:
+                            # Very zoomed in - extremely sensitive
+                            error_threshold = 0.0001  # 0.01% error threshold
+                            slope_threshold = 20  # Lower slope change threshold
+                        elif _pixels_per_unit > 50:
+                            # Moderately zoomed in - very sensitive
+                            error_threshold = 0.0002  # 0.02% error threshold
+                            slope_threshold = 30
+                        else:
+                            # Normal zoom - standard sensitivity
+                            error_threshold = 0.0005  # 0.05% error threshold
+                            slope_threshold = 50
                         
-                        if combined_error > threshold or slope_change_ratio > 0.5:
-                            # Function changes rapidly or has high curvature - subdivide and add all points
-                            points.append([float(x_mid), float(y_mid)])
+                        if y1_val is not None and y2 is not None and y_mid is not None:
+                            # Linear interpolation error check
+                            y_linear = (y1_val + y2) / 2
+                            error = abs(y_mid - y_linear)
+                            y_magnitude = max(abs(y1_val), abs(y2), abs(y_mid), 1)
+                            
+                            # Normalized error - use adaptive threshold based on zoom
+                            normalized_error = error / y_magnitude if y_magnitude > 0 else 0
+                            should_subdivide = normalized_error > error_threshold
+                            
+                            # Also check for rapid slope change (indicates high frequency)
+                            if not should_subdivide:
+                                slope1 = (y_mid - y1_val) / (x_mid - x1) if (x_mid - x1) > 0 else 0
+                                slope2 = (y2 - y_mid) / (x2 - x_mid) if (x2 - x_mid) > 0 else 0
+                                slope_change = abs(slope2 - slope1)
+                                # If slope changes significantly, subdivide (adaptive threshold)
+                                if slope_change > slope_threshold:
+                                    should_subdivide = True
+                        else:
+                            should_subdivide = True  # Always subdivide around discontinuities
+                        
+                        # Detect discontinuities - critical for functions like 1/tan(exp(x))
+                        has_discontinuity = (y1_val is None) != (y2 is None) or (y_mid is None and (y1_val is not None or y2 is not None))
+                        if has_discontinuity:
+                            should_subdivide = True
+                        
+                        if should_subdivide:
+                            # Function changes rapidly, has high curvature, or has discontinuities - subdivide
+                            # Add valid points
+                            if y_mid is not None and np.isfinite(y_mid):
+                                points.append([float(x_mid), float(y_mid)])
                             
                             # Add quarter points if they're valid
                             if y_q1 is not None and np.isfinite(y_q1):
@@ -1478,80 +1915,71 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                             sample_adaptive(x1, x_mid, y1_val, depth + 1)
                             sample_adaptive(x_mid, x2, y_mid, depth + 1)
                         else:
-                            # Function is smooth - just add midpoint
-                            points.append([float(x_mid), float(y_mid)])
+                            # Function is smooth - just add midpoint if valid
+                            if y_mid is not None and np.isfinite(y_mid):
+                                points.append([float(x_mid), float(y_mid)])
                     except:
                         # If evaluation fails, try to subdivide anyway
                         x_mid = (x1 + x2) / 2
                         sample_adaptive(x1, x_mid, y1_val, depth + 1)
                         sample_adaptive(x_mid, x2, None, depth + 1)
                 
-                # First pass: uniform sampling
-                x_samples = np.linspace(x_min, x_max, n_points)
+                # Pixel-perfect initial sampling: one point per screen pixel column
+                x_samples = np.linspace(x_min, x_max, initial_n)
+                
                 initial_points = []
                 valid_count = 0
                 error_count = 0
+                
+                # First pass: batch evaluate all points using cached evaluation
                 for x in x_samples:
-                    try:
-                        y = float(original_callable(x))
-                        if np.isfinite(y):
-                            points.append([float(x), y])
-                            initial_points.append((x, y))
-                            valid_count += 1
-                        else:
-                            initial_points.append((x, None))
-                            error_count += 1
-                    except (ZeroDivisionError, ValueError, OverflowError, TypeError) as e:
+                    y = evaluate_with_cache(x)
+                    if y is not None:
+                        points.append([float(x), y])
+                        initial_points.append((x, y))
+                        valid_count += 1
+                    else:
                         initial_points.append((x, None))
                         error_count += 1
-                        continue
-                    except Exception as e:
-                        print(f"[plot wrapper] Warning: Error evaluating function at x={x}: {e}")
-                        initial_points.append((x, None))
-                        error_count += 1
-                        continue
                 
-                print(f"[plot wrapper] Initial sampling: {valid_count} valid, {error_count} errors out of {n_points} points")
+                print(f"[plot wrapper] Initial pixel-perfect sampling: {valid_count} valid, {error_count} errors out of {initial_n} points")
+                print(f"[plot wrapper] Cache stats: {cache_hits} hits, {cache_misses} misses (hit rate: {cache_hits/(cache_hits+cache_misses)*100:.1f}%)" if (cache_hits + cache_misses) > 0 else "[plot wrapper] Cache stats: no evaluations yet")
                 
-                # If we got very few valid points, the function might be mostly undefined
-                # In this case, skip adaptive sampling and just use what we have
+                # If we got very few valid points, try fallback
                 if valid_count < 2:
-                    print(f"[plot wrapper] Only {valid_count} valid points found, skipping adaptive sampling")
+                    print(f"[plot wrapper] Only {valid_count} valid points found, trying fallback")
                     if len(points) > 0:
                         points.sort(key=lambda p: p[0])
                         points_list = [[float(p[0]), float(p[1])] for p in points]
-                        return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None, n_points)
-                    # If still no points, will be caught by fallback below
+                        return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None)
                 
-                # Second pass: adaptive refinement between consecutive valid points
-                # Check for rapid changes in function value
+                # Second pass: adaptive refinement between consecutive pixel samples
+                # This ensures we capture all oscillations and discontinuities
+                # CRITICAL: When zoomed in, we need to be more aggressive with refinement
                 for i in range(len(initial_points) - 1):
                     x1, y1_val = initial_points[i]
                     x2, y2_val = initial_points[i + 1]
                     
-                    if y1_val is not None and y2_val is not None:
-                        # Calculate the actual function change rate
-                        x_diff = abs(x2 - x1)
-                        
-                        # If x difference is significant, check if we need more detail
-                        if x_diff > (x_max - x_min) / n_points * 2:
-                            # Evaluate at midpoint to check for rapid change
-                            try:
-                                x_mid = (x1 + x2) / 2
-                                y_mid = float(original_callable(x_mid))
-                                
-                                if np.isfinite(y_mid):
-                                    # Check if function changes rapidly (non-linear)
-                                    y_linear = (y1_val + y2_val) / 2
-                                    change_ratio = abs(y_mid - y_linear) / (max(abs(y1_val), abs(y2_val), 1) + 1)
-                                    threshold = 0.1  # 10% difference triggers subdivision
-                                    
-                                    if change_ratio > threshold:
-                                        # Function changes rapidly - subdivide
-                                        sample_adaptive(x1, x2, y1_val, 0)
-                            except:
-                                # If evaluation fails, subdivide anyway to be safe
-                                sample_adaptive(x1, x2, y1_val, 0)
+                    # Calculate gap size in world coordinates
+                    x_diff = x2 - x1
+                    
+                    # Always refine between pixel samples to catch rapid changes
+                    # But be more aggressive when zoomed in (higher pixels_per_unit)
+                    if _pixels_per_unit > 200:
+                        # Extremely zoomed in - refine ALL gaps, no matter how small
+                        sample_adaptive(x1, x2, y1_val, 0)
+                    elif _pixels_per_unit > 100:
+                        # Very zoomed in - refine even tiny gaps
+                        if x_diff > pixel_size_x * 0.05:  # Refine if gap > 0.05 pixels (very small)
+                            sample_adaptive(x1, x2, y1_val, 0)
+                    elif _pixels_per_unit > 50:
+                        # Moderately zoomed in
+                        if x_diff > pixel_size_x * 0.2:  # Refine if gap > 0.2 pixels
+                            sample_adaptive(x1, x2, y1_val, 0)
+                    else:
+                        # Normal zoom - refine if gap is significant
+                        if x_diff > pixel_size_x * 1.0:  # Refine if gap > 1.0 pixels
+                            sample_adaptive(x1, x2, y1_val, 0)
                 
                 # Sort points by x coordinate (adaptive sampling may add points out of order)
                 points.sort(key=lambda p: p[0])
@@ -1564,7 +1992,7 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                     # Try a simpler approach: just evaluate at evenly spaced points
                     # Use a denser grid for fallback to increase chances of finding valid points
                     fallback_points = []
-                    fallback_n = max(200, min(500, n_points * 2))  # Use more points for fallback
+                    fallback_n = max(200, min(500, initial_n * 2))  # Use more points for fallback
                     error_count = 0
                     success_count = 0
                     last_error = None
@@ -1600,10 +2028,11 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                         points = fallback_points
                         print(f"[plot wrapper] Fallback collected {len(points)} points (had {error_count} errors, last success at x={last_success_x})")
                     else:
-                        # Try one more time with even denser sampling and different strategy
+                        # Try one more time with even denser sampling
                         print(f"[plot wrapper] Fallback failed, trying ultra-dense sampling")
                         ultra_dense_points = []
-                        ultra_n = 1000  # Very dense
+                        # Use very dense sampling for difficult functions
+                        ultra_n = 5000  # Very dense
                         for x in np.linspace(x_min, x_max, ultra_n):
                             try:
                                 y = float(original_callable(x))

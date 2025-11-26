@@ -355,6 +355,13 @@ function CodePanel({
     const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
     try {
+      // Calculate pixels per unit for screen-resolution-aware sampling
+      const estimatedCanvasWidth = typeof window !== 'undefined' ? window.innerWidth : 1920
+      const estimatedCanvasHeight = typeof window !== 'undefined' ? window.innerHeight : 1080
+      // Use a default zoom estimate if viewport not available
+      const estimatedZoom = 50 // Default zoom
+      const pixelsPerUnit = estimatedZoom * (estimatedCanvasWidth / 1000)
+      
       const result = await executeCode(
         codeToExecute,
         selectedFrame.id,
@@ -371,7 +378,10 @@ function CodePanel({
             ...func,
             id: generateId('func'),
           })
-        }
+        },
+        estimatedCanvasWidth,
+        estimatedCanvasHeight,
+        pixelsPerUnit
       )
       
       if (result.success) {

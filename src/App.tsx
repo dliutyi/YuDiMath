@@ -178,22 +178,72 @@ function App() {
   const [autoExecuteFrameId, setAutoExecuteFrameId] = useState<string | null>(null)
   const [autoExecutionResult, setAutoExecutionResult] = useState<{ success: boolean; error?: string } | null>(null)
 
+  // Viewport-based caching: only recalculate when viewport changes significantly
+  // Use more precise rounding to catch zoom changes better
+  const viewportCacheKeyRef = useRef<string>('')
+  const lastExecutionTimeRef = useRef<number>(0)
+  const THROTTLE_MS = 50 // Reduced throttle for more responsive zoom
+  
   // Auto-execute code when autoExecuteCode changes (works regardless of active tab)
   useEffect(() => {
+    // Create cache key from BOTH main viewport AND frame viewport (if executing for a frame)
+    // This ensures plots recalculate when frame is zoomed
+    const mainViewportKey = `${workspace.viewport.zoom.toFixed(4)}_${workspace.viewport.x.toFixed(1)}_${workspace.viewport.y.toFixed(1)}`
+    
+    // Get frame viewport if executing for a frame
+    let frameViewportKey = ''
+    if (autoExecuteFrameId) {
+      const frame = workspace.frames.find(f => f.id === autoExecuteFrameId)
+      if (frame) {
+        frameViewportKey = `_frame_${frame.viewport.zoom.toFixed(4)}_${frame.viewport.x.toFixed(1)}_${frame.viewport.y.toFixed(1)}`
+      }
+    }
+    
+    const viewportKey = mainViewportKey + frameViewportKey
+    const now = Date.now()
+    
+    // Always recalculate on zoom changes (zoom is critical for plot quality)
+    // Check both main zoom and frame zoom
+    const oldKey = viewportCacheKeyRef.current
+    
+    // Extract zoom values for comparison
+    const oldMainZoom = oldKey !== '' ? oldKey.split('_')[0] : ''
+    const newMainZoom = viewportKey.split('_')[0]
+    const mainZoomChanged = oldMainZoom !== '' && oldMainZoom !== newMainZoom
+    
+    // Check frame zoom if frame viewport key exists
+    let frameZoomChanged = false
+    if (frameViewportKey) {
+      const oldFrameZoom = oldKey.includes('_frame_') ? oldKey.split('_frame_')[1]?.split('_')[0] : ''
+      const newFrameZoom = frameViewportKey.split('_frame_')[1]?.split('_')[0]
+      frameZoomChanged = oldFrameZoom !== '' && oldFrameZoom !== newFrameZoom
+    }
+    
+    const zoomChanged = mainZoomChanged || frameZoomChanged
+    
+    // Skip only if viewport hasn't changed AND we executed recently (but never skip zoom changes)
+    // Also skip if this is the first execution (oldKey is empty)
+    if (oldKey === '') {
+      // First execution - always run
+    } else if (!zoomChanged && viewportKey === viewportCacheKeyRef.current && (now - lastExecutionTimeRef.current) < THROTTLE_MS) {
+      return // Skip execution - viewport hasn't changed enough
+    }
+    
     console.log('[App] Auto-execution effect triggered:', {
       autoExecuteCode: !!autoExecuteCode,
       autoExecuteCodeLength: autoExecuteCode?.length,
       autoExecuteFrameId,
       isReady,
       isExecuting,
+      viewportKey,
       shouldExecute: !!(autoExecuteCode && autoExecuteFrameId && isReady && !isExecuting)
     })
     
     // Wait for execution to finish if it's currently running
     if (autoExecuteCode && autoExecuteFrameId && isReady) {
       if (isExecuting) {
-        console.log('[App] Execution in progress, waiting...')
-        // Don't execute yet - wait for current execution to finish
+        console.log('[App] Execution in progress, skipping...')
+        // Don't execute yet - skip this update
         return
       }
       
@@ -214,7 +264,34 @@ function App() {
       // Generate unique IDs for vectors and functions
       const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-      console.log('[App] Calling executeCode...')
+      // Calculate pixels per unit for screen-resolution-aware sampling
+      // pixelsPerUnit = zoom (since zoom determines how many units fit in the canvas)
+      // For a typical canvas width of ~1920px and zoom of 50, we get ~38 pixels per unit
+      // But zoom directly represents the scale, so pixelsPerUnit ≈ zoom
+      // We'll use a more accurate calculation: estimate canvas size and calculate from viewport
+      const estimatedCanvasWidth = typeof window !== 'undefined' ? window.innerWidth : 1920
+      const estimatedCanvasHeight = typeof window !== 'undefined' ? window.innerHeight : 1080
+      // Calculate pixels per unit accurately based on viewport zoom
+      // CRITICAL: Main viewport zoom directly affects pixels per unit
+      // Higher zoom = see less world space = more pixels per unit
+      // pixelsPerUnit = zoom * (canvasWidth / 1000) as scaling factor
+      let pixelsPerUnit = workspace.viewport.zoom * (estimatedCanvasWidth / 1000)
+      
+      // If executing for a frame, multiply by frame zoom (frame zoom is additional scaling)
+      // Frame zoom is independent and multiplies the effective pixels per unit
+      if (frameIdToExecute) {
+        const frame = workspace.frames.find(f => f.id === frameIdToExecute)
+        if (frame) {
+          // Frame zoom multiplies the effective pixels per unit
+          // Higher frame zoom = more detail = more pixels per unit in frame coordinates
+          pixelsPerUnit = pixelsPerUnit * frame.viewport.zoom
+        }
+      }
+      
+      // Ensure we always recalculate when zoom changes significantly
+      // This is critical for high-frequency functions
+      
+      console.log('[App] Calling executeCode with pixelsPerUnit:', pixelsPerUnit)
       executeCode(
         codeToExecute,
         frameIdToExecute,
@@ -231,8 +308,15 @@ function App() {
             ...func,
             id: generateId('func'),
           })
-        }
+        },
+        estimatedCanvasWidth,
+        estimatedCanvasHeight,
+        pixelsPerUnit
       ).then((result) => {
+        // Update cache and execution time
+        viewportCacheKeyRef.current = viewportKey
+        lastExecutionTimeRef.current = Date.now()
+        
         console.log('[App] Auto-execution result received:', {
           success: result.success,
           error: result.error,
@@ -309,7 +393,7 @@ function App() {
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoExecuteCode, autoExecuteFrameId, isReady, isExecuting])
+  }, [autoExecuteCode, autoExecuteFrameId, isReady, isExecuting, workspace.viewport, workspace.frames])
 
   const handleCodeRun = (frameId: string, _code: string) => {
     // Code execution is handled by CodePanel, this is just a callback

@@ -1090,33 +1090,31 @@ function drawFrameFunctions(
         // Collect valid points first for better smoothing
         const validPoints: Array<{ point: Point2D; screen: Point2D }> = []
         
+        // CRITICAL CHANGE: We no longer break paths based on gap size
+        // Only break when we encounter invalid points (NaN, Infinity)
+        // This prevents curves from disappearing when zoomed in
+        
+        // CRITICAL: For point-based rendering, we should connect all valid points in order
+        // Only break paths when we encounter actual invalid points (NaN, Infinity)
+        // Don't break based on gap size - this causes curves to disappear when zoomed in
         for (let i = 0; i < func.points.length; i++) {
           const [x, y] = func.points[i]
           
-          // Skip invalid points (NaN, Infinity, etc.)
-          if (!isFinite(x) || !isFinite(y)) {
-            continue
+          // Check if point is invalid - this is the ONLY reason to break the path
+          const isInvalid = !isFinite(x) || !isFinite(y)
+          
+          if (isInvalid) {
+            // Invalid point - draw current segment and start new one
+            if (validPoints.length > 1) {
+              drawSmoothCurve(ctx, validPoints.map(p => p.screen))
+            }
+            ctx.stroke()
+            ctx.beginPath()
+            validPoints.length = 0
+            continue  // Skip invalid point
           }
           
           const pointScreen = transformToScreen([x, y])
-          
-          // Check for discontinuities (large jumps)
-          if (validPoints.length > 0) {
-            const prevScreen = validPoints[validPoints.length - 1].screen
-            const dx = Math.abs(pointScreen[0] - prevScreen[0])
-            const dy = Math.abs(pointScreen[1] - prevScreen[1])
-            // If the jump is very large (more than 100 pixels), break the path
-            if (dx > 100 || dy > 100) {
-              // Draw current segment and start new one
-              if (validPoints.length > 1) {
-                drawSmoothCurve(ctx, validPoints.map(p => p.screen))
-              }
-              ctx.stroke()
-              ctx.beginPath()
-              validPoints.length = 0
-            }
-          }
-          
           validPoints.push({ point: [x, y], screen: pointScreen })
         }
         
@@ -1327,30 +1325,14 @@ function drawFrameFunctions(
         // Sort points by x coordinate (adaptive sampling may add points out of order)
         validPoints.sort((a, b) => a.point[0] - b.point[0])
         
-        // Draw the curve, handling discontinuities
-        let segmentPoints: Point2D[] = []
-        for (let i = 0; i < validPoints.length; i++) {
-          const current = validPoints[i]
-          
-          // Check for discontinuities
-          if (segmentPoints.length > 0) {
-            const prevScreen = transformToScreen(validPoints[i - 1].point)
-            const dx = Math.abs(current.screen[0] - prevScreen[0])
-            const dy = Math.abs(current.screen[1] - prevScreen[1])
-            
-            if (dx > 100 || dy > 100) {
-              // Large jump - draw current segment and start new one
-              if (segmentPoints.length > 1) {
-                drawSmoothCurve(ctx, segmentPoints.map(p => transformToScreen(p)))
-              }
-              ctx.stroke()
-              ctx.beginPath()
-              segmentPoints = []
-            }
-          }
-          
-          segmentPoints.push(current.point)
-        }
+        // CRITICAL CHANGE: We no longer break paths based on gap size
+        // Only break when we encounter invalid points (already filtered out above)
+        // This prevents curves from disappearing when zoomed in
+        
+        // Draw the curve - connect all valid points in order
+        // Only break when we encounter invalid points (already filtered out above)
+        // Don't break based on gap size - this causes curves to disappear when zoomed in
+        const segmentPoints: Point2D[] = validPoints.map(p => p.point)
         
         // Draw the final segment
         if (segmentPoints.length > 0) {
