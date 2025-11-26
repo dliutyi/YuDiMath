@@ -762,9 +762,9 @@ def plot(formula, x_min=None, x_max=None, color=None):
                     # Slider change - use MINIMAL sampling for maximum speed
                     # This keeps sliders smooth and responsive
                     # Use uniform sampling only - no adaptive refinement
-                    points_per_pixel = 0.2  # Extremely light - 0.2 points per pixel for maximum speed
-                    initial_n = max(100, int(pixels_covered * points_per_pixel))
-                    initial_n = min(initial_n, 250)  # Very low cap for maximum speed
+                    points_per_pixel = 0.15  # Ultra-minimal - 0.15 points per pixel for maximum speed
+                    initial_n = max(50, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 150)  # Very low cap for maximum speed
                 elif _pixels_per_unit > 200:
                     # Extremely zoomed in - use extremely dense sampling
                     points_per_pixel = 8.0  # Increased from 5.0
@@ -1018,13 +1018,19 @@ def plot(formula, x_min=None, x_max=None, color=None):
                 # For sliders, use ultra-fast path - minimal overhead
                 if _is_slider_change:
                     # Ultra-fast path for sliders - no tracking, no logging, direct evaluation
+                    # Skip caching overhead - direct evaluation is faster for small point counts
                     for x in x_samples:
-                        y = evaluate_with_cache(x)
-                        if y is not None:
-                            points.append([float(x), y])
+                        try:
+                            y = float(original_callable(x))
+                            if np.isfinite(y):
+                                points.append([float(x), y])
+                        except:
+                            pass  # Skip invalid points silently
                     # Immediate return for sliders - no adaptive sampling, no logging
+                    # linspace is already sorted, so skip sort if possible
                     if len(points) > 0:
-                        points.sort(key=lambda p: p[0])
+                        if len(points) > 1 and points[0][0] > points[-1][0]:
+                            points.sort(key=lambda p: p[0])
                         points_list = [[float(p[0]), float(p[1])] for p in points]
                         return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None)
                     else:
@@ -1261,9 +1267,9 @@ def plot(formula, x_min=None, x_max=None, color=None):
                     # Slider change - use MINIMAL sampling for maximum speed
                     # This keeps sliders smooth and responsive
                     # Use uniform sampling only - no adaptive refinement
-                    points_per_pixel = 0.2  # Extremely light - 0.2 points per pixel for maximum speed
-                    initial_n = max(100, int(pixels_covered * points_per_pixel))
-                    initial_n = min(initial_n, 250)  # Very low cap for maximum speed
+                    points_per_pixel = 0.15  # Ultra-minimal - 0.15 points per pixel for maximum speed
+                    initial_n = max(50, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 150)  # Very low cap for maximum speed
                 elif _pixels_per_unit > 200:
                     # Extremely zoomed in - use extremely dense sampling
                     points_per_pixel = 8.0  # Increased from 5.0
@@ -1517,13 +1523,19 @@ def plot(formula, x_min=None, x_max=None, color=None):
                 # For sliders, use ultra-fast path - minimal overhead
                 if _is_slider_change:
                     # Ultra-fast path for sliders - no tracking, no logging, direct evaluation
+                    # Skip caching overhead - direct evaluation is faster for small point counts
                     for x in x_samples:
-                        y = evaluate_with_cache(x)
-                        if y is not None:
-                            points.append([float(x), y])
+                        try:
+                            y = float(original_callable(x))
+                            if np.isfinite(y):
+                                points.append([float(x), y])
+                        except:
+                            pass  # Skip invalid points silently
                     # Immediate return for sliders - no adaptive sampling, no logging
+                    # linspace is already sorted, so skip sort if possible
                     if len(points) > 0:
-                        points.sort(key=lambda p: p[0])
+                        if len(points) > 1 and points[0][0] > points[-1][0]:
+                            points.sort(key=lambda p: p[0])
                         points_list = [[float(p[0]), float(p[1])] for p in points]
                         return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None)
                     else:
@@ -1755,9 +1767,9 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                     # Slider change - use MINIMAL sampling for maximum speed
                     # This keeps sliders smooth and responsive
                     # Use uniform sampling only - no adaptive refinement
-                    points_per_pixel = 0.2  # Extremely light - 0.2 points per pixel for maximum speed
-                    initial_n = max(100, int(pixels_covered * points_per_pixel))
-                    initial_n = min(initial_n, 250)  # Very low cap for maximum speed
+                    points_per_pixel = 0.15  # Ultra-minimal - 0.15 points per pixel for maximum speed
+                    initial_n = max(50, int(pixels_covered * points_per_pixel))
+                    initial_n = min(initial_n, 150)  # Very low cap for maximum speed
                 elif _pixels_per_unit > 200:
                     # Extremely zoomed in - use extremely dense sampling
                     points_per_pixel = 8.0  # Increased from 5.0
@@ -2011,13 +2023,19 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
                 # For sliders, use ultra-fast path - minimal overhead
                 if _is_slider_change:
                     # Ultra-fast path for sliders - no tracking, no logging, direct evaluation
+                    # Skip caching overhead - direct evaluation is faster for small point counts
                     for x in x_samples:
-                        y = evaluate_with_cache(x)
-                        if y is not None:
-                            points.append([float(x), y])
+                        try:
+                            y = float(original_callable(x))
+                            if np.isfinite(y):
+                                points.append([float(x), y])
+                        except:
+                            pass  # Skip invalid points silently
                     # Immediate return for sliders - no adaptive sampling, no logging
+                    # linspace is already sorted, so skip sort if possible
                     if len(points) > 0:
-                        points.sort(key=lambda p: p[0])
+                        if len(points) > 1 and points[0][0] > points[-1][0]:
+                            points.sort(key=lambda p: p[0])
                         points_list = [[float(p[0]), float(p[1])] for p in points]
                         return _yudimath.plot_points(points_list, x_min, x_max, color if color is not None else None)
                     else:

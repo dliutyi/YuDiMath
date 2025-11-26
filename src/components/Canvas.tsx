@@ -245,13 +245,27 @@ function Canvas({
 
   }, [viewport, width, height, topLevelFrames, frames, selectedFrameId, drawingRect])
 
-  useEffect(() => {
-    // Use requestAnimationFrame to ensure DOM is ready
-    const frameId = requestAnimationFrame(() => {
-      draw()
-    })
-    return () => cancelAnimationFrame(frameId)
+  // Throttle redraws to once per frame for smoother performance
+  const pendingRedrawRef = useRef<number | null>(null)
+  const scheduleRedraw = useCallback(() => {
+    if (pendingRedrawRef.current === null) {
+      pendingRedrawRef.current = requestAnimationFrame(() => {
+        draw()
+        pendingRedrawRef.current = null
+      })
+    }
   }, [draw])
+
+  useEffect(() => {
+    // Schedule redraw when dependencies change
+    scheduleRedraw()
+    return () => {
+      if (pendingRedrawRef.current !== null) {
+        cancelAnimationFrame(pendingRedrawRef.current)
+        pendingRedrawRef.current = null
+      }
+    }
+  }, [scheduleRedraw, viewport, width, height, topLevelFrames, frames, selectedFrameId, drawingRect])
 
   // Also redraw on window resize
   useEffect(() => {

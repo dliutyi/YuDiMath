@@ -95,7 +95,7 @@ function App() {
       
       if (isSliderChange) {
         // Ultra-fast execution for sliders - minimal delay for maximum responsiveness
-        // 15ms debounce for smooth response
+        // 10ms debounce for live updates while preventing queue buildup
         const regeneratedCode = generateCode(updatedFrame, currentFrame.code)
         
         // Update frame immediately (without code) for responsive UI
@@ -122,7 +122,7 @@ function App() {
                 setAutoExecuteFrameId(frameId)
               })
             })
-          }, 15) // 15ms debounce - smooth response
+          }, 10) // 10ms debounce - live updates with minimal delay
           debouncedCodeGenerationRef.current.set(frameId + '_slider', debouncedFn)
         }
         

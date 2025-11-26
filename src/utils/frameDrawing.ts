@@ -1107,8 +1107,11 @@ function drawFrameFunctions(
             // Invalid point - draw current segment and start new one
             if (validPoints.length > 1) {
               drawSmoothCurve(ctx, validPoints.map(p => p.screen))
+              ctx.stroke()
+            } else if (validPoints.length === 1) {
+              // Single point - just move to it
+              ctx.moveTo(validPoints[0].screen[0], validPoints[0].screen[1])
             }
-            ctx.stroke()
             ctx.beginPath()
             validPoints.length = 0
             continue  // Skip invalid point
@@ -1121,10 +1124,11 @@ function drawFrameFunctions(
         // Draw the final segment
         if (validPoints.length > 0) {
           if (validPoints.length === 1) {
-            ctx.moveTo(Math.round(validPoints[0].screen[0]) + 0.5, Math.round(validPoints[0].screen[1]) + 0.5)
+            ctx.moveTo(validPoints[0].screen[0], validPoints[0].screen[1])
           } else {
             drawSmoothCurve(ctx, validPoints.map(p => p.screen))
           }
+          ctx.stroke()
         }
       } else if (func.expression) {
         // Otherwise, evaluate the expression at multiple points
