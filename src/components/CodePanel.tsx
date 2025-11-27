@@ -43,7 +43,7 @@ function CodePanel({
 }: CodePanelProps) {
   const [localCode, setLocalCode] = useState<string>('')
   const [isRunning, setIsRunning] = useState(false)
-  const [localExecutionResult, setLocalExecutionResult] = useState<{ success: boolean; error?: string } | null>(null)
+  const [localExecutionResult, setLocalExecutionResult] = useState<{ success: boolean; error?: string | any } | null>(null)
   const [showLoading, setShowLoading] = useState(false)
   const { isReady, executeCode, isExecuting } = usePyScript()
   
@@ -402,13 +402,40 @@ function CodePanel({
           onCodeRun(selectedFrame.id, codeToExecute)
         }
       } else {
-        // On error, set error result
-        const errorMessage = result.error?.message || 
-                            (typeof result.error === 'string' ? result.error : result.error?.toString()) || 
-                            'Unknown error occurred'
+        // On error, extract error message from PyScriptError object
+        // PyScriptError has structure: { message: string, type: string, traceback?: string }
+        // The message property contains the full traceback string
+        let errorMessage = 'Unknown error occurred'
+        
+        if (result.error) {
+          if (typeof result.error === 'string') {
+            errorMessage = result.error
+          } else if (result.error && typeof result.error === 'object') {
+            // CRITICAL: PyScriptError.message is a string containing the full traceback
+            // Access it directly - this is the most reliable way
+            const err: any = result.error
+            if (err.message && typeof err.message === 'string') {
+              errorMessage = err.message
+            } else if (err.traceback && typeof err.traceback === 'string') {
+              errorMessage = err.traceback
+            } else {
+              // Last resort fallbacks
+              try {
+                const str = String(err)
+                if (str && str !== '[object Object]') {
+                  errorMessage = str
+                }
+              } catch (e) {
+                // Ignore
+              }
+            }
+          }
+        }
+        
+        // CRITICAL: Always ensure we store a string, never an object
         const errorResult = {
           success: false as const,
-          error: errorMessage,
+          error: String(errorMessage), // Force string conversion
         }
         // Use flushSync to ensure error state is set immediately and persists
         flushSync(() => {
@@ -426,10 +453,17 @@ function CodePanel({
         })
       }
     } catch (error: any) {
-      const errorMessage = error?.message || error?.toString() || 'Execution failed'
+      let errorMessage = 'Execution failed'
+      if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error && typeof error === 'object') {
+        errorMessage = error.message || error.toString() || 'Execution failed'
+      }
+      // Ensure errorMessage is always a string
+      const finalErrorMessage = typeof errorMessage === 'string' ? errorMessage : String(errorMessage)
       const errorResult = {
         success: false as const,
-        error: errorMessage,
+        error: finalErrorMessage,
       }
       // Use flushSync to ensure error state is set immediately and persists
       flushSync(() => {
@@ -552,7 +586,21 @@ function CodePanel({
               Execution Error
             </div>
             <div className="text-xs mt-1 font-mono bg-error/10 p-2 rounded border border-error/20 break-all whitespace-pre-wrap max-h-32 overflow-y-auto code-editor-error-message">
-              {localExecutionResult.error || 'Unknown error occurred'}
+              {(() => {
+                const err = localExecutionResult.error
+                // CRITICAL: Always return a string, never an object
+                if (typeof err === 'string') {
+                  return err
+                } else if (err != null) {
+                  // If somehow an object got through, extract string
+                  if (typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
+                    return err.message
+                  }
+                  const str = String(err)
+                  return str !== '[object Object]' ? str : 'Unknown error occurred'
+                }
+                return 'Unknown error occurred'
+              })()}
             </div>
           </div>
         </div>

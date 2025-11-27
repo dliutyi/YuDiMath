@@ -287,17 +287,76 @@ export function usePyScript(): UsePyScriptReturn {
       } catch (error: any) {
         clearFunctionContext()
         
+        // Extract error message from various Pyodide error formats
+        let errorMessage = 'Unknown error occurred'
+        let errorType = 'ExecutionError'
+        let errorTraceback: string | undefined = undefined
+        
+        // Try various ways to extract the error message
+        if (typeof error === 'string') {
+          errorMessage = error
+        } else if (error && typeof error === 'object') {
+          // Check for message property
+          if (error.message && typeof error.message === 'string') {
+            errorMessage = error.message
+          }
+          // Check for args (Pyodide PythonError sometimes has args array)
+          else if (error.args && Array.isArray(error.args) && error.args.length > 0) {
+            const firstArg = error.args[0]
+            if (typeof firstArg === 'string') {
+              errorMessage = firstArg
+            } else if (firstArg && typeof firstArg === 'object' && firstArg.message) {
+              errorMessage = firstArg.message
+            }
+          }
+          // Check for toString method
+          else if (typeof error.toString === 'function') {
+            const errorStr = error.toString()
+            if (errorStr && errorStr !== '[object Object]') {
+              errorMessage = errorStr
+            }
+          }
+          
+          // Extract error type
+          if (error.name && typeof error.name === 'string') {
+            errorType = error.name
+          } else if (error.type && typeof error.type === 'string') {
+            errorType = error.type
+          }
+          
+          // Extract traceback
+          if (error.traceback && typeof error.traceback === 'string') {
+            errorTraceback = error.traceback
+          } else if (error.stack && typeof error.stack === 'string') {
+            errorTraceback = error.stack
+          }
+          
+          // If we still don't have a good message, try to parse traceback
+          if (errorMessage === 'Unknown error occurred' && errorTraceback) {
+            // Try to extract the last line of traceback (usually the error message)
+            const tracebackLines = errorTraceback.split('\n')
+            for (let i = tracebackLines.length - 1; i >= 0; i--) {
+              const line = tracebackLines[i].trim()
+              if (line && !line.startsWith('File') && !line.startsWith('at ') && line !== 'Traceback (most recent call last):') {
+                errorMessage = line
+                break
+              }
+            }
+          }
+        }
+        
         const pyScriptError: PyScriptError = {
-          message: error.message || 'Unknown error occurred',
-          type: error.name || 'ExecutionError',
-          traceback: error.traceback || error.stack,
+          message: errorMessage,
+          type: errorType,
+          traceback: errorTraceback,
         }
 
         // Update completion time even on error
         lastExecutionCompletionTime = Date.now()
         setIsExecuting(false)
 
-        item.reject({
+        // Resolve with error instead of rejecting, so CodePanel can handle it properly
+        item.resolve({
           success: false,
           error: pyScriptError,
           functionCalls: getCapturedCalls(), // Return any calls captured before error
