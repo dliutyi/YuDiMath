@@ -145,7 +145,6 @@ function App() {
               setAutoExecuteFrameId(frameId)
             })
             
-            console.log('[App] Executing code after debounced generation for frame:', frameId)
           }, 300) // 300ms debounce for text inputs
           debouncedCodeGenerationRef.current.set(frameId, debouncedFn)
         }
@@ -256,25 +255,14 @@ function App() {
       return // Skip execution - viewport hasn't changed enough
     }
     
-    console.log('[App] Auto-execution effect triggered:', {
-      autoExecuteCode: !!autoExecuteCode,
-      autoExecuteCodeLength: autoExecuteCode?.length,
-      autoExecuteFrameId,
-      isReady,
-      isExecuting,
-      viewportKey,
-      shouldExecute: !!(autoExecuteCode && autoExecuteFrameId && isReady && !isExecuting)
-    })
     
     // Wait for execution to finish if it's currently running
     if (autoExecuteCode && autoExecuteFrameId && isReady) {
       if (isExecuting) {
-        console.log('[App] Execution in progress, skipping...')
         // Don't execute yet - skip this update
         return
       }
       
-      console.log('[App] Starting auto-execution for frame:', autoExecuteFrameId, 'Code length:', autoExecuteCode.length)
       
       // Store the code and frameId to execute (in case they change during execution)
       const codeToExecute = autoExecuteCode
@@ -318,7 +306,6 @@ function App() {
       // Ensure we always recalculate when zoom changes significantly
       // This is critical for high-frequency functions
       
-      console.log('[App] Calling executeCode with pixelsPerUnit:', pixelsPerUnit)
       const isSliderTriggered = isSliderTriggeredRef.current
       isSliderTriggeredRef.current = false // Reset flag
       executeCode(
@@ -347,16 +334,8 @@ function App() {
         viewportCacheKeyRef.current = viewportKey
         lastExecutionTimeRef.current = Date.now()
         
-        console.log('[App] Auto-execution result received:', {
-          success: result.success,
-          error: result.error,
-          errorMessage: result.error?.message,
-          errorType: result.error?.type,
-          errorString: result.error?.toString(),
-        })
         
         if (result.success) {
-          console.log('[App] Setting SUCCESS result')
           // On success, set success result (this will clear any previous errors)
           setAutoExecutionResult({ success: true })
           // Atomically replace old vectors/functions with new ones
@@ -370,21 +349,11 @@ function App() {
           const errorMessage = result.error?.message || 
                               (typeof result.error === 'string' ? result.error : result.error?.toString()) || 
                               'Unknown error occurred'
-          console.error('[App] Setting ERROR result:', errorMessage)
-          console.error('[App] Full error object:', result.error)
-          
           const errorResult = {
             success: false as const,
             error: errorMessage,
           }
-          console.log('[App] Error result object before setState:', errorResult)
-          console.log('[App] Calling setAutoExecutionResult with:', JSON.stringify(errorResult))
           setAutoExecutionResult(errorResult)
-          
-          // Verify it was set
-          setTimeout(() => {
-            console.log('[App] After setAutoExecutionResult - checking state...')
-          }, 0)
           
           // On error, clear vectors/functions to show that execution failed
           flushSync(() => {
@@ -393,13 +362,10 @@ function App() {
           })
         }
         // Clear auto-execute trigger after execution
-        console.log('[App] Clearing auto-execute triggers after execution')
         setAutoExecuteCode(null)
         setAutoExecuteFrameId(null)
       }).catch((error) => {
-        console.error('[App] Auto-execution exception caught:', error)
         const errorMessage = error?.message || error?.toString() || 'Execution failed'
-        console.error('[App] Setting ERROR result from catch:', errorMessage)
         setAutoExecutionResult({
           success: false,
           error: errorMessage,
@@ -410,25 +376,17 @@ function App() {
           handleFunctionsClear(frameIdToExecute)
         })
         // Clear auto-execute trigger even on error
-        console.log('[App] Clearing auto-execute triggers after error')
         setAutoExecuteCode(null)
         setAutoExecuteFrameId(null)
       })
     } else {
-      console.log('[App] Auto-execution skipped - conditions not met:', {
-        hasCode: !!autoExecuteCode,
-        hasFrameId: !!autoExecuteFrameId,
-        isReady,
-        isExecuting,
-      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoExecuteCode, autoExecuteFrameId, isReady, isExecuting, workspace.viewport, workspace.frames])
 
-  const handleCodeRun = (frameId: string, _code: string) => {
+  const handleCodeRun = (_frameId: string, _code: string) => {
     // Code execution is handled by CodePanel, this is just a callback
     // Future: Could add logging or other side effects here
-    console.log('[App] Code executed for frame:', frameId)
     // Clear auto-execute trigger after execution
     setAutoExecuteCode(null)
     setAutoExecuteFrameId(null)
