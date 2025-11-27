@@ -1087,38 +1087,100 @@ function drawFrameFunctions(
       
       // If points are provided, use them directly (for callable functions evaluated in Python)
       if (func.points && func.points.length > 0) {
-        // Collect valid points first for better smoothing
+        // Ultra-conservative discontinuity detection
+        // Only breaks on: invalid points (NaN/Infinity) and extremely clear vertical asymptotes
+        // Designed to never break high-frequency functions, even at extreme zoom levels
+        
+        // Calculate pixels per unit accounting for BOTH frame zoom AND main viewport zoom
+        // The transformToScreen function applies both: frame zoom * main zoom
+        const originScreen = transformToScreen([0, 0])
+        const oneUnitScreen = transformToScreen([1, 0])
+        const pixelsPerUnit = Math.abs(oneUnitScreen[0] - originScreen[0])
+        
+        // Also calculate pixels per unit in Y direction (for vertical jumps)
+        const oneUnitYScreen = transformToScreen([0, 1])
+        const pixelsPerUnitY = Math.abs(oneUnitYScreen[1] - originScreen[1])
+        const pixelsPerUnitAvg = (pixelsPerUnit + pixelsPerUnitY) / 2
+        
+        // Very conservative zoom-aware thresholds that account for BOTH zoom levels
+        // At high zoom (either frame or main), need even larger jumps to be considered discontinuities
+        // Use a larger multiplier to be extra conservative for high-frequency functions
+        const MIN_VERTICAL_JUMP_PIXELS = Math.max(1000, pixelsPerUnitAvg * 10) // Very large vertical jumps only
+        const MAX_X_DISTANCE_WORLD = (func.xMax - func.xMin) / func.points.length * 20 // Large X gaps only
+        
+        // Collect valid points - only break on clear discontinuities
         const validPoints: Array<{ point: Point2D; screen: Point2D }> = []
+        let lastPoint: Point2D | null = null
+        let lastScreen: Point2D | null = null
+        let lastY: number | null = null
         
-        // CRITICAL CHANGE: We no longer break paths based on gap size
-        // Only break when we encounter invalid points (NaN, Infinity)
-        // This prevents curves from disappearing when zoomed in
-        
-        // CRITICAL: For point-based rendering, we should connect all valid points in order
-        // Only break paths when we encounter actual invalid points (NaN, Infinity)
-        // Don't break based on gap size - this causes curves to disappear when zoomed in
         for (let i = 0; i < func.points.length; i++) {
           const [x, y] = func.points[i]
           
-          // Check if point is invalid - this is the ONLY reason to break the path
-          const isInvalid = !isFinite(x) || !isFinite(y)
-          
-          if (isInvalid) {
-            // Invalid point - draw current segment and start new one
+          // Always break on invalid points (NaN, Infinity) - this is the primary discontinuity indicator
+          if (!isFinite(x) || !isFinite(y)) {
+            // Draw current segment before breaking
             if (validPoints.length > 1) {
               drawSmoothCurve(ctx, validPoints.map(p => p.screen))
               ctx.stroke()
             } else if (validPoints.length === 1) {
-              // Single point - just move to it
               ctx.moveTo(validPoints[0].screen[0], validPoints[0].screen[1])
             }
             ctx.beginPath()
             validPoints.length = 0
-            continue  // Skip invalid point
+            lastPoint = null
+            lastScreen = null
+            lastY = null
+            continue
           }
           
           const pointScreen = transformToScreen([x, y])
+          
+          // Only check for discontinuity if we have a previous point
+          if (lastScreen !== null && lastPoint !== null && lastY !== null) {
+            // World-space X distance (zoom-independent)
+            const worldXDistance = Math.abs(x - lastPoint[0])
+            
+            // Screen-space vertical jump (for vertical asymptotes)
+            const dy = pointScreen[1] - lastScreen[1]
+            const verticalJump = Math.abs(dy)
+            
+            // Ultra-conservative detection: only break on:
+            // 1. Extremely large vertical jumps (clear vertical asymptotes) - zoom-aware
+            // 2. Very large X gaps (sampling issues, not really discontinuities but should break)
+            // 3. Sign change crossing zero with extremely large vertical jump (1/x at x=0)
+            const hasExtremeVerticalJump = verticalJump > MIN_VERTICAL_JUMP_PIXELS
+            const hasVeryLargeXGap = worldXDistance > MAX_X_DISTANCE_WORLD
+            const signChange = (lastY < 0 && y > 0) || (lastY > 0 && y < 0)
+            const crossesZero = (lastPoint[0] < 0 && x > 0) || (lastPoint[0] > 0 && x < 0)
+            const hasSignChangeAtZero = signChange && crossesZero && verticalJump > MIN_VERTICAL_JUMP_PIXELS * 0.8
+            
+            // Only break on extremely clear discontinuities
+            // Removed relative jump detection entirely - it was causing false positives on high-frequency functions
+            if (hasExtremeVerticalJump || hasVeryLargeXGap || hasSignChangeAtZero) {
+              // Discontinuity detected - draw current segment and start new one
+              if (validPoints.length > 1) {
+                drawSmoothCurve(ctx, validPoints.map(p => p.screen))
+                ctx.stroke()
+              } else if (validPoints.length === 1) {
+                ctx.moveTo(validPoints[0].screen[0], validPoints[0].screen[1])
+              }
+              ctx.beginPath()
+              validPoints.length = 0
+              // Start new segment with current point
+              validPoints.push({ point: [x, y], screen: pointScreen })
+              lastPoint = [x, y]
+              lastScreen = pointScreen
+              lastY = y
+              continue
+            }
+          }
+          
+          // Add point to current segment
           validPoints.push({ point: [x, y], screen: pointScreen })
+          lastPoint = [x, y]
+          lastScreen = pointScreen
+          lastY = y
         }
         
         // Draw the final segment
