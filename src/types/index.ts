@@ -95,6 +95,34 @@ export interface ParametricPlot {
 }
 
 /**
+ * Implicit plot definition - represents an implicit curve where f(x, y) = 0
+ */
+export interface ImplicitPlot {
+  /** Unique identifier for the implicit plot */
+  id: string
+  /** Equation function of x and y (string expression or callable marker) */
+  equation: string
+  /** Minimum x value for search range */
+  xMin: number
+  /** Maximum x value for search range */
+  xMax: number
+  /** Minimum y value for search range */
+  yMin: number
+  /** Maximum y value for search range */
+  yMax: number
+  /** Color of the implicit curve (hex format, e.g., '#ff00ff') */
+  color: string
+  /** Pre-computed contour points for the implicit curve */
+  points?: Array<[number, number]>
+  /** Number of grid points used for contour finding */
+  numPoints?: number
+  /** Whether this plot uses progressive rendering */
+  isProgressive?: boolean
+  /** Cache key for point caching */
+  cacheKey?: string
+}
+
+/**
  * Rectangle bounds - defines the position and size of a frame viewport
  */
 export interface FrameBounds {
@@ -142,6 +170,8 @@ export interface CoordinateFrame {
   functions: FunctionPlot[]
   /** Parametric plots defined in this frame (via plot_parametric() calls) */
   parametricPlots: ParametricPlot[]
+  /** Implicit plots defined in this frame (via plot_implicit() calls) */
+  implicitPlots: ImplicitPlot[]
   /** Python code for this frame */
   code: string
   /** Parameter slider values (t1, t2, t3, etc.) */

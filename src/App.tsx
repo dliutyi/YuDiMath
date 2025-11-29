@@ -11,7 +11,7 @@ import { usePyScript, clearQueuedExecutionsForFrame } from './hooks/usePyScript'
 import { useWorkspace } from './hooks/useWorkspace'
 import { downloadWorkspace, importWorkspaceFromFile } from './utils/exportImport'
 import { debounce } from './utils/debounce'
-import type { ViewportState, CoordinateFrame, Vector, FunctionPlot, ParametricPlot, WorkspaceState } from './types'
+import type { ViewportState, CoordinateFrame, Vector, FunctionPlot, ParametricPlot, ImplicitPlot, WorkspaceState } from './types'
 import { MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM, ZOOM_STEP_MULTIPLIER } from './utils/constants'
 
 function App() {
@@ -204,6 +204,19 @@ function App() {
     workspace.updateFrame(frameId, { parametricPlots: [] })
   }
 
+  const handleImplicitPlotsUpdate = (frameId: string, implicitPlots: ImplicitPlot[], replace: boolean = false) => {
+    const frame = workspace.frames.find(f => f.id === frameId)
+    if (frame) {
+      workspace.updateFrame(frameId, {
+        implicitPlots: replace ? implicitPlots : [...(frame.implicitPlots || []), ...implicitPlots],
+      })
+    }
+  }
+
+  const handleImplicitPlotsClear = (frameId: string) => {
+    workspace.updateFrame(frameId, { implicitPlots: [] })
+  }
+
   const [autoExecuteCode, setAutoExecuteCode] = useState<string | null>(null)
   const [autoExecuteFrameId, setAutoExecuteFrameId] = useState<string | null>(null)
   const isSliderTriggeredRef = useRef<boolean>(false) // Track if execution is slider-triggered
@@ -319,6 +332,7 @@ function App() {
       const isSliderTriggered = isSliderTriggeredRef.current
       isSliderTriggeredRef.current = false // Reset flag
       const newParametricPlots: ParametricPlot[] = []
+      const newImplicitPlots: ImplicitPlot[] = []
       executeCode(
         codeToExecute,
         frameIdToExecute,
@@ -338,10 +352,11 @@ function App() {
         },
         // onParametricPlotCreated callback
         (plot) => {
-          newParametricPlots.push({
-            ...plot,
-            id: generateId('param'),
-          })
+          newParametricPlots.push(plot as ParametricPlot)
+        },
+        // onImplicitPlotCreated callback
+        (plot) => {
+          newImplicitPlots.push(plot as ImplicitPlot)
         },
         estimatedCanvasWidth,
         estimatedCanvasHeight,
@@ -361,6 +376,7 @@ function App() {
             handleVectorsClear(frameIdToExecute)
             handleFunctionsClear(frameIdToExecute)
             handleParametricPlotsClear(frameIdToExecute)
+            handleImplicitPlotsClear(frameIdToExecute)
           })
           // Then atomically replace with new ones
           // This keeps old ones visible until new ones are ready, eliminating blinking
@@ -368,6 +384,7 @@ function App() {
             handleVectorsUpdate(frameIdToExecute, newVectors, true)
             handleFunctionsUpdate(frameIdToExecute, newFunctions, true)
             handleParametricPlotsUpdate(frameIdToExecute, newParametricPlots, true)
+            handleImplicitPlotsUpdate(frameIdToExecute, newImplicitPlots, true)
           })
         } else {
           // On error, set error result (this will be displayed)
@@ -385,6 +402,7 @@ function App() {
             handleVectorsClear(frameIdToExecute)
             handleFunctionsClear(frameIdToExecute)
             handleParametricPlotsClear(frameIdToExecute)
+            handleImplicitPlotsClear(frameIdToExecute)
           })
         }
         // Clear auto-execute trigger after execution
@@ -643,9 +661,11 @@ function App() {
           onVectorsUpdate={handleVectorsUpdate}
           onFunctionsUpdate={handleFunctionsUpdate}
           onParametricPlotsUpdate={handleParametricPlotsUpdate}
+          onImplicitPlotsUpdate={handleImplicitPlotsUpdate}
           onVectorsClear={handleVectorsClear}
           onFunctionsClear={handleFunctionsClear}
           onParametricPlotsClear={handleParametricPlotsClear}
+          onImplicitPlotsClear={handleImplicitPlotsClear}
           externalExecutionResult={autoExecutionResult}
           onFrameDelete={handleFrameDelete}
         />

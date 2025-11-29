@@ -1,7 +1,7 @@
 import { useState, useEffect, memo } from 'react'
 import PropertiesPanel from './PropertiesPanel'
 import CodePanel from './CodePanel'
-import type { CoordinateFrame, ViewportState, Vector, FunctionPlot, ParametricPlot } from '../types'
+import type { CoordinateFrame, ViewportState, Vector, FunctionPlot, ParametricPlot, ImplicitPlot } from '../types'
 
 interface FrameEditorPanelProps {
   selectedFrame: CoordinateFrame | null
@@ -12,9 +12,11 @@ interface FrameEditorPanelProps {
   onVectorsUpdate?: (frameId: string, vectors: Vector[], replace?: boolean) => void
   onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[], replace?: boolean) => void
   onParametricPlotsUpdate?: (frameId: string, parametricPlots: ParametricPlot[], replace?: boolean) => void
+  onImplicitPlotsUpdate?: (frameId: string, implicitPlots: ImplicitPlot[], replace?: boolean) => void
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
   onParametricPlotsClear?: (frameId: string) => void
+  onImplicitPlotsClear?: (frameId: string) => void
   externalExecutionResult?: { success: boolean; error?: string } | null
   onFrameDelete?: (frameId: string) => void
 }
@@ -30,9 +32,11 @@ function FrameEditorPanel({
   onVectorsUpdate,
   onFunctionsUpdate,
   onParametricPlotsUpdate,
+  onImplicitPlotsUpdate,
   onVectorsClear,
   onFunctionsClear,
   onParametricPlotsClear,
+  onImplicitPlotsClear,
   externalExecutionResult,
   onFrameDelete,
 }: FrameEditorPanelProps) {
@@ -133,9 +137,11 @@ function FrameEditorPanel({
             onVectorsUpdate={onVectorsUpdate}
             onFunctionsUpdate={onFunctionsUpdate}
             onParametricPlotsUpdate={onParametricPlotsUpdate}
+            onImplicitPlotsUpdate={onImplicitPlotsUpdate}
             onVectorsClear={onVectorsClear}
             onFunctionsClear={onFunctionsClear}
             onParametricPlotsClear={onParametricPlotsClear}
+            onImplicitPlotsClear={onImplicitPlotsClear}
             externalExecutionResult={externalExecutionResult}
             onExecutionErrorChange={setHasExecutionError}
           />

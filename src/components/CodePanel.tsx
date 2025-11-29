@@ -5,7 +5,7 @@ import { highlight, languages } from 'prismjs'
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
 import { usePyScript } from '../hooks/usePyScript'
-import type { CoordinateFrame, Vector, FunctionPlot, ParametricPlot } from '../types'
+import type { CoordinateFrame, Vector, FunctionPlot, ParametricPlot, ImplicitPlot } from '../types'
 
 interface CodePanelProps {
   selectedFrame: CoordinateFrame | null
@@ -14,9 +14,11 @@ interface CodePanelProps {
   onVectorsUpdate?: (frameId: string, vectors: Vector[], replace?: boolean) => void
   onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[], replace?: boolean) => void
   onParametricPlotsUpdate?: (frameId: string, parametricPlots: ParametricPlot[], replace?: boolean) => void
+  onImplicitPlotsUpdate?: (frameId: string, implicitPlots: ImplicitPlot[], replace?: boolean) => void
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
   onParametricPlotsClear?: (frameId: string) => void
+  onImplicitPlotsClear?: (frameId: string) => void
   externalExecutionResult?: { success: boolean; error?: string } | null // Execution result from external (auto-execution)
   onExecutionErrorChange?: (hasError: boolean) => void // Callback to notify parent of error state changes
 }
@@ -39,9 +41,11 @@ function CodePanel({
   onVectorsUpdate,
   onFunctionsUpdate,
   onParametricPlotsUpdate,
+  onImplicitPlotsUpdate,
   onVectorsClear,
   onFunctionsClear,
   onParametricPlotsClear,
+  onImplicitPlotsClear,
   externalExecutionResult,
   onExecutionErrorChange,
 }: CodePanelProps) {
@@ -367,6 +371,7 @@ function CodePanel({
       const pixelsPerUnit = estimatedZoom * (estimatedCanvasWidth / 1000)
       
       const newParametricPlots: ParametricPlot[] = []
+      const newImplicitPlots: ImplicitPlot[] = []
       const result = await executeCode(
         codeToExecute,
         selectedFrame.id,
@@ -389,7 +394,14 @@ function CodePanel({
           newParametricPlots.push({
             ...plot,
             id: generateId('param'),
-          })
+          } as ParametricPlot)
+        },
+        // onImplicitPlotCreated callback
+        (plot) => {
+          newImplicitPlots.push({
+            ...plot,
+            id: generateId('implicit'),
+          } as ImplicitPlot)
         },
         estimatedCanvasWidth,
         estimatedCanvasHeight,
@@ -410,6 +422,9 @@ function CodePanel({
           if (onParametricPlotsClear) {
             onParametricPlotsClear(selectedFrame.id)
           }
+          if (onImplicitPlotsClear) {
+            onImplicitPlotsClear(selectedFrame.id)
+          }
         })
         
         // Then atomically replace with new ones
@@ -423,6 +438,9 @@ function CodePanel({
           }
           if (onParametricPlotsUpdate) {
             onParametricPlotsUpdate(selectedFrame.id, newParametricPlots, true)
+          }
+          if (onImplicitPlotsUpdate) {
+            onImplicitPlotsUpdate(selectedFrame.id, newImplicitPlots, true)
           }
         })
         

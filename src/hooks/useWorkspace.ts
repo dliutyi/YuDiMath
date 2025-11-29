@@ -56,6 +56,7 @@ export function useWorkspace(options: { persist?: boolean } = {}) {
             const migratedFrames = parsed.frames.map((frame: CoordinateFrame) => ({
               ...frame,
               parametricPlots: frame.parametricPlots || [],
+              implicitPlots: frame.implicitPlots || [],
             }))
             return {
               ...parsed,
