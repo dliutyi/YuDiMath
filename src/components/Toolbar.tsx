@@ -1,4 +1,5 @@
 import GridStepSelector from './GridStepSelector'
+import { MIN_ZOOM, MAX_ZOOM } from '../utils/constants'
 
 interface ToolbarProps {
   gridStep: number
@@ -13,9 +14,6 @@ interface ToolbarProps {
   isDrawing: boolean
   onDrawingToggle: () => void
 }
-
-const MIN_ZOOM = 5.0
-const MAX_ZOOM = 500.0
 
 export default function Toolbar({
   gridStep,

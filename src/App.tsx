@@ -12,10 +12,7 @@ import { useWorkspace } from './hooks/useWorkspace'
 import { downloadWorkspace, importWorkspaceFromFile } from './utils/exportImport'
 import { debounce } from './utils/debounce'
 import type { ViewportState, CoordinateFrame, Vector, FunctionPlot, WorkspaceState } from './types'
-
-const MIN_ZOOM = 5.0
-const MAX_ZOOM = 500.0
-const DEFAULT_ZOOM = 50.0
+import { MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM, ZOOM_STEP_MULTIPLIER } from './utils/constants'
 
 function App() {
   const workspace = useWorkspace({ persist: true })
@@ -48,13 +45,13 @@ function App() {
 
   const handleZoomIn = () => {
     const currentZoom = workspace.viewport.zoom
-    const newZoom = Math.min(currentZoom * 1.2, MAX_ZOOM)
+    const newZoom = Math.min(currentZoom * ZOOM_STEP_MULTIPLIER, MAX_ZOOM)
     workspace.updateViewport({ zoom: newZoom })
   }
 
   const handleZoomOut = () => {
     const currentZoom = workspace.viewport.zoom
-    const newZoom = Math.max(currentZoom / 1.2, MIN_ZOOM)
+    const newZoom = Math.max(currentZoom / ZOOM_STEP_MULTIPLIER, MIN_ZOOM)
     workspace.updateViewport({ zoom: newZoom })
   }
 

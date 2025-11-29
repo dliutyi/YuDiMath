@@ -186,7 +186,7 @@ describe('pythonFunctions', () => {
         xMin: -5,
         xMax: 5,
         color: '#3b82f6', // Default color
-        numPoints: 1000,
+        numPoints: 750, // Adaptive: range 10 * 75 = 750
       })
     })
 
@@ -204,7 +204,7 @@ describe('pythonFunctions', () => {
         xMin: -10,
         xMax: 10,
         color: '#00ff00',
-        numPoints: 1000,
+        numPoints: 1500, // Adaptive: range 20 * 75 = 1500
       })
     })
 
@@ -306,7 +306,7 @@ describe('pythonFunctions', () => {
         xMin: -5,
         xMax: 5,
         color: '#00ff00',
-        numPoints: 1000,
+        numPoints: 750, // Adaptive: range 10 * 75 = 750
       })
     })
 
@@ -328,7 +328,7 @@ describe('pythonFunctions', () => {
         xMin: -5,
         xMax: 5,
         color: '#ff00ff',
-        numPoints: 1000,
+        numPoints: 750, // Adaptive: range 10 * 75 = 750
       })
     })
   })

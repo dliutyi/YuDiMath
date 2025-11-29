@@ -14,6 +14,20 @@ vi.mock('../../src/utils/frameTransforms', () => ({
     const [ox, oy] = frame.origin
     return [px - ox, py - oy]
   }),
+  screenToFrame: vi.fn((point, frame, viewport, canvasWidth, canvasHeight) => {
+    // Simple mock: convert screen to frame coordinates
+    const [sx, sy] = point
+    const frameX = (sx / canvasWidth - 0.5) * frame.bounds.width / frame.viewport.zoom + frame.viewport.x
+    const frameY = (0.5 - sy / canvasHeight) * frame.bounds.height / frame.viewport.zoom + frame.viewport.y
+    return [frameX, frameY]
+  }),
+  screenToNestedFrame: vi.fn((point, frame, frames, viewport, canvasWidth, canvasHeight) => {
+    // Simple mock: convert screen to nested frame coordinates
+    const [sx, sy] = point
+    const frameX = (sx / canvasWidth - 0.5) * frame.bounds.width / frame.viewport.zoom + frame.viewport.x
+    const frameY = (0.5 - sy / canvasHeight) * frame.bounds.height / frame.viewport.zoom + frame.viewport.y
+    return [frameX, frameY]
+  }),
 }))
 
 describe('useCanvasZoom', () => {

@@ -6,11 +6,7 @@ import { frameToScreen, screenToFrame, screenToNestedFrame } from '../utils/fram
 import { drawGrid, drawAxes } from '../utils/canvasDrawing'
 import { useCanvasZoom } from '../hooks/useCanvasZoom'
 import { useCanvasDrawing } from '../hooks/useCanvasDrawing'
-
-const MIN_ZOOM = 5.0
-const MAX_ZOOM = 500.0
-const FRAME_MIN_ZOOM = 0.1
-const FRAME_MAX_ZOOM = 10.0
+import { MIN_ZOOM, MAX_ZOOM, FRAME_MIN_ZOOM, FRAME_MAX_ZOOM } from '../utils/constants'
 
 interface CanvasProps {
   viewport: ViewportState

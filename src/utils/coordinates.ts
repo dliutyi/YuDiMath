@@ -1,4 +1,5 @@
 import type { ViewportState, Point2D, FrameBounds } from '../types'
+import { clampPoint } from './mathUtils'
 
 /**
  * Convert world coordinates to screen coordinates
@@ -162,16 +163,12 @@ export function isFrameInsideFrame(innerFrame: FrameBounds, outerFrame: FrameBou
  * @returns Clamped point [x, y]
  */
 export function clampPointToFrameBounds(point: Point2D, bounds: FrameBounds): Point2D {
-  const [x, y] = point
   const minX = bounds.x
   const maxX = bounds.x + bounds.width
   const minY = bounds.y
   const maxY = bounds.y + bounds.height
 
-  return [
-    Math.max(minX, Math.min(maxX, x)),
-    Math.max(minY, Math.min(maxY, y))
-  ]
+  return clampPoint(point, minX, maxX, minY, maxY)
 }
 
 /**

@@ -74,7 +74,9 @@ describe('FrameEditorPanel', () => {
       />
     )
     
-    expect(container.firstChild).toBeNull()
+    // Component returns a hidden div when no frame is selected, not null
+    expect(container.firstChild).not.toBeNull()
+    expect(container.firstChild).toHaveStyle({ visibility: 'hidden' })
   })
 
   it('should render when frame is selected', () => {
@@ -91,7 +93,7 @@ describe('FrameEditorPanel', () => {
   })
 
   it('should default to properties tab', () => {
-    render(
+    const { container } = render(
       <FrameEditorPanel
         selectedFrame={mockFrame}
         onFrameUpdate={mockOnFrameUpdate}
@@ -99,8 +101,16 @@ describe('FrameEditorPanel', () => {
       />
     )
     
-    expect(screen.getByTestId('properties-panel')).toBeInTheDocument()
-    expect(screen.queryByTestId('code-panel')).not.toBeInTheDocument()
+    const propertiesPanel = screen.getByTestId('properties-panel')
+    const codePanel = screen.queryByTestId('code-panel')
+    expect(propertiesPanel).toBeInTheDocument()
+    expect(codePanel).toBeInTheDocument() // Both are in DOM, but code panel should be hidden
+    
+    // Find the wrapper divs with opacity classes
+    const propertiesWrapper = propertiesPanel.closest('div[class*="opacity"]')
+    const codeWrapper = codePanel?.closest('div[class*="opacity"]')
+    expect(codeWrapper).toHaveClass('opacity-0', 'pointer-events-none')
+    expect(propertiesWrapper).toHaveClass('opacity-100')
   })
 
   it('should switch to code tab when clicked', () => {
@@ -115,8 +125,16 @@ describe('FrameEditorPanel', () => {
     const codeTab = screen.getByText('Code Editor')
     fireEvent.click(codeTab)
     
-    expect(screen.getByTestId('code-panel')).toBeInTheDocument()
-    expect(screen.queryByTestId('properties-panel')).not.toBeInTheDocument()
+    const codePanel = screen.getByTestId('code-panel')
+    const propertiesPanel = screen.getByTestId('properties-panel')
+    expect(codePanel).toBeInTheDocument()
+    expect(propertiesPanel).toBeInTheDocument() // Both are in DOM, but properties panel should be hidden
+    
+    // Find the wrapper divs with opacity classes
+    const propertiesWrapper = propertiesPanel.closest('div[class*="opacity"]')
+    const codeWrapper = codePanel.closest('div[class*="opacity"]')
+    expect(propertiesWrapper).toHaveClass('opacity-0', 'pointer-events-none')
+    expect(codeWrapper).toHaveClass('opacity-100')
   })
 
   it('should switch back to properties tab when clicked', () => {
@@ -130,12 +148,20 @@ describe('FrameEditorPanel', () => {
     
     // Switch to code tab
     fireEvent.click(screen.getByText('Code Editor'))
-    expect(screen.getByTestId('code-panel')).toBeInTheDocument()
+    const codePanel = screen.getByTestId('code-panel')
+    expect(codePanel).toBeInTheDocument()
     
     // Switch back to properties tab
     fireEvent.click(screen.getByText('Frame Properties'))
-    expect(screen.getByTestId('properties-panel')).toBeInTheDocument()
-    expect(screen.queryByTestId('code-panel')).not.toBeInTheDocument()
+    const propertiesPanel = screen.getByTestId('properties-panel')
+    expect(propertiesPanel).toBeInTheDocument()
+    expect(codePanel).toBeInTheDocument() // Both are in DOM, but code panel should be hidden
+    
+    // Find the wrapper divs with opacity classes
+    const codeWrapper = codePanel.closest('div[class*="opacity"]')
+    const propertiesWrapper = propertiesPanel.closest('div[class*="opacity"]')
+    expect(codeWrapper).toHaveClass('opacity-0', 'pointer-events-none')
+    expect(propertiesWrapper).toHaveClass('opacity-100')
   })
 
   it('should apply active tab styling', () => {

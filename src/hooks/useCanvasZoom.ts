@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { ViewportState, CoordinateFrame } from '../types'
 import { screenToWorld } from '../utils/coordinates'
 import { screenToFrame, screenToNestedFrame } from '../utils/frameTransforms'
+import { MIN_ZOOM, MAX_ZOOM, ZOOM_SENSITIVITY, FRAME_MIN_ZOOM, FRAME_MAX_ZOOM, FRAME_ZOOM_SENSITIVITY } from '../utils/constants'
 
 interface UseCanvasZoomProps {
   canvasRef: React.RefObject<HTMLCanvasElement>
@@ -14,13 +15,6 @@ interface UseCanvasZoomProps {
   onViewportChange?: (viewport: ViewportState) => void
   onFrameViewportChange?: (frameId: string, viewport: ViewportState) => void
 }
-
-const MIN_ZOOM = 5.0
-const MAX_ZOOM = 500.0
-const ZOOM_SENSITIVITY = 0.1
-const FRAME_MIN_ZOOM = 0.1
-const FRAME_MAX_ZOOM = 10.0
-const FRAME_ZOOM_SENSITIVITY = 0.005
 
 export function useCanvasZoom({
   canvasRef,
