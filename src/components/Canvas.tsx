@@ -714,14 +714,12 @@ function Canvas({
         y: touch.clientY - rect.top,
       }
 
-      if (panningFrameRef.current && onFrameViewportChange) {
+      if (panningFrameRef.current && onFrameViewportChange && startFramePointRef.current) {
         // Panning inside a frame - update frame viewport
         const frame = frames.find(f => f.id === panningFrameRef.current)
         if (frame) {
-          // Get the frame point that was under the touch when panning started
-          const startFramePoint = frame.parentFrameId
-            ? screenToNestedFrame([lastPanPointRef.current.x, lastPanPointRef.current.y], frame, frames, viewport, canvasWidth, canvasHeight)
-            : screenToFrame([lastPanPointRef.current.x, lastPanPointRef.current.y], frame, viewport, canvasWidth, canvasHeight)
+          // Use the stored frame point from when panning started
+          const startFramePoint = startFramePointRef.current
           
           // Get the frame point that is currently under the touch (with current viewport)
           const currentFramePoint = frame.parentFrameId
@@ -739,16 +737,9 @@ function Canvas({
             y: frame.viewport.y + deltaY,
           })
         }
-      } else if (onViewportChange) {
-        // Panning background
-        // Get the world point that was under the touch when panning started
-        const startWorld = screenToWorld(
-          lastPanPointRef.current.x,
-          lastPanPointRef.current.y,
-          viewport,
-          canvasWidth,
-          canvasHeight
-        )
+      } else if (onViewportChange && startWorldPointRef.current) {
+        // Panning background - use the stored world point from when panning started
+        const startWorld = startWorldPointRef.current
         
         // Get the world point that is currently under the touch (with current viewport)
         const currentWorld = screenToWorld(
@@ -869,6 +860,9 @@ function Canvas({
     
     isPanningRef.current = false
     lastPanPointRef.current = null
+    panningFrameRef.current = null
+    startWorldPointRef.current = null
+    startFramePointRef.current = null
     touchStartRef.current = null
   }, [isDrawing, width, height, handleDrawingMouseUp, onDrawingModeChange])
 
