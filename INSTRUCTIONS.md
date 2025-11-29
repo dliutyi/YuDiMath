@@ -1728,8 +1728,10 @@ For each step:
 
 ---
 
-### [ ] Step 13.6: Add Extended Mode Persistence (Optional)
+### [ ] Step 13.6: Add Extended Mode Persistence (Optional) - SKIPPED
 **Task**: Persist extended mode preference per frame or globally.
+
+**Status**: Skipped for now - will be implemented later if needed
 
 **Implementation**:
 - Store extended mode preference in frame data or global settings
