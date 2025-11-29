@@ -30,21 +30,75 @@ export const plotImplicitPointsImplementation: FunctionImplementation = (
   const colorArg = args.length > 5 ? args[5] : undefined
 
   // Validate points - should be an array of [x, y] pairs
-  if (!Array.isArray(pointsArg)) {
-    throw new Error('plot_implicit_points() points must be an array of [x, y] pairs')
+  // Pyodide may pass this as a Pyodide list/array object, so we need to convert it
+  let pointsArray: unknown[]
+  if (Array.isArray(pointsArg)) {
+    pointsArray = pointsArg
+  } else if (pointsArg && typeof pointsArg === 'object') {
+    // Try to convert Pyodide list/array to JavaScript array
+    const obj = pointsArg as any
+    if (typeof obj.toJs === 'function') {
+      pointsArray = obj.toJs()
+    } else if (typeof obj.tolist === 'function') {
+      pointsArray = obj.tolist()
+    } else if (Array.from && typeof obj[Symbol.iterator] === 'function') {
+      pointsArray = Array.from(obj)
+    } else {
+      // Try to access as array-like
+      const length = obj.length
+      if (typeof length === 'number' && length >= 0) {
+        pointsArray = []
+        for (let i = 0; i < length; i++) {
+          pointsArray.push(obj[i])
+        }
+      } else {
+        throw new Error('plot_implicit_points() points must be an array or array-like object')
+      }
+    }
+  } else {
+    throw new Error('plot_implicit_points() points must be an array')
   }
 
   const points: Array<[number, number]> = []
-  for (const point of pointsArg) {
-    if (!Array.isArray(point) || point.length !== 2) {
-      throw new Error('plot_implicit_points() each point must be an array of [x, y]')
+  for (const point of pointsArray) {
+    // Convert point if it's a Pyodide object
+    let pointArray: unknown[]
+    if (Array.isArray(point)) {
+      pointArray = point
+    } else if (point && typeof point === 'object') {
+      const pointObj = point as any
+      if (typeof pointObj.toJs === 'function') {
+        pointArray = pointObj.toJs()
+      } else if (typeof pointObj.tolist === 'function') {
+        pointArray = pointObj.tolist()
+      } else if (Array.from && typeof pointObj[Symbol.iterator] === 'function') {
+        pointArray = Array.from(pointObj)
+      } else {
+        // Try to access as array-like
+        const length = pointObj.length
+        if (typeof length === 'number' && length === 2) {
+          pointArray = [pointObj[0], pointObj[1]]
+        } else {
+          throw new Error('plot_implicit_points() each point must be a [x, y] pair')
+        }
+      }
+    } else {
+      throw new Error('plot_implicit_points() each point must be a [x, y] pair')
     }
-    const x = typeof point[0] === 'number' ? point[0] : parseFloat(String(point[0]))
-    const y = typeof point[1] === 'number' ? point[1] : parseFloat(String(point[1]))
+
+    if (!Array.isArray(pointArray) || pointArray.length !== 2) {
+      throw new Error('plot_implicit_points() each point must be a [x, y] pair')
+    }
+    const x = typeof pointArray[0] === 'number' ? pointArray[0] : parseFloat(String(pointArray[0]))
+    const y = typeof pointArray[1] === 'number' ? pointArray[1] : parseFloat(String(pointArray[1]))
     if (isNaN(x) || isNaN(y)) {
-      throw new Error('plot_implicit_points() point coordinates must be numbers')
+      continue // Skip invalid points
     }
     points.push([x, y])
+  }
+
+  if (points.length === 0) {
+    throw new Error('plot_implicit_points() must have at least one valid point')
   }
 
   // Validate x_min, x_max, y_min, y_max
