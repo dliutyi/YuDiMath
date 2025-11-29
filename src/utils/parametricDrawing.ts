@@ -155,26 +155,39 @@ function drawParametricFromExpressions(
   // Calculate pixelsPerUnit first to make baseNumPoints screen-space aware
   const pixelsPerUnit = calculatePixelsPerUnit(transformToScreen)
   
-  // Estimate coordinate range by sampling a few points
+  // Estimate coordinate range by sampling multiple points
   // This helps determine if we need more points for large coordinate values
+  // Only apply scaling for coordinates > 10 to avoid breaking small values
   let estimatedMaxCoord = 1
   try {
-    const sampleT = [tMin, (tMin + tMax) / 2, tMax]
-    for (const t of sampleT) {
-      const x = evaluateParametricExpression(xFunc, t)
-      const y = evaluateParametricExpression(yFunc, t)
-      if (isFinite(x) && isFinite(y)) {
-        estimatedMaxCoord = Math.max(estimatedMaxCoord, Math.abs(x), Math.abs(y))
+    // Sample more points for better estimation (similar to Python side)
+    const numSamples = 20
+    for (let i = 0; i <= numSamples; i++) {
+      const t = tMin + (i / numSamples) * (tMax - tMin)
+      try {
+        const x = evaluateParametricExpression(xFunc, t)
+        const y = evaluateParametricExpression(yFunc, t)
+        if (isFinite(x) && isFinite(y)) {
+          estimatedMaxCoord = Math.max(estimatedMaxCoord, Math.abs(x), Math.abs(y))
+        }
+      } catch (e) {
+        // Skip invalid points
       }
     }
   } catch (e) {
-    // If sampling fails, use default
+    // If sampling fails, use default (no scaling)
   }
   
-  // Base number of points: scale with parameter range AND coordinate scale
-  // For large coordinate values, we need more points to maintain quality
-  // pixelsPerUnit already accounts for zoom, so we scale by coordinate magnitude
-  const coordinateScale = Math.max(1, estimatedMaxCoord / 10) // Scale factor for coordinates > 10
+  // Base number of points: only scale for large coordinate values (>10)
+  // Use conservative linear scaling to avoid breaking small values
+  // For coordinates ≤ 10: no scaling (coordinateScale = 1)
+  // For coordinates > 10: linear scaling, capped at 10x
+  let coordinateScale = 1.0
+  if (estimatedMaxCoord > 10) {
+    coordinateScale = 1.0 + (estimatedMaxCoord - 10.0) / 30.0  // Linear scaling above 10
+    coordinateScale = Math.min(coordinateScale, 10.0)  // Cap at 10x
+  }
+  
   const baseNumPoints = plot.numPoints ?? Math.max(
     200, 
     Math.min(3000, Math.round(tRange * 75 * coordinateScale))

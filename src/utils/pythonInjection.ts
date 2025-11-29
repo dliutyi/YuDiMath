@@ -637,14 +637,15 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
         except:
             pass  # If sampling fails, use default
         
-        # More aggressive scaling: use square root to avoid excessive points but still scale up
-        # For coordinates around 100, this gives ~3x scaling instead of 10x
-        # This balances quality and performance better
+        # Conservative scaling: only apply for coordinates > 10
+        # Use linear scaling to avoid breaking small values
+        # For coordinates ≤ 10: no scaling (coordinate_scale = 1.0)
+        # For coordinates > 10: linear scaling, capped at 10x
         if estimated_max_coord > 10:
             coordinate_scale = 1.0 + (estimated_max_coord - 10.0) / 30.0  # Linear scaling above 10
             coordinate_scale = min(coordinate_scale, 10.0)  # Cap at 10x to avoid excessive points
         else:
-            coordinate_scale = 1.0
+            coordinate_scale = 1.0  # No scaling for small values - preserve existing behavior
         
         # Calculate optimal number of points based on range, zoom, AND coordinate scale
         pixels_covered = t_range * _pixels_per_unit
@@ -1853,14 +1854,15 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
         except:
             pass  # If sampling fails, use default
         
-        # More aggressive scaling: use square root to avoid excessive points but still scale up
-        # For coordinates around 100, this gives ~3x scaling instead of 10x
-        # This balances quality and performance better
+        # Conservative scaling: only apply for coordinates > 10
+        # Use linear scaling to avoid breaking small values
+        # For coordinates ≤ 10: no scaling (coordinate_scale = 1.0)
+        # For coordinates > 10: linear scaling, capped at 10x
         if estimated_max_coord > 10:
             coordinate_scale = 1.0 + (estimated_max_coord - 10.0) / 30.0  # Linear scaling above 10
             coordinate_scale = min(coordinate_scale, 10.0)  # Cap at 10x to avoid excessive points
         else:
-            coordinate_scale = 1.0
+            coordinate_scale = 1.0  # No scaling for small values - preserve existing behavior
         
         # Calculate optimal number of points based on range, zoom, AND coordinate scale
         pixels_covered = t_range * _pixels_per_unit
