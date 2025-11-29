@@ -786,33 +786,83 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
             # and find zero-crossings, then pass contour points to JavaScript
             try:
                 # Create a grid and evaluate the function
-                grid_resolution = 100  # Start with moderate resolution
+                grid_resolution = 200  # Increased resolution for better quality
                 dx = (x_max - x_min) / grid_resolution
                 dy = (y_max - y_min) / grid_resolution
                 
                 # Evaluate at grid points and find zero-crossings
                 contour_points = []
-                for i in range(grid_resolution):
+                
+                # Helper function to interpolate zero-crossing on an edge
+                def interpolate_zero(p1, p2, v1, v2):
+                    """Linear interpolation to find zero-crossing between two points"""
+                    if v1 == 0:
+                        return p1
+                    if v2 == 0:
+                        return p2
+                    if np.sign(v1) == np.sign(v2):
+                        return None  # No zero-crossing
+                    # Linear interpolation: t = -v1 / (v2 - v1)
+                    t = -v1 / (v2 - v1)
+                    return p1 + t * (p2 - p1)
+                
+                # Evaluate function at all grid points
+                grid_values = {}
+                for i in range(grid_resolution + 1):
                     y = y_min + i * dy
-                    for j in range(grid_resolution):
+                    for j in range(grid_resolution + 1):
                         x = x_min + j * dx
                         try:
-                            # Evaluate at four corners of cell
-                            v00 = float(original_callable(x, y))
-                            v10 = float(original_callable(x + dx, y))
-                            v01 = float(original_callable(x, y + dy))
-                            v11 = float(original_callable(x + dx, y + dy))
-                            
-                            # Check for zero-crossings
-                            if np.isfinite(v00) and np.isfinite(v10) and np.isfinite(v01) and np.isfinite(v11):
-                                signs = [np.sign(v00), np.sign(v10), np.sign(v01), np.sign(v11)]
-                                # If signs differ, there's a zero-crossing
-                                if len(set(signs)) > 1:
-                                    # Approximate zero-crossing as cell center (simple approach)
-                                    # For better quality, could use linear interpolation
-                                    contour_points.append([float(x + dx/2), float(y + dy/2)])
+                            val = float(original_callable(x, y))
+                            if np.isfinite(val):
+                                grid_values[(i, j)] = val
                         except:
                             pass
+                
+                # Process each cell to find zero-crossings
+                for i in range(grid_resolution):
+                    for j in range(grid_resolution):
+                        # Get corner values
+                        v00 = grid_values.get((i, j), None)
+                        v10 = grid_values.get((i + 1, j), None)
+                        v01 = grid_values.get((i, j + 1), None)
+                        v11 = grid_values.get((i + 1, j + 1), None)
+                        
+                        # Skip if any corner is missing or invalid
+                        if v00 is None or v10 is None or v01 is None or v11 is None:
+                            continue
+                        
+                        # Get corner positions
+                        x0 = x_min + j * dx
+                        y0 = y_min + i * dy
+                        x1 = x0 + dx
+                        y1 = y0 + dy
+                        
+                        # Check each edge for zero-crossings
+                        edges = [
+                            # Left edge: (x0, y0) to (x0, y1)
+                            ((x0, y0), (x0, y1), v00, v10),
+                            # Bottom edge: (x0, y1) to (x1, y1)
+                            ((x0, y1), (x1, y1), v10, v11),
+                            # Right edge: (x1, y1) to (x1, y0)
+                            ((x1, y1), (x1, y0), v11, v01),
+                            # Top edge: (x1, y0) to (x0, y0)
+                            ((x1, y0), (x0, y0), v01, v00),
+                        ]
+                        
+                        for (px1, py1), (px2, py2), val1, val2 in edges:
+                            if np.sign(val1) != np.sign(val2):
+                                # Zero-crossing on this edge
+                                if px1 == px2:
+                                    # Vertical edge
+                                    y_interp = interpolate_zero(py1, py2, val1, val2)
+                                    if y_interp is not None:
+                                        contour_points.append([float(px1), float(y_interp)])
+                                else:
+                                    # Horizontal edge
+                                    x_interp = interpolate_zero(px1, px2, val1, val2)
+                                    if x_interp is not None:
+                                        contour_points.append([float(x_interp), float(py1)])
                 
                 if len(contour_points) > 0:
                     # Convert to JavaScript-compatible format (list of lists)
@@ -2087,33 +2137,83 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
             # and find zero-crossings, then pass contour points to JavaScript
             try:
                 # Create a grid and evaluate the function
-                grid_resolution = 100  # Start with moderate resolution
+                grid_resolution = 200  # Increased resolution for better quality
                 dx = (x_max - x_min) / grid_resolution
                 dy = (y_max - y_min) / grid_resolution
                 
                 # Evaluate at grid points and find zero-crossings
                 contour_points = []
-                for i in range(grid_resolution):
+                
+                # Helper function to interpolate zero-crossing on an edge
+                def interpolate_zero(p1, p2, v1, v2):
+                    """Linear interpolation to find zero-crossing between two points"""
+                    if v1 == 0:
+                        return p1
+                    if v2 == 0:
+                        return p2
+                    if np.sign(v1) == np.sign(v2):
+                        return None  # No zero-crossing
+                    # Linear interpolation: t = -v1 / (v2 - v1)
+                    t = -v1 / (v2 - v1)
+                    return p1 + t * (p2 - p1)
+                
+                # Evaluate function at all grid points
+                grid_values = {}
+                for i in range(grid_resolution + 1):
                     y = y_min + i * dy
-                    for j in range(grid_resolution):
+                    for j in range(grid_resolution + 1):
                         x = x_min + j * dx
                         try:
-                            # Evaluate at four corners of cell
-                            v00 = float(original_callable(x, y))
-                            v10 = float(original_callable(x + dx, y))
-                            v01 = float(original_callable(x, y + dy))
-                            v11 = float(original_callable(x + dx, y + dy))
-                            
-                            # Check for zero-crossings
-                            if np.isfinite(v00) and np.isfinite(v10) and np.isfinite(v01) and np.isfinite(v11):
-                                signs = [np.sign(v00), np.sign(v10), np.sign(v01), np.sign(v11)]
-                                # If signs differ, there's a zero-crossing
-                                if len(set(signs)) > 1:
-                                    # Approximate zero-crossing as cell center (simple approach)
-                                    # For better quality, could use linear interpolation
-                                    contour_points.append([float(x + dx/2), float(y + dy/2)])
+                            val = float(original_callable(x, y))
+                            if np.isfinite(val):
+                                grid_values[(i, j)] = val
                         except:
                             pass
+                
+                # Process each cell to find zero-crossings
+                for i in range(grid_resolution):
+                    for j in range(grid_resolution):
+                        # Get corner values
+                        v00 = grid_values.get((i, j), None)
+                        v10 = grid_values.get((i + 1, j), None)
+                        v01 = grid_values.get((i, j + 1), None)
+                        v11 = grid_values.get((i + 1, j + 1), None)
+                        
+                        # Skip if any corner is missing or invalid
+                        if v00 is None or v10 is None or v01 is None or v11 is None:
+                            continue
+                        
+                        # Get corner positions
+                        x0 = x_min + j * dx
+                        y0 = y_min + i * dy
+                        x1 = x0 + dx
+                        y1 = y0 + dy
+                        
+                        # Check each edge for zero-crossings
+                        edges = [
+                            # Left edge: (x0, y0) to (x0, y1)
+                            ((x0, y0), (x0, y1), v00, v10),
+                            # Bottom edge: (x0, y1) to (x1, y1)
+                            ((x0, y1), (x1, y1), v10, v11),
+                            # Right edge: (x1, y1) to (x1, y0)
+                            ((x1, y1), (x1, y0), v11, v01),
+                            # Top edge: (x1, y0) to (x0, y0)
+                            ((x1, y0), (x0, y0), v01, v00),
+                        ]
+                        
+                        for (px1, py1), (px2, py2), val1, val2 in edges:
+                            if np.sign(val1) != np.sign(val2):
+                                # Zero-crossing on this edge
+                                if px1 == px2:
+                                    # Vertical edge
+                                    y_interp = interpolate_zero(py1, py2, val1, val2)
+                                    if y_interp is not None:
+                                        contour_points.append([float(px1), float(y_interp)])
+                                else:
+                                    # Horizontal edge
+                                    x_interp = interpolate_zero(px1, px2, val1, val2)
+                                    if x_interp is not None:
+                                        contour_points.append([float(x_interp), float(py1)])
                 
                 if len(contour_points) > 0:
                     # Pass contour points to JavaScript
