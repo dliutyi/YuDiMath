@@ -297,6 +297,7 @@ export function useCanvasDrawing({
         origin: [originX, originY],
         baseI,
         baseJ,
+        parametricPlots: [],
         bounds: newBounds,
         viewport: {
           x: 0,

@@ -5,7 +5,7 @@ import { highlight, languages } from 'prismjs'
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
 import { usePyScript } from '../hooks/usePyScript'
-import type { CoordinateFrame, Vector, FunctionPlot } from '../types'
+import type { CoordinateFrame, Vector, FunctionPlot, ParametricPlot } from '../types'
 
 interface CodePanelProps {
   selectedFrame: CoordinateFrame | null
@@ -362,6 +362,7 @@ function CodePanel({
       const estimatedZoom = 50 // Default zoom
       const pixelsPerUnit = estimatedZoom * (estimatedCanvasWidth / 1000)
       
+      const newParametricPlots: ParametricPlot[] = []
       const result = await executeCode(
         codeToExecute,
         selectedFrame.id,
@@ -377,6 +378,13 @@ function CodePanel({
           newFunctions.push({
             ...func,
             id: generateId('func'),
+          })
+        },
+        // onParametricPlotCreated callback
+        (plot) => {
+          newParametricPlots.push({
+            ...plot,
+            id: generateId('param'),
           })
         },
         estimatedCanvasWidth,

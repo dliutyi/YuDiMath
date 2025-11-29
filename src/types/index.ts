@@ -69,6 +69,32 @@ export interface FunctionPlot {
 }
 
 /**
+ * Parametric plot definition - represents a parametric curve where x and y are functions of parameter t
+ */
+export interface ParametricPlot {
+  /** Unique identifier for the parametric plot */
+  id: string
+  /** X-coordinate function of parameter t (string expression or callable marker) */
+  xFunc: string
+  /** Y-coordinate function of parameter t (string expression or callable marker) */
+  yFunc: string
+  /** Minimum parameter value */
+  tMin: number
+  /** Maximum parameter value */
+  tMax: number
+  /** Color of the parametric curve (hex format, e.g., '#ff00ff') */
+  color: string
+  /** Pre-computed points for the parametric curve - used when provided instead of expressions */
+  points?: Array<[number, number]>
+  /** Number of points to sample for plotting */
+  numPoints?: number
+  /** Whether this plot uses progressive rendering */
+  isProgressive?: boolean
+  /** Cache key for point caching */
+  cacheKey?: string
+}
+
+/**
  * Rectangle bounds - defines the position and size of a frame viewport
  */
 export interface FrameBounds {
@@ -114,6 +140,8 @@ export interface CoordinateFrame {
   vectors: Vector[]
   /** Function plots defined in this frame (via plot() calls) */
   functions: FunctionPlot[]
+  /** Parametric plots defined in this frame (via plot_parametric() calls) */
+  parametricPlots: ParametricPlot[]
   /** Python code for this frame */
   code: string
   /** Parameter slider values (t1, t2, t3, etc.) */

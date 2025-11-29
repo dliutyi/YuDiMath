@@ -11,7 +11,7 @@ import { usePyScript, clearQueuedExecutionsForFrame } from './hooks/usePyScript'
 import { useWorkspace } from './hooks/useWorkspace'
 import { downloadWorkspace, importWorkspaceFromFile } from './utils/exportImport'
 import { debounce } from './utils/debounce'
-import type { ViewportState, CoordinateFrame, Vector, FunctionPlot, WorkspaceState } from './types'
+import type { ViewportState, CoordinateFrame, Vector, FunctionPlot, ParametricPlot, WorkspaceState } from './types'
 import { MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM, ZOOM_STEP_MULTIPLIER } from './utils/constants'
 
 function App() {
@@ -183,6 +183,15 @@ function App() {
     }
   }
 
+  const handleParametricPlotsUpdate = (frameId: string, parametricPlots: ParametricPlot[], replace: boolean = false) => {
+    const frame = workspace.frames.find(f => f.id === frameId)
+    if (frame) {
+      workspace.updateFrame(frameId, {
+        parametricPlots: replace ? parametricPlots : [...(frame.parametricPlots || []), ...parametricPlots],
+      })
+    }
+  }
+
   const handleVectorsClear = (frameId: string) => {
     workspace.updateFrame(frameId, { vectors: [] })
   }
@@ -305,6 +314,7 @@ function App() {
       
       const isSliderTriggered = isSliderTriggeredRef.current
       isSliderTriggeredRef.current = false // Reset flag
+      const newParametricPlots: ParametricPlot[] = []
       executeCode(
         codeToExecute,
         frameIdToExecute,
@@ -320,6 +330,13 @@ function App() {
           newFunctions.push({
             ...func,
             id: generateId('func'),
+          })
+        },
+        // onParametricPlotCreated callback
+        (plot) => {
+          newParametricPlots.push({
+            ...plot,
+            id: generateId('param'),
           })
         },
         estimatedCanvasWidth,
@@ -340,6 +357,7 @@ function App() {
           flushSync(() => {
             handleVectorsUpdate(frameIdToExecute, newVectors, true)
             handleFunctionsUpdate(frameIdToExecute, newFunctions, true)
+            handleParametricPlotsUpdate(frameIdToExecute, newParametricPlots, true)
           })
         } else {
           // On error, set error result (this will be displayed)

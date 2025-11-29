@@ -1,4 +1,4 @@
-import type { Vector, FunctionPlot } from '../types'
+import type { Vector, FunctionPlot, ParametricPlot } from '../types'
 import type { PythonFunctionCallback } from './pythonFunctions'
 import { getFunctionImplementation } from './pythonFunctionRegistry'
 import { parsePythonArgs } from './pythonArgParsing'
@@ -22,10 +22,11 @@ let capturedCalls: Array<{
 let currentFrameId: string | null = null
 
 /**
- * Storage functions for vectors and function plots
+ * Storage functions for vectors, function plots, and parametric plots
  */
 let storeVectorFn: ((vector: Omit<Vector, 'id'>) => void) | null = null
 let storeFunctionFn: ((func: Omit<FunctionPlot, 'id'>) => void) | null = null
+let storeParametricPlotFn: ((plot: Omit<ParametricPlot, 'id'>) => void) | null = null
 
 /**
  * Canvas and viewport information for screen-resolution-aware sampling
@@ -41,6 +42,7 @@ let canvasInfo: {
  * @param frameId The ID of the frame where functions will be called
  * @param onVectorCreated Callback to store a vector
  * @param onFunctionCreated Callback to store a function plot
+ * @param onParametricPlotCreated Optional callback to store a parametric plot
  * @param canvasWidth Optional canvas width for screen-resolution-aware sampling
  * @param canvasHeight Optional canvas height for screen-resolution-aware sampling
  * @param pixelsPerUnit Optional pixels per unit in frame coordinates for optimal sampling
@@ -49,6 +51,7 @@ export function setupFunctionContext(
   frameId: string,
   onVectorCreated: (vector: Omit<Vector, 'id'>) => void,
   onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void,
+  onParametricPlotCreated?: (plot: Omit<ParametricPlot, 'id'>) => void,
   canvasWidth?: number,
   canvasHeight?: number,
   pixelsPerUnit?: number
@@ -56,6 +59,7 @@ export function setupFunctionContext(
   currentFrameId = frameId
   storeVectorFn = onVectorCreated
   storeFunctionFn = onFunctionCreated
+  storeParametricPlotFn = onParametricPlotCreated || null
   capturedCalls = []
   
   // Store canvas info for screen-resolution-aware sampling
@@ -73,6 +77,7 @@ export function clearFunctionContext(): void {
   currentFrameId = null
   storeVectorFn = null
   storeFunctionFn = null
+  storeParametricPlotFn = null
   capturedCalls = []
   canvasInfo = null
 }
@@ -157,7 +162,7 @@ export function createPythonFunctionWrapper(name: string): PythonFunctionCallbac
     
     // Execute the implementation
     try {
-      implementation(args, currentFrameId, storeVectorFn, storeFunctionFn)
+      implementation(args, currentFrameId, storeVectorFn, storeFunctionFn, storeParametricPlotFn || undefined)
     } catch (error: any) {
       throw new Error(`Error in ${name}(): ${error.message}`)
     }

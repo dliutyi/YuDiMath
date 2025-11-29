@@ -6,7 +6,7 @@ import {
   injectFunctionsIntoPyodide,
   updateCanvasInfoInPyodide,
 } from '../utils/pythonFunctions'
-import type { Vector, FunctionPlot } from '../types'
+import type { Vector, FunctionPlot, ParametricPlot } from '../types'
 
 interface PyScriptError {
   message: string
@@ -21,6 +21,7 @@ interface UsePyScriptReturn {
     frameId: string,
     onVectorCreated: (vector: Omit<Vector, 'id'>) => void,
     onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void,
+    onParametricPlotCreated?: (plot: Omit<ParametricPlot, 'id'>) => void,
     canvasWidth?: number,
     canvasHeight?: number,
     pixelsPerUnit?: number,
@@ -43,6 +44,7 @@ let executionQueue: Array<{
   frameId: string
   onVectorCreated: (vector: Omit<Vector, 'id'>) => void
   onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void
+  onParametricPlotCreated?: (plot: Omit<ParametricPlot, 'id'>) => void
   canvasWidth?: number
   canvasHeight?: number
   pixelsPerUnit?: number
@@ -241,6 +243,7 @@ export function usePyScript(): UsePyScriptReturn {
             item.frameId,
             item.onVectorCreated,
             item.onFunctionCreated,
+            item.onParametricPlotCreated,
             item.canvasWidth,
             item.canvasHeight,
             item.pixelsPerUnit
@@ -251,6 +254,7 @@ export function usePyScript(): UsePyScriptReturn {
             item.frameId,
             item.onVectorCreated,
             item.onFunctionCreated,
+            item.onParametricPlotCreated,
             item.canvasWidth,
             item.canvasHeight,
             item.pixelsPerUnit
@@ -377,6 +381,7 @@ export function usePyScript(): UsePyScriptReturn {
       frameId: string,
       onVectorCreated: (vector: Omit<Vector, 'id'>) => void,
       onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void,
+      onParametricPlotCreated?: (plot: Omit<ParametricPlot, 'id'>) => void,
       canvasWidth?: number,
       canvasHeight?: number,
       pixelsPerUnit?: number,
@@ -402,6 +407,7 @@ export function usePyScript(): UsePyScriptReturn {
             frameId,
             onVectorCreated,
             onFunctionCreated,
+            onParametricPlotCreated,
             canvasWidth,
             canvasHeight,
             pixelsPerUnit,

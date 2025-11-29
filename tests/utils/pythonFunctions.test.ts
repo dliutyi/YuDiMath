@@ -517,7 +517,8 @@ describe('pythonFunctions', () => {
         ['arg1', 'arg2'],
         'test-frame-1',
         mockStoreVector,
-        mockStoreFunction
+        mockStoreFunction,
+        undefined // storeParametricPlot (optional)
       )
     })
   })

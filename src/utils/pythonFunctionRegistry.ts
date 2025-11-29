@@ -1,4 +1,4 @@
-import type { Vector, FunctionPlot } from '../types'
+import type { Vector, FunctionPlot, ParametricPlot } from '../types'
 
 /**
  * Function implementation that processes arguments and stores results
@@ -7,7 +7,8 @@ export type FunctionImplementation = (
   args: unknown[],
   frameId: string,
   storeVector: (vector: Omit<Vector, 'id'>) => void,
-  storeFunction: (func: Omit<FunctionPlot, 'id'>) => void
+  storeFunction: (func: Omit<FunctionPlot, 'id'>) => void,
+  storeParametricPlot?: (plot: Omit<ParametricPlot, 'id'>) => void
 ) => void
 
 /**

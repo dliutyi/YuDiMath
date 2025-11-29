@@ -52,7 +52,15 @@ export function useWorkspace(options: { persist?: boolean } = {}) {
             Array.isArray(parsed.frames) &&
             (parsed.selectedFrameId === null || typeof parsed.selectedFrameId === 'string')
           ) {
-            return parsed
+            // Migration: ensure all frames have parametricPlots array
+            const migratedFrames = parsed.frames.map((frame: CoordinateFrame) => ({
+              ...frame,
+              parametricPlots: frame.parametricPlots || [],
+            }))
+            return {
+              ...parsed,
+              frames: migratedFrames,
+            }
           }
         }
       } catch (error) {

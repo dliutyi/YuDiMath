@@ -30,6 +30,7 @@ export { parsePythonArgs } from './pythonArgParsing'
 // Re-export implementations
 export { drawImplementation } from './pythonDraw'
 export { plotImplementation, plotPointsImplementation } from './pythonPlot'
+export { plotParametricImplementation } from './pythonParametricPlot'
 
 // Import and re-export injection (will be created separately)
 import { injectFunctionsIntoPyodide } from './pythonInjection'
@@ -39,16 +40,18 @@ export { injectFunctionsIntoPyodide }
 import { registerFunction } from './pythonFunctionRegistry'
 import { drawImplementation } from './pythonDraw'
 import { plotImplementation, plotPointsImplementation } from './pythonPlot'
+import { plotParametricImplementation } from './pythonParametricPlot'
 
 /**
  * Initialize the predefined functions system
- * Registers default functions (draw, plot)
+ * Registers default functions (draw, plot, plot_parametric)
  */
 export function initializeFunctions(): void {
   // Register default functions
   registerFunction('draw', drawImplementation)
   registerFunction('plot', plotImplementation)
   registerFunction('plot_points', plotPointsImplementation)
+  registerFunction('plot_parametric', plotParametricImplementation)
 }
 
 // Initialize default functions on module load
