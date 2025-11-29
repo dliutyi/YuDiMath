@@ -257,14 +257,26 @@ function drawParametricFromExpressions(
     // Curvature is the change in direction
     const curvature = Math.abs(dx2 - dx1) + Math.abs(dy2 - dy1)
 
-    // Calculate error metric
-    const maxVal = Math.max(Math.abs(x1_val), Math.abs(y1_val), Math.abs(x2), Math.abs(y2), Math.abs(xMid), Math.abs(yMid))
-    const linearError = Math.sqrt((xMid - xLinear) ** 2 + (yMid - yLinear) ** 2) / (maxVal + 1)
-    const normalizedCurvature = curvature * dt * dt / (maxVal + 1)
-    const combinedError = linearError + normalizedCurvature * 0.3
+    // Calculate error metric in screen space (pixel-based) instead of coordinate space
+    // This ensures proper sampling regardless of coordinate scale
+    const pointMidScreen = transformToScreen([xMid, yMid])
+    const pointLinearScreen = transformToScreen([xLinear, yLinear])
+    
+    // Screen-space linear error (in pixels)
+    const screenLinearError = Math.sqrt(
+      (pointMidScreen[0] - pointLinearScreen[0]) ** 2 + 
+      (pointMidScreen[1] - pointLinearScreen[1]) ** 2
+    )
+    
+    // Screen-space curvature error (estimate based on screen distance)
+    const screenCurvatureError = curvature * dt * dt * pixelsPerUnit * 0.3
+    
+    // Combined error in pixels
+    const combinedError = screenLinearError + screenCurvatureError
 
-    // Subdivide if error is too large
-    const errorThreshold = 0.01
+    // Adaptive threshold: subdivide if screen-space error exceeds 2 pixels
+    // This ensures smooth curves regardless of coordinate scale
+    const errorThreshold = 2.0
     if (combinedError > errorThreshold) {
       const tMid = (t1 + t2) / 2
       sampleAdaptive(t1, tMid, x1_val, y1_val, depth + 1)
