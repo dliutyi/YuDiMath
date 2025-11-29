@@ -9,7 +9,7 @@ import {
   createPythonFunctionWrapper,
   injectFunctionsIntoPyodide,
 } from '../../src/utils/pythonFunctions'
-import type { Vector, FunctionPlot } from '../../src/types'
+import type { Vector, FunctionPlot, ParametricPlot, ImplicitPlot } from '../../src/types'
 
 describe('pythonFunctions', () => {
   beforeEach(() => {
@@ -518,8 +518,99 @@ describe('pythonFunctions', () => {
         'test-frame-1',
         mockStoreVector,
         mockStoreFunction,
-        undefined // storeParametricPlot (optional)
+        undefined, // storeParametricPlot (optional)
+        undefined  // storeImplicitPlot (optional)
       )
+    })
+  })
+
+  describe('plot_implicit function', () => {
+    beforeEach(() => {
+      initializeFunctions()
+    })
+
+    it('should register plot_implicit function', () => {
+      const registeredNames = getRegisteredFunctionNames()
+      expect(registeredNames).toContain('plot_implicit')
+    })
+
+    it('should create implicit plot from string equation', () => {
+      const mockStoreVector = vi.fn()
+      const mockStoreFunction = vi.fn()
+      const mockStoreImplicitPlot = vi.fn()
+      
+      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot)
+      
+      const plotImplicitWrapper = createPythonFunctionWrapper('plot_implicit')
+      plotImplicitWrapper('x**2 + y**2 - 16', -10, 10, -10, 10)
+      
+      expect(mockStoreImplicitPlot).toHaveBeenCalledTimes(1)
+      expect(mockStoreImplicitPlot).toHaveBeenCalledWith({
+        equation: 'x**2 + y**2 - 16',
+        xMin: -10,
+        xMax: 10,
+        yMin: -10,
+        yMax: 10,
+        color: '#3b82f6',
+        numPoints: expect.any(Number),
+      })
+    })
+
+    it('should validate required parameters', () => {
+      const mockStoreVector = vi.fn()
+      const mockStoreFunction = vi.fn()
+      const mockStoreImplicitPlot = vi.fn()
+      
+      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot)
+      
+      const plotImplicitWrapper = createPythonFunctionWrapper('plot_implicit')
+      
+      expect(() => plotImplicitWrapper('x**2 + y**2 - 16')).toThrow()
+      expect(() => plotImplicitWrapper('x**2 + y**2 - 16', -10)).toThrow()
+      expect(() => plotImplicitWrapper('x**2 + y**2 - 16', -10, 10)).toThrow()
+      expect(() => plotImplicitWrapper('x**2 + y**2 - 16', -10, 10, -10)).toThrow()
+    })
+
+    it('should validate x_min < x_max and y_min < y_max', () => {
+      const mockStoreVector = vi.fn()
+      const mockStoreFunction = vi.fn()
+      const mockStoreImplicitPlot = vi.fn()
+      
+      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot)
+      
+      const plotImplicitWrapper = createPythonFunctionWrapper('plot_implicit')
+      
+      expect(() => plotImplicitWrapper('x**2 + y**2 - 16', 10, -10, -10, 10)).toThrow('x_min must be less than x_max')
+      expect(() => plotImplicitWrapper('x**2 + y**2 - 16', -10, 10, 10, -10)).toThrow('y_min must be less than y_max')
+    })
+
+    it('should accept color parameter', () => {
+      const mockStoreVector = vi.fn()
+      const mockStoreFunction = vi.fn()
+      const mockStoreImplicitPlot = vi.fn()
+      
+      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot)
+      
+      const plotImplicitWrapper = createPythonFunctionWrapper('plot_implicit')
+      plotImplicitWrapper('x**2 + y**2 - 16', -10, 10, -10, 10, '#ff0000')
+      
+      expect(mockStoreImplicitPlot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          color: '#ff0000',
+        })
+      )
+    })
+
+    it('should validate equation is string or callable', () => {
+      const mockStoreVector = vi.fn()
+      const mockStoreFunction = vi.fn()
+      const mockStoreImplicitPlot = vi.fn()
+      
+      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot)
+      
+      const plotImplicitWrapper = createPythonFunctionWrapper('plot_implicit')
+      
+      expect(() => plotImplicitWrapper(123, -10, 10, -10, 10)).toThrow('equation must be a string expression or callable function')
     })
   })
 })

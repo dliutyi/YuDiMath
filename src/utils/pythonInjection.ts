@@ -747,6 +747,45 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
     except Exception as e:
         print(f"[plot_parametric wrapper] Evaluation failed: {e}")
         raise ValueError(f"plot_parametric() could not evaluate functions. Error: {str(e)}")
+
+# Wrapper for plot_implicit() that handles keyword arguments and callables
+def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, color=None):
+    # Handle both positional and keyword arguments
+    if x_min is None or x_max is None or y_min is None or y_max is None:
+        raise ValueError("plot_implicit() requires x_min, x_max, y_min, and y_max arguments")
+    
+    # If equation is callable, try to extract expression or evaluate at grid points
+    if callable(equation):
+        import numpy as np
+        # Try to extract expression from lambda
+        original_callable = equation
+        extracted_expression = None
+        
+        try:
+            import inspect
+            source = inspect.getsource(equation)
+            if 'lambda' in source:
+                lambda_part = source.split('lambda', 1)[1]
+                if ':' in lambda_part:
+                    expr = lambda_part.split(':', 1)[1].strip()
+                    expr = expr.rstrip(',').rstrip(')').rstrip().strip()
+                    while (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
+                        expr = expr[1:-1].strip()
+                    expr = ' '.join(expr.split())
+                    extracted_expression = expr
+                    equation = extracted_expression
+        except Exception as e:
+            print(f"[plot_implicit wrapper] Could not extract expression from callable: {e}")
+            # For callables, we need to evaluate at grid points
+            # This is more complex for 2D, so for now we'll just pass the string representation
+            # The JavaScript side will handle evaluation
+            equation = str(equation)
+    
+    # Pass to JavaScript implementation
+    if color is not None:
+        return _yudimath.plot_implicit(equation, x_min, x_max, y_min, y_max, color)
+    else:
+        return _yudimath.plot_implicit(equation, x_min, x_max, y_min, y_max)
 `
       pyodide.runPython(pythonCode)
       console.log('[pythonFunctions] Functions injected via registerJsModule with keyword argument support:', functionNames)
@@ -1962,6 +2001,45 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
     except Exception as e:
         print(f"[plot_parametric wrapper] Evaluation failed: {e}")
         raise ValueError(f"plot_parametric() could not evaluate functions. Error: {str(e)}")
+
+# Wrapper for plot_implicit() that handles keyword arguments and callables
+def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, color=None):
+    # Handle both positional and keyword arguments
+    if x_min is None or x_max is None or y_min is None or y_max is None:
+        raise ValueError("plot_implicit() requires x_min, x_max, y_min, and y_max arguments")
+    
+    # If equation is callable, try to extract expression or evaluate at grid points
+    if callable(equation):
+        import numpy as np
+        # Try to extract expression from lambda
+        original_callable = equation
+        extracted_expression = None
+        
+        try:
+            import inspect
+            source = inspect.getsource(equation)
+            if 'lambda' in source:
+                lambda_part = source.split('lambda', 1)[1]
+                if ':' in lambda_part:
+                    expr = lambda_part.split(':', 1)[1].strip()
+                    expr = expr.rstrip(',').rstrip(')').rstrip().strip()
+                    while (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
+                        expr = expr[1:-1].strip()
+                    expr = ' '.join(expr.split())
+                    extracted_expression = expr
+                    equation = extracted_expression
+        except Exception as e:
+            print(f"[plot_implicit wrapper] Could not extract expression from callable: {e}")
+            # For callables, we need to evaluate at grid points
+            # This is more complex for 2D, so for now we'll just pass the string representation
+            # The JavaScript side will handle evaluation
+            equation = str(equation)
+    
+    # Pass to JavaScript implementation
+    if color is not None:
+        return __yudimath_plot_implicit(equation, x_min, x_max, y_min, y_max, color)
+    else:
+        return __yudimath_plot_implicit(equation, x_min, x_max, y_min, y_max)
 `
       for (const name of functionNames) {
         pyodide.globals.set(`__yudimath_${name}`, jsFunctions[name])
