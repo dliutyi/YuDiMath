@@ -612,30 +612,55 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
         import numpy as np
         t_range = t_max - t_min
         
-        # Calculate optimal number of points based on range and zoom
+        # First, estimate coordinate range by sampling a few points
+        # This helps determine if we need more points for large coordinate values
+        estimated_max_coord = 1.0
+        try:
+            sample_t = [t_min, (t_min + t_max) / 2, t_max]
+            for t_val in sample_t:
+                try:
+                    if x_is_callable and original_x_func is not None:
+                        x_val = float(original_x_func(t_val))
+                    else:
+                        x_val = float(eval(x_func, {'t': t_val, 'np': np, 'math': __import__('math'), 'sin': np.sin, 'cos': np.cos, 'tan': np.tan, 'exp': np.exp, 'log': np.log, 'sqrt': np.sqrt, 'abs': abs}))
+                    if y_is_callable and original_y_func is not None:
+                        y_val = float(original_y_func(t_val))
+                    else:
+                        y_val = float(eval(y_func, {'t': t_val, 'np': np, 'math': __import__('math'), 'sin': np.sin, 'cos': np.cos, 'tan': np.tan, 'exp': np.exp, 'log': np.log, 'sqrt': np.sqrt, 'abs': abs}))
+                    if np.isfinite(x_val) and np.isfinite(y_val):
+                        estimated_max_coord = max(estimated_max_coord, abs(x_val), abs(y_val))
+                except:
+                    pass
+        except:
+            pass  # If sampling fails, use default
+        
+        # Scale factor for coordinates > 10
+        coordinate_scale = max(1.0, estimated_max_coord / 10.0)
+        
+        # Calculate optimal number of points based on range, zoom, AND coordinate scale
         pixels_covered = t_range * _pixels_per_unit
         
-        # Initial sampling: adapt to zoom level
+        # Initial sampling: adapt to zoom level and coordinate scale
         if _is_slider_change:
             # Slider change - use minimal sampling
             points_per_pixel = 0.15
-            initial_n = max(50, int(pixels_covered * points_per_pixel))
+            initial_n = max(50, int(pixels_covered * points_per_pixel * coordinate_scale))
             initial_n = min(initial_n, 150)
         elif _pixels_per_unit > 200:
             points_per_pixel = 8.0
-            initial_n = max(5000, int(pixels_covered * points_per_pixel))
+            initial_n = max(5000, int(pixels_covered * points_per_pixel * coordinate_scale))
             initial_n = min(initial_n, 30000)
         elif _pixels_per_unit > 100:
             points_per_pixel = 6.0
-            initial_n = max(3000, int(pixels_covered * points_per_pixel))
+            initial_n = max(3000, int(pixels_covered * points_per_pixel * coordinate_scale))
             initial_n = min(initial_n, 25000)
         elif _pixels_per_unit > 50:
             points_per_pixel = 5.0
-            initial_n = max(2000, int(pixels_covered * points_per_pixel))
+            initial_n = max(2000, int(pixels_covered * points_per_pixel * coordinate_scale))
             initial_n = min(initial_n, 15000)
         else:
             points_per_pixel = 4.0
-            initial_n = max(1000, int(pixels_covered * points_per_pixel))
+            initial_n = max(1000, int(pixels_covered * points_per_pixel * coordinate_scale))
             initial_n = min(initial_n, 6000)
         
         # Evaluate functions at t values
@@ -1794,30 +1819,55 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
         import numpy as np
         t_range = t_max - t_min
         
-        # Calculate optimal number of points based on range and zoom
+        # First, estimate coordinate range by sampling a few points
+        # This helps determine if we need more points for large coordinate values
+        estimated_max_coord = 1.0
+        try:
+            sample_t = [t_min, (t_min + t_max) / 2, t_max]
+            for t_val in sample_t:
+                try:
+                    if x_is_callable and original_x_func is not None:
+                        x_val = float(original_x_func(t_val))
+                    else:
+                        x_val = float(eval(x_func, {'t': t_val, 'np': np, 'math': __import__('math'), 'sin': np.sin, 'cos': np.cos, 'tan': np.tan, 'exp': np.exp, 'log': np.log, 'sqrt': np.sqrt, 'abs': abs}))
+                    if y_is_callable and original_y_func is not None:
+                        y_val = float(original_y_func(t_val))
+                    else:
+                        y_val = float(eval(y_func, {'t': t_val, 'np': np, 'math': __import__('math'), 'sin': np.sin, 'cos': np.cos, 'tan': np.tan, 'exp': np.exp, 'log': np.log, 'sqrt': np.sqrt, 'abs': abs}))
+                    if np.isfinite(x_val) and np.isfinite(y_val):
+                        estimated_max_coord = max(estimated_max_coord, abs(x_val), abs(y_val))
+                except:
+                    pass
+        except:
+            pass  # If sampling fails, use default
+        
+        # Scale factor for coordinates > 10
+        coordinate_scale = max(1.0, estimated_max_coord / 10.0)
+        
+        # Calculate optimal number of points based on range, zoom, AND coordinate scale
         pixels_covered = t_range * _pixels_per_unit
         
-        # Initial sampling: adapt to zoom level
+        # Initial sampling: adapt to zoom level and coordinate scale
         if _is_slider_change:
             # Slider change - use minimal sampling
             points_per_pixel = 0.15
-            initial_n = max(50, int(pixels_covered * points_per_pixel))
+            initial_n = max(50, int(pixels_covered * points_per_pixel * coordinate_scale))
             initial_n = min(initial_n, 150)
         elif _pixels_per_unit > 200:
             points_per_pixel = 8.0
-            initial_n = max(5000, int(pixels_covered * points_per_pixel))
+            initial_n = max(5000, int(pixels_covered * points_per_pixel * coordinate_scale))
             initial_n = min(initial_n, 30000)
         elif _pixels_per_unit > 100:
             points_per_pixel = 6.0
-            initial_n = max(3000, int(pixels_covered * points_per_pixel))
+            initial_n = max(3000, int(pixels_covered * points_per_pixel * coordinate_scale))
             initial_n = min(initial_n, 25000)
         elif _pixels_per_unit > 50:
             points_per_pixel = 5.0
-            initial_n = max(2000, int(pixels_covered * points_per_pixel))
+            initial_n = max(2000, int(pixels_covered * points_per_pixel * coordinate_scale))
             initial_n = min(initial_n, 15000)
         else:
             points_per_pixel = 4.0
-            initial_n = max(1000, int(pixels_covered * points_per_pixel))
+            initial_n = max(1000, int(pixels_covered * points_per_pixel * coordinate_scale))
             initial_n = min(initial_n, 6000)
         
         # Evaluate functions at t values
