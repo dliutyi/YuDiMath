@@ -1393,7 +1393,7 @@ For each step:
 
 ---
 
-### [ ] Step 11.4: Implement Implicit Plot Rendering
+### [x] Step 11.4: Implement Implicit Plot Rendering
 **Task**: Render implicit plots in frames.
 
 **Implementation**:
