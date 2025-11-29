@@ -440,18 +440,21 @@ function Canvas({
             ? screenToNestedFrame([lastPanPointRef.current.x, lastPanPointRef.current.y], frame, frames, viewport, canvasWidth, canvasHeight)
             : screenToFrame([lastPanPointRef.current.x, lastPanPointRef.current.y], frame, viewport, canvasWidth, canvasHeight)
           
-          // Get the frame point that should be under the cursor now
-          const targetFramePoint = frame.parentFrameId
+          // Get the frame point that is currently under the cursor (with current viewport)
+          const currentFramePoint = frame.parentFrameId
             ? screenToNestedFrame([currentPoint.x, currentPoint.y], frame, frames, viewport, canvasWidth, canvasHeight)
             : screenToFrame([currentPoint.x, currentPoint.y], frame, viewport, canvasWidth, canvasHeight)
           
-          // Calculate how much we need to adjust the frame viewport to make startFramePoint appear at targetFramePoint
-          // The frame viewport pan (x, y) represents the offset in frame coordinates
-          // We want: startFramePoint - viewport.x = targetFramePoint - newViewport.x
-          // So: newViewport.x = targetFramePoint - (startFramePoint - viewport.x)
-          // Which simplifies to: newViewport.x = viewport.x + (targetFramePoint - startFramePoint)
-          const deltaX = targetFramePoint[0] - startFramePoint[0]
-          const deltaY = targetFramePoint[1] - startFramePoint[1]
+          // To make startFramePoint appear at the current cursor position, we need to adjust
+          // the frame viewport by the difference between where startFramePoint currently appears
+          // and where we want it to appear (at currentFramePoint)
+          // frameToScreen: frameU = u - frameViewport.x, so if we want u=startFramePoint[0] to appear
+          // at the screen position of currentFramePoint[0], we need:
+          // startFramePoint[0] - newViewport.x = currentFramePoint[0] - frameViewport.x
+          // newViewport.x = startFramePoint[0] - (currentFramePoint[0] - frameViewport.x)
+          // newViewport.x = frameViewport.x + (startFramePoint[0] - currentFramePoint[0])
+          const deltaX = startFramePoint[0] - currentFramePoint[0]
+          const deltaY = startFramePoint[1] - currentFramePoint[1]
           
           // Update frame viewport to keep the point under the cursor
           onFrameViewportChange(frame.id, {
@@ -462,30 +465,19 @@ function Canvas({
         }
       } else if (onViewportChange) {
         // Panning background - make the world point under the cursor follow the cursor
-        // Get the world point that was under the cursor when panning started
-        const startWorld = screenToWorld(
-          lastPanPointRef.current.x,
-          lastPanPointRef.current.y,
-          viewport,
-          canvasWidth,
-          canvasHeight
-        )
+        // Calculate how much the cursor moved in screen space
+        const screenDeltaX = currentPoint.x - lastPanPointRef.current.x
+        const screenDeltaY = currentPoint.y - lastPanPointRef.current.y
         
-        // Get the world point that should be under the cursor now
-        const targetWorld = screenToWorld(
-          currentPoint.x,
-          currentPoint.y,
-          viewport,
-          canvasWidth,
-          canvasHeight
-        )
-        
-        // Calculate how much we need to adjust the viewport to make startWorld appear at targetWorld
-        // The viewport pan (x, y) represents the world coordinate at the center
-        // We want: startWorld to appear at the current cursor position
-        // The difference tells us how much to adjust the viewport
-        const deltaX = targetWorld[0] - startWorld[0]
-        const deltaY = targetWorld[1] - startWorld[1]
+        // Convert screen movement to world movement
+        // When cursor moves right (screenDeltaX > 0), we want the world to move left
+        // so the point under the cursor stays under the cursor
+        // screenToWorld: worldX = viewport.x + (screenX - centerX) / zoom
+        // So if screenX changes by deltaX, worldX changes by deltaX / zoom
+        // But we want the OLD world point to appear at the NEW screen position
+        // So we need to adjust viewport.x by -deltaX / zoom
+        const deltaX = -screenDeltaX / viewport.zoom
+        const deltaY = screenDeltaY / viewport.zoom  // Y is inverted in screen space
 
         // Update viewport to keep the point under the cursor
         onViewportChange({
@@ -706,47 +698,21 @@ function Canvas({
         // Panning inside a frame - update frame viewport
         const frame = frames.find(f => f.id === panningFrameRef.current)
         if (frame) {
-          // Convert screen points to frame coordinates
-          const lastWorld = screenToWorld(
-            lastPanPointRef.current.x,
-            lastPanPointRef.current.y,
-            viewport,
-            canvasWidth,
-            canvasHeight
-          )
-          const currentWorld = screenToWorld(
-            currentPoint.x,
-            currentPoint.y,
-            viewport,
-            canvasWidth,
-            canvasHeight
-          )
+          // Get the frame point that was under the touch when panning started
+          const startFramePoint = frame.parentFrameId
+            ? screenToNestedFrame([lastPanPointRef.current.x, lastPanPointRef.current.y], frame, frames, viewport, canvasWidth, canvasHeight)
+            : screenToFrame([lastPanPointRef.current.x, lastPanPointRef.current.y], frame, viewport, canvasWidth, canvasHeight)
           
-          // Inverse transform: parent to frame coordinates
-          const parentToFrameTransform = (point: Point2D, frame: CoordinateFrame): Point2D => {
-            const [px, py] = point
-            const [originX, originY] = frame.origin
-            const dx = px - originX
-            const dy = py - originY
-            const [iX, iY] = frame.baseI
-            const [jX, jY] = frame.baseJ
-            const det = iX * jY - iY * jX
-            if (Math.abs(det) < 1e-10) return [0, 0]
-            const invDet = 1.0 / det
-            const u = (jY * dx - jX * dy) * invDet
-            const v = (-iY * dx + iX * dy) * invDet
-            return [u, v]
-          }
+          // Get the frame point that is currently under the touch (with current viewport)
+          const currentFramePoint = frame.parentFrameId
+            ? screenToNestedFrame([currentPoint.x, currentPoint.y], frame, frames, viewport, canvasWidth, canvasHeight)
+            : screenToFrame([currentPoint.x, currentPoint.y], frame, viewport, canvasWidth, canvasHeight)
           
-          const lastFrame = parentToFrameTransform(lastWorld, frame)
-          const currentFrame = parentToFrameTransform(currentWorld, frame)
+          // To make startFramePoint appear at the current touch position, adjust viewport
+          const deltaX = startFramePoint[0] - currentFramePoint[0]
+          const deltaY = startFramePoint[1] - currentFramePoint[1]
           
-          // Calculate pan delta in frame coordinates
-          const frameZoom = frame.viewport.zoom
-          const deltaX = (lastFrame[0] - currentFrame[0]) / frameZoom
-          const deltaY = (lastFrame[1] - currentFrame[1]) / frameZoom
-          
-          // Update frame viewport
+          // Update frame viewport to keep the point under the touch
           onFrameViewportChange(frame.id, {
             ...frame.viewport,
             x: frame.viewport.x + deltaX,
@@ -755,23 +721,15 @@ function Canvas({
         }
       } else if (onViewportChange) {
         // Panning background
-        const lastWorld = screenToWorld(
-          lastPanPointRef.current.x,
-          lastPanPointRef.current.y,
-          viewport,
-          canvasWidth,
-          canvasHeight
-        )
-        const currentWorld = screenToWorld(
-          currentPoint.x,
-          currentPoint.y,
-          viewport,
-          canvasWidth,
-          canvasHeight
-        )
-
-        const deltaX = lastWorld[0] - currentWorld[0]
-        const deltaY = lastWorld[1] - currentWorld[1]
+        // Calculate how much the touch moved in screen space
+        const screenDeltaX = currentPoint.x - lastPanPointRef.current.x
+        const screenDeltaY = currentPoint.y - lastPanPointRef.current.y
+        
+        // Convert screen movement to world movement
+        // When touch moves right (screenDeltaX > 0), we want the world to move left
+        // so the point under the touch stays under the touch
+        const deltaX = -screenDeltaX / viewport.zoom
+        const deltaY = screenDeltaY / viewport.zoom  // Y is inverted in screen space
 
         onViewportChange({
           ...viewport,
