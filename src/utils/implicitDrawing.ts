@@ -74,14 +74,18 @@ function drawImplicitFromPoints(
     return
   }
 
+  // Sort points by proximity to form continuous curves
+  // This helps when points come from Python in random order
+  const sortedPoints = sortPointsByProximity(plot.points)
+
   // Draw all points as a continuous curve
   // Note: For implicit plots, points may represent multiple disconnected contours
   // We'll draw them as separate segments, breaking at NaN points or large gaps
   const screenPoints: Point2D[] = []
-  const maxScreenGap = 20 // pixels - break curve if gap is larger than this (increased for better continuity)
+  const maxScreenGap = 30 // pixels - break curve if gap is larger than this
   
-  for (let i = 0; i < plot.points.length; i++) {
-    const point = plot.points[i]
+  for (let i = 0; i < sortedPoints.length; i++) {
+    const point = sortedPoints[i]
     const [x, y] = point
     
     // Check for NaN separator points (used to mark contour boundaries)
@@ -119,6 +123,58 @@ function drawImplicitFromPoints(
   if (screenPoints.length > 1) {
     drawSmoothCurve(ctx, screenPoints)
   }
+}
+
+/**
+ * Sort points by proximity to form continuous curves
+ * Uses a greedy nearest-neighbor algorithm
+ */
+function sortPointsByProximity(points: Array<[number, number]>): Array<[number, number]> {
+  if (points.length <= 1) {
+    return points
+  }
+
+  const sorted: Array<[number, number]> = []
+  const remaining = new Set(points.map((_, i) => i))
+  
+  // Start with first point
+  let currentIdx = 0
+  remaining.delete(currentIdx)
+  sorted.push(points[currentIdx])
+  
+  // Greedily find nearest neighbor
+  while (remaining.size > 0) {
+    let nearestIdx: number | null = null
+    let minDist = Infinity
+    
+    const currentPoint = points[currentIdx]
+    
+    for (const idx of remaining) {
+      const point = points[idx]
+      const dist = Math.sqrt(
+        (point[0] - currentPoint[0]) ** 2 + (point[1] - currentPoint[1]) ** 2
+      )
+      if (dist < minDist) {
+        minDist = dist
+        nearestIdx = idx
+      }
+    }
+    
+    if (nearestIdx !== null && minDist < Infinity) {
+      sorted.push(points[nearestIdx])
+      remaining.delete(nearestIdx)
+      currentIdx = nearestIdx
+    } else {
+      // No nearby point found, start a new segment
+      if (remaining.size > 0) {
+        currentIdx = remaining.values().next().value
+        remaining.delete(currentIdx)
+        sorted.push(points[currentIdx])
+      }
+    }
+  }
+  
+  return sorted
 }
 
 /**

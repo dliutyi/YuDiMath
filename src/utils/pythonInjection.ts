@@ -865,71 +865,10 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
                                         contour_points.append([float(x_interp), float(py1)])
                 
                 if len(contour_points) > 0:
-                    # Sort and connect points into continuous contours
-                    # Use a greedy nearest-neighbor algorithm with larger connection radius
-                    sorted_contours = []
-                    remaining_points = set(range(len(contour_points)))  # Use indices for efficiency
-                    
-                    while len(remaining_points) > 0:
-                        # Start a new contour with the first remaining point
-                        start_idx = next(iter(remaining_points))
-                        remaining_points.remove(start_idx)
-                        current_contour = [contour_points[start_idx]]
-                        
-                        # Try to extend the contour by finding nearby points
-                        # Use a larger connection distance to ensure continuity
-                        max_distance = max(dx, dy) * 4.0  # Connect points within 4 cell sizes
-                        changed = True
-                        iterations = 0
-                        max_iterations = len(contour_points) * 3  # Prevent infinite loops
-                        
-                        while changed and len(remaining_points) > 0 and iterations < max_iterations:
-                            iterations += 1
-                            changed = False
-                            best_idx = None
-                            best_dist = max_distance
-                            add_to_start = False
-                            
-                            # Find the closest point to either end of the current contour
-                            start_point = current_contour[0]
-                            end_point = current_contour[-1]
-                            
-                            for idx in list(remaining_points):
-                                point = contour_points[idx]
-                                # Distance to start of contour
-                                dist_start = np.sqrt((point[0] - start_point[0])**2 + (point[1] - start_point[1])**2)
-                                # Distance to end of contour
-                                dist_end = np.sqrt((point[0] - end_point[0])**2 + (point[1] - end_point[1])**2)
-                                
-                                min_dist = min(dist_start, dist_end)
-                                if min_dist < best_dist:
-                                    best_dist = min_dist
-                                    best_idx = idx
-                                    add_to_start = dist_start < dist_end
-                            
-                            if best_idx is not None:
-                                remaining_points.remove(best_idx)
-                                point = contour_points[best_idx]
-                                if add_to_start:
-                                    current_contour.insert(0, point)  # Add to start
-                                else:
-                                    current_contour.append(point)  # Add to end
-                                changed = True
-                        
-                        if len(current_contour) >= 2:
-                            sorted_contours.append(current_contour)
-                    
-                    # Flatten all contours into a single list for JavaScript
-                    # Insert a separator (NaN point) between contours to break curves
-                    all_points = []
-                    for i, contour in enumerate(sorted_contours):
-                        if i > 0:
-                            # Add a separator point (will be filtered out in JS)
-                            all_points.append([float('nan'), float('nan')])
-                        all_points.extend(contour)
-                    
+                    # For now, just pass all points in the order found
+                    # The JavaScript side will handle smoothing and gap detection
                     # Convert to JavaScript-compatible format (list of lists)
-                    points_list = [[float(p[0]), float(p[1])] for p in all_points]
+                    points_list = [[float(p[0]), float(p[1])] for p in contour_points]
                     # Pass contour points to JavaScript
                     if color is not None:
                         return _yudimath.plot_implicit_points(points_list, x_min, x_max, y_min, y_max, color)
