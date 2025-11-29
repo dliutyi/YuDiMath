@@ -13,8 +13,10 @@ interface CodePanelProps {
   onCodeRun?: (frameId: string, code: string) => void
   onVectorsUpdate?: (frameId: string, vectors: Vector[], replace?: boolean) => void
   onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[], replace?: boolean) => void
+  onParametricPlotsUpdate?: (frameId: string, parametricPlots: ParametricPlot[], replace?: boolean) => void
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
+  onParametricPlotsClear?: (frameId: string) => void
   externalExecutionResult?: { success: boolean; error?: string } | null // Execution result from external (auto-execution)
   onExecutionErrorChange?: (hasError: boolean) => void // Callback to notify parent of error state changes
 }
@@ -36,8 +38,10 @@ function CodePanel({
   onCodeRun,
   onVectorsUpdate,
   onFunctionsUpdate,
+  onParametricPlotsUpdate,
   onVectorsClear,
   onFunctionsClear,
+  onParametricPlotsClear,
   externalExecutionResult,
   onExecutionErrorChange,
 }: CodePanelProps) {
@@ -395,7 +399,20 @@ function CodePanel({
       if (result.success) {
         setLocalExecutionResult({ success: true })
         
-        // Atomically replace old vectors/functions with new ones
+        // Clear old plots before adding new ones
+        flushSync(() => {
+          if (onVectorsClear) {
+            onVectorsClear(selectedFrame.id)
+          }
+          if (onFunctionsClear) {
+            onFunctionsClear(selectedFrame.id)
+          }
+          if (onParametricPlotsClear) {
+            onParametricPlotsClear(selectedFrame.id)
+          }
+        })
+        
+        // Then atomically replace with new ones
         // This keeps old ones visible until new ones are ready, eliminating blinking
         flushSync(() => {
           if (onVectorsUpdate) {
@@ -403,6 +420,9 @@ function CodePanel({
           }
           if (onFunctionsUpdate) {
             onFunctionsUpdate(selectedFrame.id, newFunctions, true)
+          }
+          if (onParametricPlotsUpdate) {
+            onParametricPlotsUpdate(selectedFrame.id, newParametricPlots, true)
           }
         })
         

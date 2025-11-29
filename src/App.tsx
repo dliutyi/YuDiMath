@@ -200,6 +200,10 @@ function App() {
     workspace.updateFrame(frameId, { functions: [] })
   }
 
+  const handleParametricPlotsClear = (frameId: string) => {
+    workspace.updateFrame(frameId, { parametricPlots: [] })
+  }
+
   const [autoExecuteCode, setAutoExecuteCode] = useState<string | null>(null)
   const [autoExecuteFrameId, setAutoExecuteFrameId] = useState<string | null>(null)
   const isSliderTriggeredRef = useRef<boolean>(false) // Track if execution is slider-triggered
@@ -352,7 +356,13 @@ function App() {
         if (result.success) {
           // On success, set success result (this will clear any previous errors)
           setAutoExecutionResult({ success: true })
-          // Atomically replace old vectors/functions with new ones
+          // Clear old plots before adding new ones
+          flushSync(() => {
+            handleVectorsClear(frameIdToExecute)
+            handleFunctionsClear(frameIdToExecute)
+            handleParametricPlotsClear(frameIdToExecute)
+          })
+          // Then atomically replace with new ones
           // This keeps old ones visible until new ones are ready, eliminating blinking
           flushSync(() => {
             handleVectorsUpdate(frameIdToExecute, newVectors, true)
@@ -370,10 +380,11 @@ function App() {
           }
           setAutoExecutionResult(errorResult)
           
-          // On error, clear vectors/functions to show that execution failed
+          // On error, clear vectors/functions/parametric plots to show that execution failed
           flushSync(() => {
             handleVectorsClear(frameIdToExecute)
             handleFunctionsClear(frameIdToExecute)
+            handleParametricPlotsClear(frameIdToExecute)
           })
         }
         // Clear auto-execute trigger after execution
@@ -385,10 +396,11 @@ function App() {
           success: false,
           error: errorMessage,
         })
-        // On error, clear vectors/functions
+        // On error, clear vectors/functions/parametric plots
         flushSync(() => {
           handleVectorsClear(frameIdToExecute)
           handleFunctionsClear(frameIdToExecute)
+          handleParametricPlotsClear(frameIdToExecute)
         })
         // Clear auto-execute trigger even on error
         setAutoExecuteCode(null)
@@ -630,8 +642,10 @@ function App() {
           onCodeRun={handleCodeRun}
           onVectorsUpdate={handleVectorsUpdate}
           onFunctionsUpdate={handleFunctionsUpdate}
+          onParametricPlotsUpdate={handleParametricPlotsUpdate}
           onVectorsClear={handleVectorsClear}
           onFunctionsClear={handleFunctionsClear}
+          onParametricPlotsClear={handleParametricPlotsClear}
           externalExecutionResult={autoExecutionResult}
           onFrameDelete={handleFrameDelete}
         />

@@ -50,15 +50,18 @@ basis_matrix = np.column_stack([base_i, base_j])${parameterCode}
 #   Example: plot('2*x + 1', x_min=-5, x_max=5, color='#ff00ff')
 #   Example: plot(lambda x: x**2, x_min=-5, x_max=5, color='#00ff00', num_points=1000)
 # - plot_parametric(x_func, y_func, t_min, t_max, color?) - Plot a parametric curve
-#   Example: plot_parametric('cos(t)', 'sin(t)', 0, 2*np.pi)  # Circle
+#   Example: plot_parametric('cos(t)', 'sin(t)', 0, 2*np.pi)  # Circle (string expressions)
 #   Example: plot_parametric('2*cos(t)', 'sin(t)', 0, 2*np.pi, color='#ff0000')  # Ellipse
 #   Example: plot_parametric('t*cos(t)', 't*sin(t)', 0, 4*np.pi)  # Spiral
 #   Example: plot_parametric('sin(3*t)', 'cos(2*t)', 0, 2*np.pi)  # Lissajous curve
+#   Example: plot_parametric(lambda t: np.cos(t), lambda t: np.sin(t), 0, 2*np.pi)  # Circle (lambdas)
+#   Example: plot_parametric(lambda t: t*np.cos(t), lambda t: t*np.sin(t), 0, 4*np.pi)  # Spiral (lambdas)
 
 # Example usage:
 # draw(np.array([2, 3]), color='#00ff00')
 # plot('x**2', x_min=-5, x_max=5, color='#ff00ff')
 # plot_parametric('cos(t)', 'sin(t)', 0, 2*np.pi, color='#0000ff')  # Circle
+# plot_parametric(lambda t: np.cos(t), lambda t: np.sin(t), 0, 2*np.pi)  # Circle with lambdas
 `
 }
 

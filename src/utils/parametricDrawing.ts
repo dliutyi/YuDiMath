@@ -43,9 +43,12 @@ export function drawFrameParametricPlots(
       // If points are provided, use them directly (for callable functions evaluated in Python)
       if (plot.points && plot.points.length > 0) {
         drawParametricFromPoints(ctx, plot, transformToScreen, frame, viewport, canvasWidth, canvasHeight)
-      } else if (plot.xFunc && plot.yFunc) {
-        // Evaluate string expressions
+      } else if (plot.xFunc && plot.yFunc && plot.xFunc.length > 0 && plot.yFunc.length > 0) {
+        // Evaluate string expressions (check for non-empty strings)
         drawParametricFromExpressions(ctx, plot, transformToScreen, frame, viewport, canvasWidth, canvasHeight)
+      } else {
+        // Skip if no valid data
+        console.warn('[drawFrameParametricPlots] Skipping parametric plot with no points or expressions:', plot)
       }
       
       ctx.stroke()

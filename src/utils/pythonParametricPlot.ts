@@ -14,8 +14,6 @@ export const plotParametricImplementation: FunctionImplementation = (
   _storeFunction,
   storeParametricPlot
 ) => {
-  console.log('[plotParametricImplementation] Received args:', args.length, args)
-
   if (!storeParametricPlot) {
     throw new Error('plot_parametric() requires parametric plot storage callback')
   }
@@ -29,23 +27,6 @@ export const plotParametricImplementation: FunctionImplementation = (
   const tMinArg = args[2]
   const tMaxArg = args[3]
   const colorArg = args.length > 4 ? args[4] : undefined
-
-  console.log(
-    '[plotParametricImplementation] xFuncArg:',
-    xFuncArg,
-    'type:',
-    typeof xFuncArg,
-    'isCallable:',
-    isCallable(xFuncArg)
-  )
-  console.log(
-    '[plotParametricImplementation] yFuncArg:',
-    yFuncArg,
-    'type:',
-    typeof yFuncArg,
-    'isCallable:',
-    isCallable(yFuncArg)
-  )
 
   // Validate x_func - should be a string (Python wrapper should have converted callables)
   let xFuncString: string

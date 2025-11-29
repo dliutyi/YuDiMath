@@ -1,7 +1,7 @@
 import { useState, useEffect, memo } from 'react'
 import PropertiesPanel from './PropertiesPanel'
 import CodePanel from './CodePanel'
-import type { CoordinateFrame, ViewportState, Vector, FunctionPlot } from '../types'
+import type { CoordinateFrame, ViewportState, Vector, FunctionPlot, ParametricPlot } from '../types'
 
 interface FrameEditorPanelProps {
   selectedFrame: CoordinateFrame | null
@@ -11,8 +11,10 @@ interface FrameEditorPanelProps {
   onCodeRun?: (frameId: string, code: string) => void
   onVectorsUpdate?: (frameId: string, vectors: Vector[], replace?: boolean) => void
   onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[], replace?: boolean) => void
+  onParametricPlotsUpdate?: (frameId: string, parametricPlots: ParametricPlot[], replace?: boolean) => void
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
+  onParametricPlotsClear?: (frameId: string) => void
   externalExecutionResult?: { success: boolean; error?: string } | null
   onFrameDelete?: (frameId: string) => void
 }
@@ -27,8 +29,10 @@ function FrameEditorPanel({
   onCodeRun,
   onVectorsUpdate,
   onFunctionsUpdate,
+  onParametricPlotsUpdate,
   onVectorsClear,
   onFunctionsClear,
+  onParametricPlotsClear,
   externalExecutionResult,
   onFrameDelete,
 }: FrameEditorPanelProps) {
@@ -128,8 +132,10 @@ function FrameEditorPanel({
             onCodeRun={onCodeRun}
             onVectorsUpdate={onVectorsUpdate}
             onFunctionsUpdate={onFunctionsUpdate}
+            onParametricPlotsUpdate={onParametricPlotsUpdate}
             onVectorsClear={onVectorsClear}
             onFunctionsClear={onFunctionsClear}
+            onParametricPlotsClear={onParametricPlotsClear}
             externalExecutionResult={externalExecutionResult}
             onExecutionErrorChange={setHasExecutionError}
           />
