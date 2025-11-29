@@ -76,40 +76,43 @@ function drawImplicitFromPoints(
 
   // Draw all points as a continuous curve
   // Note: For implicit plots, points may represent multiple disconnected contours
-  // We'll draw them as separate segments, breaking at large gaps
+  // We'll draw them as separate segments, breaking at NaN points or large gaps
   const screenPoints: Point2D[] = []
-  const maxScreenGap = 10 // pixels - break curve if gap is larger than this
+  const maxScreenGap = 20 // pixels - break curve if gap is larger than this (increased for better continuity)
   
   for (let i = 0; i < plot.points.length; i++) {
     const point = plot.points[i]
     const [x, y] = point
-    if (isFinite(x) && isFinite(y)) {
-      const screen = transformToScreen([x, y])
-      
-      // Check for large gaps (disconnected contours)
-      if (screenPoints.length > 0) {
-        const prevScreen = screenPoints[screenPoints.length - 1]
-        const screenDistance = Math.sqrt(
-          (screen[0] - prevScreen[0]) ** 2 + (screen[1] - prevScreen[1]) ** 2
-        )
-        
-        if (screenDistance > maxScreenGap) {
-          // Large gap detected - break the curve and start a new segment
-          if (screenPoints.length > 1) {
-            drawSmoothCurve(ctx, screenPoints)
-          }
-          screenPoints.length = 0
-        }
-      }
-      
-      screenPoints.push(screen)
-    } else {
-      // Break the curve at invalid points
+    
+    // Check for NaN separator points (used to mark contour boundaries)
+    if (!isFinite(x) || !isFinite(y)) {
+      // Break the curve at separator points
       if (screenPoints.length > 1) {
         drawSmoothCurve(ctx, screenPoints)
+      }
+      screenPoints.length = 0
+      continue
+    }
+    
+    const screen = transformToScreen([x, y])
+    
+    // Check for large gaps (disconnected contours)
+    if (screenPoints.length > 0) {
+      const prevScreen = screenPoints[screenPoints.length - 1]
+      const screenDistance = Math.sqrt(
+        (screen[0] - prevScreen[0]) ** 2 + (screen[1] - prevScreen[1]) ** 2
+      )
+      
+      if (screenDistance > maxScreenGap) {
+        // Large gap detected - break the curve and start a new segment
+        if (screenPoints.length > 1) {
+          drawSmoothCurve(ctx, screenPoints)
+        }
         screenPoints.length = 0
       }
     }
+    
+    screenPoints.push(screen)
   }
   
   // Draw remaining points
