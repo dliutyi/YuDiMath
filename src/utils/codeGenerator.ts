@@ -61,6 +61,10 @@ basis_matrix = np.column_stack([base_i, base_j])${parameterCode}
 #   Example: plot_implicit('x**2/4 + y**2 - 1', -5, 5, -5, 5, color='#ff0000')  # Ellipse
 #   Example: plot_implicit('x**2 - y**2 - 1', -5, 5, -5, 5)  # Hyperbola
 #   Example: plot_implicit(lambda x, y: x**2 + y**2 - 16, -10, 10, -10, 10)  # Circle (lambda)
+# - fill_determinant(vector1, vector2, color?) - Fill parallelogram formed by two vectors (visualizes determinant)
+#   Example: fill_determinant(np.array([1, 0]), np.array([0, 1]))  # Unit square
+#   Example: fill_determinant(np.array([3, 0]), np.array([0, 2]), color='#ff000080')  # Rectangle
+#   Example: fill_determinant(np.array([2, 1]), np.array([1, 2]))  # Parallelogram
 
 # Example usage:
 # draw(np.array([2, 3]), color='#00ff00')
@@ -69,6 +73,7 @@ basis_matrix = np.column_stack([base_i, base_j])${parameterCode}
 # plot_parametric(lambda t: np.cos(t), lambda t: np.sin(t), 0, 2*np.pi)  # Circle with lambdas
 # plot_implicit('x**2 + y**2 - 16', -10, 10, -10, 10, color='#00ff00')  # Circle
 # plot_implicit(lambda x, y: x**2 + y**2 - 16, -10, 10, -10, 10)  # Circle with lambda
+# fill_determinant(np.array([1, 0]), np.array([0, 1]), color='#3b82f680')  # Unit square
 `
 }
 
@@ -153,11 +158,11 @@ export function extractUserCode(code: string): string[] {
     
     // Only process lines after the marker (or if marker not found, process all)
     if (foundMarker || !code.includes(generatorMarker)) {
-      // Check if line contains draw(), plot(), plot_parametric(), or plot_implicit() calls (not commented out)
+      // Check if line contains draw(), plot(), plot_parametric(), plot_implicit(), or fill_determinant() calls (not commented out)
       // Also exclude parameter variable assignments (t1 = ..., t2 = ..., etc.)
       if (trimmed && !trimmed.startsWith('#') && 
           !trimmed.match(/^\s*t\d+\s*=\s*-?\d+\.?\d*\s*(?:#.*)?$/i) &&
-          (trimmed.includes('draw(') || trimmed.includes('plot(') || trimmed.includes('plot_parametric(') || trimmed.includes('plot_implicit('))) {
+          (trimmed.includes('draw(') || trimmed.includes('plot(') || trimmed.includes('plot_parametric(') || trimmed.includes('plot_implicit(') || trimmed.includes('fill_determinant('))) {
         userCode.push(line)
       }
     }

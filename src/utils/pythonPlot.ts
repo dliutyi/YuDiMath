@@ -7,7 +7,7 @@ import { validateColor, isCallable } from './pythonValidation'
  * Supports both string expressions and callable functions (lambdas)
  * For callables, we store a special marker and the callable will be evaluated in Python
  */
-export const plotImplementation: FunctionImplementation = (args, _frameId, _storeVector, storeFunction) => {
+export const plotImplementation: FunctionImplementation = (args, _frameId, _storeVector, storeFunction, _storeParametricPlot, _storeImplicitPlot, _storeDeterminantFill) => {
   console.log('[plotImplementation] Received args:', args.length, args)
   
   if (args.length < 3) {
@@ -86,7 +86,7 @@ export const plotImplementation: FunctionImplementation = (args, _frameId, _stor
  * Implementation of plot_points(points, x_min, x_max, color?, num_points?) function
  * Used for callable functions that are evaluated in Python
  */
-export const plotPointsImplementation: FunctionImplementation = (args, _frameId, _storeVector, storeFunction) => {
+export const plotPointsImplementation: FunctionImplementation = (args, _frameId, _storeVector, storeFunction, _storeParametricPlot, _storeImplicitPlot, _storeDeterminantFill) => {
   if (args.length < 3) {
     throw new Error('plot_points() requires at least 3 arguments: points, x_min, x_max')
   }

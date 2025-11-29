@@ -5,7 +5,7 @@ import { highlight, languages } from 'prismjs'
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
 import { usePyScript } from '../hooks/usePyScript'
-import type { CoordinateFrame, Vector, FunctionPlot, ParametricPlot, ImplicitPlot } from '../types'
+import type { CoordinateFrame, Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill } from '../types'
 
 interface CodePanelProps {
   selectedFrame: CoordinateFrame | null
@@ -15,10 +15,12 @@ interface CodePanelProps {
   onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[], replace?: boolean) => void
   onParametricPlotsUpdate?: (frameId: string, parametricPlots: ParametricPlot[], replace?: boolean) => void
   onImplicitPlotsUpdate?: (frameId: string, implicitPlots: ImplicitPlot[], replace?: boolean) => void
+  onDeterminantFillsUpdate?: (frameId: string, determinantFills: DeterminantFill[], replace?: boolean) => void
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
   onParametricPlotsClear?: (frameId: string) => void
   onImplicitPlotsClear?: (frameId: string) => void
+  onDeterminantFillsClear?: (frameId: string) => void
   externalExecutionResult?: { success: boolean; error?: string } | null // Execution result from external (auto-execution)
   onExecutionErrorChange?: (hasError: boolean) => void // Callback to notify parent of error state changes
 }
@@ -42,10 +44,12 @@ function CodePanel({
   onFunctionsUpdate,
   onParametricPlotsUpdate,
   onImplicitPlotsUpdate,
+  onDeterminantFillsUpdate,
   onVectorsClear,
   onFunctionsClear,
   onParametricPlotsClear,
   onImplicitPlotsClear,
+  onDeterminantFillsClear,
   externalExecutionResult,
   onExecutionErrorChange,
 }: CodePanelProps) {
@@ -372,6 +376,7 @@ function CodePanel({
       
       const newParametricPlots: ParametricPlot[] = []
       const newImplicitPlots: ImplicitPlot[] = []
+      const newDeterminantFills: DeterminantFill[] = []
       const result = await executeCode(
         codeToExecute,
         selectedFrame.id,
@@ -403,6 +408,13 @@ function CodePanel({
             id: generateId('implicit'),
           } as ImplicitPlot)
         },
+        // onDeterminantFillCreated callback
+        (fill) => {
+          newDeterminantFills.push({
+            ...fill,
+            id: generateId('det'),
+          } as DeterminantFill)
+        },
         estimatedCanvasWidth,
         estimatedCanvasHeight,
         pixelsPerUnit
@@ -425,6 +437,9 @@ function CodePanel({
           if (onImplicitPlotsClear) {
             onImplicitPlotsClear(selectedFrame.id)
           }
+          if (onDeterminantFillsClear) {
+            onDeterminantFillsClear(selectedFrame.id)
+          }
         })
         
         // Then atomically replace with new ones
@@ -441,6 +456,9 @@ function CodePanel({
           }
           if (onImplicitPlotsUpdate) {
             onImplicitPlotsUpdate(selectedFrame.id, newImplicitPlots, true)
+          }
+          if (onDeterminantFillsUpdate) {
+            onDeterminantFillsUpdate(selectedFrame.id, newDeterminantFills, true)
           }
         })
         

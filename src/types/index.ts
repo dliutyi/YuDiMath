@@ -144,6 +144,23 @@ export interface FrameBounds {
 }
 
 /**
+ * Determinant fill definition - represents a filled parallelogram formed by two vectors
+ * The filled area represents the absolute value of the determinant
+ */
+export interface DeterminantFill {
+  /** Unique identifier for the determinant fill */
+  id: string
+  /** First column vector (in frame coordinates) */
+  vector1: Point2D
+  /** Second column vector (in frame coordinates) */
+  vector2: Point2D
+  /** Color of the fill (hex format, e.g., '#3b82f680' with alpha) */
+  color: string
+  /** Calculated determinant value (vector1[0] * vector2[1] - vector1[1] * vector2[0]) */
+  determinant?: number
+}
+
+/**
  * Coordinate frame - represents a viewport with its own coordinate system
  * Each frame is a rectangular region snapped to the background coordinate system
  * but has its own independent coordinate grid based on base vectors
@@ -172,6 +189,8 @@ export interface CoordinateFrame {
   parametricPlots: ParametricPlot[]
   /** Implicit plots defined in this frame (via plot_implicit() calls) */
   implicitPlots: ImplicitPlot[]
+  /** Determinant fills defined in this frame (via fill_determinant() calls) */
+  determinantFills: DeterminantFill[]
   /** Python code for this frame */
   code: string
   /** Parameter slider values (t1, t2, t3, etc.) */

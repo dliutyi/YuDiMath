@@ -540,6 +540,25 @@ def plot(formula, x_min=None, x_max=None, color=None):
         return _yudimath.plot(formula_to_use, x_min, x_max)
 
 # Wrapper for plot_parametric() that handles keyword arguments and callables
+# Wrapper for fill_determinant() that handles keyword arguments and numpy arrays
+def fill_determinant(vector1, vector2, color=None):
+    # Convert numpy arrays to lists if needed
+    import numpy as np
+    if isinstance(vector1, np.ndarray):
+        vector1 = vector1.tolist()
+    elif hasattr(vector1, 'tolist'):
+        vector1 = vector1.tolist()
+    
+    if isinstance(vector2, np.ndarray):
+        vector2 = vector2.tolist()
+    elif hasattr(vector2, 'tolist'):
+        vector2 = vector2.tolist()
+    
+    if color is not None:
+        return __yudimath_functions.fill_determinant(vector1, vector2, color)
+    else:
+        return __yudimath_functions.fill_determinant(vector1, vector2)
+
 def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
     # Handle both positional and keyword arguments
     if t_min is None or t_max is None:
@@ -747,6 +766,25 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
     except Exception as e:
         print(f"[plot_parametric wrapper] Evaluation failed: {e}")
         raise ValueError(f"plot_parametric() could not evaluate functions. Error: {str(e)}")
+
+# Wrapper for fill_determinant() that handles keyword arguments and numpy arrays
+def fill_determinant(vector1, vector2, color=None):
+    # Convert numpy arrays to lists if needed
+    import numpy as np
+    if isinstance(vector1, np.ndarray):
+        vector1 = vector1.tolist()
+    elif hasattr(vector1, 'tolist'):
+        vector1 = vector1.tolist()
+    
+    if isinstance(vector2, np.ndarray):
+        vector2 = vector2.tolist()
+    elif hasattr(vector2, 'tolist'):
+        vector2 = vector2.tolist()
+    
+    if color is not None:
+        return _yudimath.fill_determinant(vector1, vector2, color)
+    else:
+        return _yudimath.fill_determinant(vector1, vector2)
 
 # Wrapper for plot_implicit() that handles keyword arguments and callables
 def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, color=None):
@@ -1905,6 +1943,25 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
         return __yudimath_plot(formula_to_use, x_min, x_max)
 
 # Wrapper for plot_parametric() that handles keyword arguments and callables
+# Wrapper for fill_determinant() that handles keyword arguments and numpy arrays
+def fill_determinant(vector1, vector2, color=None):
+    # Convert numpy arrays to lists if needed
+    import numpy as np
+    if isinstance(vector1, np.ndarray):
+        vector1 = vector1.tolist()
+    elif hasattr(vector1, 'tolist'):
+        vector1 = vector1.tolist()
+    
+    if isinstance(vector2, np.ndarray):
+        vector2 = vector2.tolist()
+    elif hasattr(vector2, 'tolist'):
+        vector2 = vector2.tolist()
+    
+    if color is not None:
+        return __yudimath_functions.fill_determinant(vector1, vector2, color)
+    else:
+        return __yudimath_functions.fill_determinant(vector1, vector2)
+
 def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
     # Handle both positional and keyword arguments
     if t_min is None or t_max is None:
@@ -2109,6 +2166,25 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
     except Exception as e:
         print(f"[plot_parametric wrapper] Evaluation failed: {e}")
         raise ValueError(f"plot_parametric() could not evaluate functions. Error: {str(e)}")
+
+# Wrapper for fill_determinant() that handles keyword arguments and numpy arrays
+def fill_determinant(vector1, vector2, color=None):
+    # Convert numpy arrays to lists if needed
+    import numpy as np
+    if isinstance(vector1, np.ndarray):
+        vector1 = vector1.tolist()
+    elif hasattr(vector1, 'tolist'):
+        vector1 = vector1.tolist()
+    
+    if isinstance(vector2, np.ndarray):
+        vector2 = vector2.tolist()
+    elif hasattr(vector2, 'tolist'):
+        vector2 = vector2.tolist()
+    
+    if color is not None:
+        return _yudimath.fill_determinant(vector1, vector2, color)
+    else:
+        return _yudimath.fill_determinant(vector1, vector2)
 
 # Wrapper for plot_implicit() that handles keyword arguments and callables
 def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, color=None):

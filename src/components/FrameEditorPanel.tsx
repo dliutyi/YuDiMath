@@ -1,7 +1,7 @@
 import { useState, useEffect, memo } from 'react'
 import PropertiesPanel from './PropertiesPanel'
 import CodePanel from './CodePanel'
-import type { CoordinateFrame, ViewportState, Vector, FunctionPlot, ParametricPlot, ImplicitPlot } from '../types'
+import type { CoordinateFrame, ViewportState, Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill } from '../types'
 
 interface FrameEditorPanelProps {
   selectedFrame: CoordinateFrame | null
@@ -13,10 +13,12 @@ interface FrameEditorPanelProps {
   onFunctionsUpdate?: (frameId: string, functions: FunctionPlot[], replace?: boolean) => void
   onParametricPlotsUpdate?: (frameId: string, parametricPlots: ParametricPlot[], replace?: boolean) => void
   onImplicitPlotsUpdate?: (frameId: string, implicitPlots: ImplicitPlot[], replace?: boolean) => void
+  onDeterminantFillsUpdate?: (frameId: string, determinantFills: DeterminantFill[], replace?: boolean) => void
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
   onParametricPlotsClear?: (frameId: string) => void
   onImplicitPlotsClear?: (frameId: string) => void
+  onDeterminantFillsClear?: (frameId: string) => void
   externalExecutionResult?: { success: boolean; error?: string } | null
   onFrameDelete?: (frameId: string) => void
 }
@@ -33,10 +35,12 @@ function FrameEditorPanel({
   onFunctionsUpdate,
   onParametricPlotsUpdate,
   onImplicitPlotsUpdate,
+  onDeterminantFillsUpdate,
   onVectorsClear,
   onFunctionsClear,
   onParametricPlotsClear,
   onImplicitPlotsClear,
+  onDeterminantFillsClear,
   externalExecutionResult,
   onFrameDelete,
 }: FrameEditorPanelProps) {
@@ -138,10 +142,12 @@ function FrameEditorPanel({
             onFunctionsUpdate={onFunctionsUpdate}
             onParametricPlotsUpdate={onParametricPlotsUpdate}
             onImplicitPlotsUpdate={onImplicitPlotsUpdate}
+            onDeterminantFillsUpdate={onDeterminantFillsUpdate}
             onVectorsClear={onVectorsClear}
             onFunctionsClear={onFunctionsClear}
             onParametricPlotsClear={onParametricPlotsClear}
             onImplicitPlotsClear={onImplicitPlotsClear}
+            onDeterminantFillsClear={onDeterminantFillsClear}
             externalExecutionResult={externalExecutionResult}
             onExecutionErrorChange={setHasExecutionError}
           />

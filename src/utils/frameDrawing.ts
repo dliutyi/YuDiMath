@@ -13,6 +13,7 @@ import { drawFrameVectors } from './vectorDrawing'
 import { drawFrameFunctions } from './functionDrawing'
 import { drawFrameParametricPlots } from './parametricDrawing'
 import { drawFrameImplicitPlots } from './implicitDrawing'
+import { drawFrameDeterminantFills } from './determinantDrawing'
 
 /**
  * Draw a coordinate frame on the canvas
@@ -274,6 +275,9 @@ export function drawCoordinateFrame(
 
   drawArrow(ctx, originScreen, baseIEndScreen, '#f97316', 3.5, 8) // Orange to match X-axis labels, thicker for base vectors
   drawArrow(ctx, originScreen, baseJEndScreen, '#10b981', 3.5, 8) // Green to match Y-axis labels, thicker for base vectors
+  
+  // Draw determinant fills first (behind vectors and plots)
+  drawFrameDeterminantFills(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
   
   // Draw vectors within clipped region
   drawFrameVectors(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)

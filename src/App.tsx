@@ -11,7 +11,7 @@ import { usePyScript, clearQueuedExecutionsForFrame } from './hooks/usePyScript'
 import { useWorkspace } from './hooks/useWorkspace'
 import { downloadWorkspace, importWorkspaceFromFile } from './utils/exportImport'
 import { debounce } from './utils/debounce'
-import type { ViewportState, CoordinateFrame, Vector, FunctionPlot, ParametricPlot, ImplicitPlot, WorkspaceState } from './types'
+import type { ViewportState, CoordinateFrame, Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill, WorkspaceState } from './types'
 import { MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM, ZOOM_STEP_MULTIPLIER } from './utils/constants'
 
 function App() {
@@ -217,6 +217,19 @@ function App() {
     workspace.updateFrame(frameId, { implicitPlots: [] })
   }
 
+  const handleDeterminantFillsUpdate = (frameId: string, determinantFills: DeterminantFill[], replace: boolean = false) => {
+    const frame = workspace.frames.find(f => f.id === frameId)
+    if (frame) {
+      workspace.updateFrame(frameId, {
+        determinantFills: replace ? determinantFills : [...(frame.determinantFills || []), ...determinantFills],
+      })
+    }
+  }
+
+  const handleDeterminantFillsClear = (frameId: string) => {
+    workspace.updateFrame(frameId, { determinantFills: [] })
+  }
+
   const [autoExecuteCode, setAutoExecuteCode] = useState<string | null>(null)
   const [autoExecuteFrameId, setAutoExecuteFrameId] = useState<string | null>(null)
   const isSliderTriggeredRef = useRef<boolean>(false) // Track if execution is slider-triggered
@@ -333,6 +346,7 @@ function App() {
       isSliderTriggeredRef.current = false // Reset flag
       const newParametricPlots: ParametricPlot[] = []
       const newImplicitPlots: ImplicitPlot[] = []
+      const newDeterminantFills: DeterminantFill[] = []
       executeCode(
         codeToExecute,
         frameIdToExecute,
@@ -357,6 +371,13 @@ function App() {
         // onImplicitPlotCreated callback
         (plot) => {
           newImplicitPlots.push(plot as ImplicitPlot)
+        },
+        // onDeterminantFillCreated callback
+        (fill) => {
+          newDeterminantFills.push({
+            ...fill,
+            id: generateId('det'),
+          } as DeterminantFill)
         },
         estimatedCanvasWidth,
         estimatedCanvasHeight,
@@ -666,6 +687,8 @@ function App() {
           onFunctionsClear={handleFunctionsClear}
           onParametricPlotsClear={handleParametricPlotsClear}
           onImplicitPlotsClear={handleImplicitPlotsClear}
+          onDeterminantFillsUpdate={handleDeterminantFillsUpdate}
+          onDeterminantFillsClear={handleDeterminantFillsClear}
           externalExecutionResult={autoExecutionResult}
           onFrameDelete={handleFrameDelete}
         />

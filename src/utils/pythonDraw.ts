@@ -5,7 +5,7 @@ import { toPoint2D, validateColor } from './pythonValidation'
 /**
  * Implementation of draw(vector, color?) function
  */
-export const drawImplementation: FunctionImplementation = (args, _frameId, storeVector, _storeFunction) => {
+export const drawImplementation: FunctionImplementation = (args, _frameId, storeVector, _storeFunction, _storeParametricPlot, _storeImplicitPlot, _storeDeterminantFill) => {
   if (args.length < 1) {
     throw new Error('draw() requires at least 1 argument: vector')
   }

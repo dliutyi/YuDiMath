@@ -12,7 +12,9 @@ export const plotParametricImplementation: FunctionImplementation = (
   _frameId,
   _storeVector,
   _storeFunction,
-  storeParametricPlot
+  storeParametricPlot,
+  _storeImplicitPlot,
+  _storeDeterminantFill
 ) => {
   if (!storeParametricPlot) {
     throw new Error('plot_parametric() requires parametric plot storage callback')

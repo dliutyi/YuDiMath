@@ -6,7 +6,7 @@ import {
   injectFunctionsIntoPyodide,
   updateCanvasInfoInPyodide,
 } from '../utils/pythonFunctions'
-import type { Vector, FunctionPlot, ParametricPlot, ImplicitPlot } from '../types'
+import type { Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill } from '../types'
 
 interface PyScriptError {
   message: string
@@ -23,6 +23,7 @@ interface UsePyScriptReturn {
     onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void,
     onParametricPlotCreated?: (plot: Omit<ParametricPlot, 'id'>) => void,
     onImplicitPlotCreated?: (plot: Omit<ImplicitPlot, 'id'>) => void,
+    onDeterminantFillCreated?: (fill: Omit<DeterminantFill, 'id'>) => void,
     canvasWidth?: number,
     canvasHeight?: number,
     pixelsPerUnit?: number,
@@ -47,6 +48,7 @@ let executionQueue: Array<{
   onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void
   onParametricPlotCreated?: (plot: Omit<ParametricPlot, 'id'>) => void
   onImplicitPlotCreated?: (plot: Omit<ImplicitPlot, 'id'>) => void
+  onDeterminantFillCreated?: (fill: Omit<DeterminantFill, 'id'>) => void
   canvasWidth?: number
   canvasHeight?: number
   pixelsPerUnit?: number
@@ -247,6 +249,7 @@ export function usePyScript(): UsePyScriptReturn {
             item.onFunctionCreated,
             item.onParametricPlotCreated,
             item.onImplicitPlotCreated,
+            item.onDeterminantFillCreated,
             item.canvasWidth,
             item.canvasHeight,
             item.pixelsPerUnit
@@ -259,6 +262,7 @@ export function usePyScript(): UsePyScriptReturn {
             item.onFunctionCreated,
             item.onParametricPlotCreated,
             item.onImplicitPlotCreated,
+            item.onDeterminantFillCreated,
             item.canvasWidth,
             item.canvasHeight,
             item.pixelsPerUnit
@@ -385,12 +389,13 @@ export function usePyScript(): UsePyScriptReturn {
       frameId: string,
       onVectorCreated: (vector: Omit<Vector, 'id'>) => void,
       onFunctionCreated: (func: Omit<FunctionPlot, 'id'>) => void,
-    onParametricPlotCreated?: (plot: Omit<ParametricPlot, 'id'>) => void,
-    onImplicitPlotCreated?: (plot: Omit<ImplicitPlot, 'id'>) => void,
-    canvasWidth?: number,
-    canvasHeight?: number,
-    pixelsPerUnit?: number,
-    isSliderChange?: boolean
+      onParametricPlotCreated?: (plot: Omit<ParametricPlot, 'id'>) => void,
+      onImplicitPlotCreated?: (plot: Omit<ImplicitPlot, 'id'>) => void,
+      onDeterminantFillCreated?: (fill: Omit<DeterminantFill, 'id'>) => void,
+      canvasWidth?: number,
+      canvasHeight?: number,
+      pixelsPerUnit?: number,
+      isSliderChange?: boolean
     ): Promise<{ success: boolean; error?: PyScriptError; result?: any; functionCalls: Array<{ name: string; args: unknown[]; frameId: string }> }> => {
       if (!isReady) {
         return {
@@ -414,6 +419,7 @@ export function usePyScript(): UsePyScriptReturn {
             onFunctionCreated,
             onParametricPlotCreated,
             onImplicitPlotCreated,
+            onDeterminantFillCreated,
             canvasWidth,
             canvasHeight,
             pixelsPerUnit,

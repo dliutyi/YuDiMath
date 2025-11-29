@@ -299,6 +299,7 @@ export function useCanvasDrawing({
         baseJ,
         parametricPlots: [],
         implicitPlots: [],
+        determinantFills: [],
         bounds: newBounds,
         viewport: {
           x: 0,

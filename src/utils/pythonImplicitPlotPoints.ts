@@ -12,7 +12,8 @@ export const plotImplicitPointsImplementation: FunctionImplementation = (
   _storeVector,
   _storeFunction,
   _storeParametricPlot,
-  storeImplicitPlot
+  storeImplicitPlot,
+  _storeDeterminantFill
 ) => {
   if (!storeImplicitPlot) {
     throw new Error('plot_implicit_points() requires implicit plot storage callback')

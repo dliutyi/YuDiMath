@@ -519,7 +519,8 @@ describe('pythonFunctions', () => {
         mockStoreVector,
         mockStoreFunction,
         undefined, // storeParametricPlot (optional)
-        undefined  // storeImplicitPlot (optional)
+        undefined,  // storeImplicitPlot (optional)
+        undefined  // storeDeterminantFill (optional)
       )
     })
   })
@@ -539,7 +540,7 @@ describe('pythonFunctions', () => {
       const mockStoreFunction = vi.fn()
       const mockStoreImplicitPlot = vi.fn()
       
-      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot)
+      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot, undefined)
       
       const plotImplicitWrapper = createPythonFunctionWrapper('plot_implicit')
       plotImplicitWrapper('x**2 + y**2 - 16', -10, 10, -10, 10)
@@ -561,7 +562,7 @@ describe('pythonFunctions', () => {
       const mockStoreFunction = vi.fn()
       const mockStoreImplicitPlot = vi.fn()
       
-      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot)
+      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot, undefined)
       
       const plotImplicitWrapper = createPythonFunctionWrapper('plot_implicit')
       
@@ -576,7 +577,7 @@ describe('pythonFunctions', () => {
       const mockStoreFunction = vi.fn()
       const mockStoreImplicitPlot = vi.fn()
       
-      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot)
+      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot, undefined)
       
       const plotImplicitWrapper = createPythonFunctionWrapper('plot_implicit')
       
@@ -589,7 +590,7 @@ describe('pythonFunctions', () => {
       const mockStoreFunction = vi.fn()
       const mockStoreImplicitPlot = vi.fn()
       
-      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot)
+      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot, undefined)
       
       const plotImplicitWrapper = createPythonFunctionWrapper('plot_implicit')
       plotImplicitWrapper('x**2 + y**2 - 16', -10, 10, -10, 10, '#ff0000')
@@ -606,7 +607,7 @@ describe('pythonFunctions', () => {
       const mockStoreFunction = vi.fn()
       const mockStoreImplicitPlot = vi.fn()
       
-      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot)
+      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot, undefined)
       
       const plotImplicitWrapper = createPythonFunctionWrapper('plot_implicit')
       
@@ -618,7 +619,7 @@ describe('pythonFunctions', () => {
       const mockStoreFunction = vi.fn()
       const mockStoreImplicitPlot = vi.fn()
       
-      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot)
+      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot, undefined)
       
       const plotImplicitWrapper = createPythonFunctionWrapper('plot_implicit')
       
