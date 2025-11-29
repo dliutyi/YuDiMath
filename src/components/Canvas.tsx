@@ -42,6 +42,8 @@ function Canvas({
   const isPanningRef = useRef(false)
   const lastPanPointRef = useRef<{ x: number; y: number } | null>(null)
   const panningFrameRef = useRef<string | null>(null)
+  const startWorldPointRef = useRef<Point2D | null>(null)  // World point under cursor when panning started
+  const startFramePointRef = useRef<Point2D | null>(null)  // Frame point under cursor when panning started
 
   // Use hooks for zoom and drawing
   useCanvasZoom({
@@ -406,6 +408,19 @@ function Canvas({
       }
       isPanningRef.current = true
       lastPanPointRef.current = { x: screenX, y: screenY }
+      
+      // Store the world/frame point under cursor when panning starts (before viewport changes)
+      if (clickedFrame && onFrameViewportChange) {
+        // Store frame point
+        startFramePointRef.current = clickedFrame.parentFrameId
+          ? screenToNestedFrame([screenX, screenY], clickedFrame, frames, viewport, canvasWidth, canvasHeight)
+          : screenToFrame([screenX, screenY], clickedFrame, viewport, canvasWidth, canvasHeight)
+        startWorldPointRef.current = null
+      } else {
+        // Store world point
+        startWorldPointRef.current = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+        startFramePointRef.current = null
+      }
     }
     e.preventDefault()
   }, [isDrawing, viewport, width, height, frames, onFrameSelected, onFrameViewportChange])
@@ -431,28 +446,19 @@ function Canvas({
       // Panning - make the point under the cursor follow the cursor
       const currentPoint = { x: screenX, y: screenY }
       
-      if (panningFrameRef.current && onFrameViewportChange) {
+      if (panningFrameRef.current && onFrameViewportChange && startFramePointRef.current) {
         // Panning inside a frame - update frame viewport
         const frame = frames.find(f => f.id === panningFrameRef.current)
         if (frame) {
-          // Get the frame point that was under the cursor when panning started
-          const startFramePoint = frame.parentFrameId
-            ? screenToNestedFrame([lastPanPointRef.current.x, lastPanPointRef.current.y], frame, frames, viewport, canvasWidth, canvasHeight)
-            : screenToFrame([lastPanPointRef.current.x, lastPanPointRef.current.y], frame, viewport, canvasWidth, canvasHeight)
+          // Use the stored frame point from when panning started (before any viewport changes)
+          const startFramePoint = startFramePointRef.current
           
           // Get the frame point that is currently under the cursor (with current viewport)
           const currentFramePoint = frame.parentFrameId
             ? screenToNestedFrame([currentPoint.x, currentPoint.y], frame, frames, viewport, canvasWidth, canvasHeight)
             : screenToFrame([currentPoint.x, currentPoint.y], frame, viewport, canvasWidth, canvasHeight)
           
-          // To make startFramePoint appear at the current cursor position, we need to adjust
-          // the frame viewport by the difference between where startFramePoint currently appears
-          // and where we want it to appear (at currentFramePoint)
-          // frameToScreen: frameU = u - frameViewport.x, so if we want u=startFramePoint[0] to appear
-          // at the screen position of currentFramePoint[0], we need:
-          // startFramePoint[0] - newViewport.x = currentFramePoint[0] - frameViewport.x
-          // newViewport.x = startFramePoint[0] - (currentFramePoint[0] - frameViewport.x)
-          // newViewport.x = frameViewport.x + (startFramePoint[0] - currentFramePoint[0])
+          // To make startFramePoint appear at the current cursor position, adjust viewport
           const deltaX = startFramePoint[0] - currentFramePoint[0]
           const deltaY = startFramePoint[1] - currentFramePoint[1]
           
@@ -463,16 +469,10 @@ function Canvas({
             y: frame.viewport.y + deltaY,
           })
         }
-      } else if (onViewportChange) {
+      } else if (onViewportChange && startWorldPointRef.current) {
         // Panning background - make the world point under the cursor follow the cursor
-        // Get the world point that was under the cursor when panning started
-        const startWorld = screenToWorld(
-          lastPanPointRef.current.x,
-          lastPanPointRef.current.y,
-          viewport,
-          canvasWidth,
-          canvasHeight
-        )
+        // Use the stored world point from when panning started (before any viewport changes)
+        const startWorld = startWorldPointRef.current
         
         // Get the world point that is currently under the cursor (with current viewport)
         const currentWorld = screenToWorld(
@@ -483,16 +483,7 @@ function Canvas({
           canvasHeight
         )
         
-        // To make startWorld appear at the current cursor position, we need to adjust
-        // the viewport. The world point startWorld should appear at currentPoint.
-        // After adjusting viewport by deltaX, startWorld should appear at currentPoint:
-        // currentPoint = centerX + (startWorld - (viewport.x + deltaX)) * zoom
-        // Solving for deltaX:
-        // currentPoint - centerX = (startWorld - viewport.x - deltaX) * zoom
-        // (currentPoint - centerX) / zoom = startWorld - viewport.x - deltaX
-        // deltaX = startWorld - viewport.x - (currentPoint - centerX) / zoom
-        // But currentWorld = viewport.x + (currentPoint - centerX) / zoom
-        // So: deltaX = startWorld - currentWorld
+        // To make startWorld appear at the current cursor position, adjust viewport
         const deltaX = startWorld[0] - currentWorld[0]
         const deltaY = startWorld[1] - currentWorld[1]
 
@@ -529,6 +520,8 @@ function Canvas({
     isPanningRef.current = false
     lastPanPointRef.current = null
     panningFrameRef.current = null
+    startWorldPointRef.current = null
+    startFramePointRef.current = null
   }, [isDrawing, onDrawingModeChange, width, height, handleDrawingMouseUp])
 
   const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -553,6 +546,8 @@ function Canvas({
     isPanningRef.current = false
     lastPanPointRef.current = null
     panningFrameRef.current = null
+    startWorldPointRef.current = null
+    startFramePointRef.current = null
   }, [isDrawing, drawingRect, width, height, handleDrawingMouseUp, onDrawingModeChange])
 
 
@@ -656,8 +651,16 @@ function Canvas({
       // Start panning - check if inside a frame for frame-level panning
       if (clickedFrame && onFrameViewportChange) {
         panningFrameRef.current = clickedFrame.id
+        // Store frame point when panning starts
+        startFramePointRef.current = clickedFrame.parentFrameId
+          ? screenToNestedFrame([screenX, screenY], clickedFrame, frames, viewport, canvasWidth, canvasHeight)
+          : screenToFrame([screenX, screenY], clickedFrame, viewport, canvasWidth, canvasHeight)
+        startWorldPointRef.current = null
       } else {
         panningFrameRef.current = null
+        // Store world point when panning starts
+        startWorldPointRef.current = screenToWorld(screenX, screenY, viewport, canvasWidth, canvasHeight)
+        startFramePointRef.current = null
       }
       
       isPanningRef.current = true
