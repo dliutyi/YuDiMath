@@ -380,6 +380,7 @@ function drawParametricFromExpressions(
   }
 
   // Second pass: adaptive refinement between consecutive valid points
+  // Also check for gaps between non-consecutive points (skipped invalid points)
   for (let i = 0; i < initialPoints.length - 1; i++) {
     const p1 = initialPoints[i]
     const p2 = initialPoints[i + 1]
@@ -387,6 +388,16 @@ function drawParametricFromExpressions(
     if (p1.x !== null && p1.y !== null && p2.x !== null && p2.y !== null) {
       // Both points are valid - refine between them
       sampleAdaptive(p1.t, p2.t, p1.x, p1.y, 0)
+    } else if (p1.x !== null && p1.y !== null) {
+      // p1 is valid but p2 is not - look ahead for next valid point
+      for (let j = i + 2; j < initialPoints.length; j++) {
+        const pNext = initialPoints[j]
+        if (pNext.x !== null && pNext.y !== null) {
+          // Found next valid point - refine between p1 and pNext
+          sampleAdaptive(p1.t, pNext.t, p1.x, p1.y, 0)
+          break
+        }
+      }
     }
   }
 
