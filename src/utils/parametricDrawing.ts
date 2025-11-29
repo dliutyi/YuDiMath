@@ -110,16 +110,9 @@ function drawParametricFromPoints(
       
       // If gap is too large, add interpolated points to fill it
       if (screenDistance > maxScreenGap) {
-        // Estimate parameter values (assume uniform distribution in t)
-        // We don't have exact t values, so estimate based on index
-        const tRange = plot.tMax - plot.tMin
-        const t1 = plot.tMin + (i - 1) / (plot.points.length - 1) * tRange
-        const t2 = plot.tMin + i / (plot.points.length - 1) * tRange
-        
         // Add interpolated points to fill the gap
         const numInterpolated = Math.ceil(screenDistance / maxScreenGap)
         for (let j = 1; j < numInterpolated; j++) {
-          const t = t1 + (j / numInterpolated) * (t2 - t1)
           const alpha = j / numInterpolated
           // Linear interpolation in coordinate space
           const interpX = prevPoint.point[0] + alpha * (point[0] - prevPoint.point[0])
