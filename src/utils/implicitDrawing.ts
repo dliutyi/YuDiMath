@@ -194,7 +194,8 @@ function sortPointsByProximity(points: Array<[number, number]>): Array<[number, 
 function drawImplicitFromExpression(
   ctx: CanvasRenderingContext2D,
   plot: ImplicitPlot,
-  transformToScreen: (point: Point2D) => Point2D
+  transformToScreen: (point: Point2D) => Point2D,
+  effectiveZoom: number = 1.0
 ): void {
   const equation = plot.equation!
   const xMin = plot.xMin
@@ -204,7 +205,10 @@ function drawImplicitFromExpression(
   
   // Calculate adaptive grid resolution based on range and zoom
   // Use the numPoints from plot if available, otherwise calculate adaptively
-  const gridResolution = plot.numPoints ?? Math.max(50, Math.min(500, Math.round((xMax - xMin + yMax - yMin) / 2 * 50)))
+  // Higher zoom = more detail needed = higher resolution
+  const baseResolution = plot.numPoints ?? Math.max(50, Math.min(500, Math.round((xMax - xMin + yMax - yMin) / 2 * 50)))
+  // Scale resolution with zoom: at zoom 1.0 use base, at zoom 10.0 use ~3x base
+  const gridResolution = Math.min(1000, Math.round(baseResolution * Math.max(1.0, Math.sqrt(effectiveZoom))))
   
   // Find contour points using marching squares
   console.log('[drawImplicitFromExpression] Finding contours for equation:', equation, 'range:', xMin, xMax, yMin, yMax, 'resolution:', gridResolution)
@@ -217,16 +221,38 @@ function drawImplicitFromExpression(
     return
   }
   
-  // Draw each contour segment
+  // Make gap threshold zoom-aware for string expressions too
+  const baseGapThreshold = 30
+  const maxScreenGap = baseGapThreshold * Math.max(1.0, Math.sqrt(effectiveZoom))
+  
+  // Draw each contour segment with gap detection
   for (const contour of contours) {
     if (contour.length < 2) continue
     
     const screenPoints: Point2D[] = []
     
-    for (const point of contour) {
+    for (let i = 0; i < contour.length; i++) {
+      const point = contour[i]
       const [x, y] = point
       if (isFinite(x) && isFinite(y)) {
         const screen = transformToScreen([x, y])
+        
+        // Check for large gaps (disconnected segments within a contour)
+        if (screenPoints.length > 0) {
+          const prevScreen = screenPoints[screenPoints.length - 1]
+          const screenDistance = Math.sqrt(
+            (screen[0] - prevScreen[0]) ** 2 + (screen[1] - prevScreen[1]) ** 2
+          )
+          
+          if (screenDistance > maxScreenGap) {
+            // Large gap detected - break the curve and start a new segment
+            if (screenPoints.length > 1) {
+              drawSmoothCurve(ctx, screenPoints)
+            }
+            screenPoints.length = 0
+          }
+        }
+        
         screenPoints.push(screen)
       } else {
         // Break the curve at invalid points
