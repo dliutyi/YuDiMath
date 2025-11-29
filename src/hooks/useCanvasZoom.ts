@@ -55,7 +55,9 @@ export function useCanvasZoom({
           ? screenToNestedFrame([mouseX, mouseY], zoomingFrame, frames, viewport, canvasWidth, canvasHeight)
           : screenToFrame([mouseX, mouseY], zoomingFrame, viewport, canvasWidth, canvasHeight)
         
-        const zoomFactor = Math.exp(-e.deltaY * FRAME_ZOOM_SENSITIVITY)
+        // More granular zoom when CTRL is pressed (reduce sensitivity by 3x)
+        const sensitivity = e.ctrlKey ? FRAME_ZOOM_SENSITIVITY / 3 : FRAME_ZOOM_SENSITIVITY
+        const zoomFactor = Math.exp(-e.deltaY * sensitivity)
         const newZoom = Math.max(FRAME_MIN_ZOOM, Math.min(FRAME_MAX_ZOOM, zoomingFrame.viewport.zoom * zoomFactor))
         
         if (Math.abs(newZoom - zoomingFrame.viewport.zoom) < 0.001) return
@@ -77,7 +79,9 @@ export function useCanvasZoom({
         // Zooming background
         const worldBefore = screenToWorld(mouseX, mouseY, viewport, canvasWidth, canvasHeight)
 
-        const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY
+        // More granular zoom when CTRL is pressed (reduce sensitivity by 3x)
+        const sensitivity = e.ctrlKey ? ZOOM_SENSITIVITY / 3 : ZOOM_SENSITIVITY
+        const zoomDelta = -e.deltaY * sensitivity
         const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom + zoomDelta))
 
         if (newZoom === viewport.zoom) return

@@ -6,7 +6,7 @@ import { frameToScreen, screenToFrame, screenToNestedFrame } from '../utils/fram
 import { drawGrid, drawAxes } from '../utils/canvasDrawing'
 import { useCanvasZoom } from '../hooks/useCanvasZoom'
 import { useCanvasDrawing } from '../hooks/useCanvasDrawing'
-import { MIN_ZOOM, MAX_ZOOM, FRAME_MIN_ZOOM, FRAME_MAX_ZOOM, PAN_SPEED_MULTIPLIER } from '../utils/constants'
+import { MIN_ZOOM, MAX_ZOOM, FRAME_MIN_ZOOM, FRAME_MAX_ZOOM } from '../utils/constants'
 
 interface CanvasProps {
   viewport: ViewportState
@@ -42,8 +42,6 @@ function Canvas({
   const isPanningRef = useRef(false)
   const lastPanPointRef = useRef<{ x: number; y: number } | null>(null)
   const panningFrameRef = useRef<string | null>(null)
-  const lastPanTimeRef = useRef<number | null>(null)  // Track time for velocity calculation
-  const panVelocityRef = useRef<{ vx: number; vy: number } | null>(null)  // Track pan velocity
 
   // Use hooks for zoom and drawing
   useCanvasZoom({
@@ -408,8 +406,6 @@ function Canvas({
       }
       isPanningRef.current = true
       lastPanPointRef.current = { x: screenX, y: screenY }
-      lastPanTimeRef.current = Date.now()
-      panVelocityRef.current = { vx: 0, vy: 0 }  // Initialize velocity
     }
     e.preventDefault()
   }, [isDrawing, viewport, width, height, frames, onFrameSelected, onFrameViewportChange])
@@ -431,86 +427,33 @@ function Canvas({
       return
     }
 
-    if (isPanningRef.current && lastPanPointRef.current && lastPanTimeRef.current) {
-      // Panning - check if inside a frame
+    if (isPanningRef.current && lastPanPointRef.current) {
+      // Panning - make the point under the cursor follow the cursor
       const currentPoint = { x: screenX, y: screenY }
-      const currentTime = Date.now()
-      const deltaTime = Math.max(1, currentTime - lastPanTimeRef.current)  // Avoid division by zero
-      
-      // Calculate mouse velocity (pixels per millisecond)
-      const screenDeltaX = currentPoint.x - lastPanPointRef.current.x
-      const screenDeltaY = currentPoint.y - lastPanPointRef.current.y
-      const velocityX = screenDeltaX / deltaTime
-      const velocityY = screenDeltaY / deltaTime
-      
-      // Update velocity with exponential smoothing for stability
-      if (panVelocityRef.current) {
-        const smoothing = 0.3  // Smoothing factor (0-1, lower = more smoothing)
-        panVelocityRef.current.vx = panVelocityRef.current.vx * (1 - smoothing) + velocityX * smoothing
-        panVelocityRef.current.vy = panVelocityRef.current.vy * (1 - smoothing) + velocityY * smoothing
-      } else {
-        panVelocityRef.current = { vx: velocityX, vy: velocityY }
-      }
-      
-      // Calculate velocity magnitude for speed-based multiplier
-      const velocityMagnitude = Math.sqrt(velocityX * velocityX + velocityY * velocityY)
-      // Apply speed multiplier: faster movement = more responsive panning
-      // Use a curve: 1.0 at low speed, up to PAN_SPEED_MULTIPLIER at high speed
-      const speedFactor = 1.0 + (PAN_SPEED_MULTIPLIER - 1.0) * Math.min(1.0, velocityMagnitude / 2.0)  // Normalize to ~2 px/ms max
       
       if (panningFrameRef.current && onFrameViewportChange) {
         // Panning inside a frame - update frame viewport
         const frame = frames.find(f => f.id === panningFrameRef.current)
         if (frame) {
-          // Convert screen points to frame coordinates
-          // First convert to parent world coordinates
-          const lastWorld = screenToWorld(
-            lastPanPointRef.current.x,
-            lastPanPointRef.current.y,
-            viewport,
-            canvasWidth,
-            canvasHeight
-          )
-          const currentWorld = screenToWorld(
-            currentPoint.x,
-            currentPoint.y,
-            viewport,
-            canvasWidth,
-            canvasHeight
-          )
+          // Get the frame point that was under the cursor when panning started
+          const startFramePoint = frame.parentFrameId
+            ? screenToNestedFrame([lastPanPointRef.current.x, lastPanPointRef.current.y], frame, frames, viewport, canvasWidth, canvasHeight)
+            : screenToFrame([lastPanPointRef.current.x, lastPanPointRef.current.y], frame, viewport, canvasWidth, canvasHeight)
           
-          // Inverse transform: parent to frame coordinates
-          const parentToFrame = (point: Point2D, frame: CoordinateFrame): Point2D => {
-            const [px, py] = point
-            const [originX, originY] = frame.origin
-            const dx = px - originX
-            const dy = py - originY
-            const [iX, iY] = frame.baseI
-            const [jX, jY] = frame.baseJ
-            const det = iX * jY - iY * jX
-            if (Math.abs(det) < 1e-10) return [0, 0]
-            const invDet = 1.0 / det
-            const u = (jY * dx - jX * dy) * invDet
-            const v = (-iY * dx + iX * dy) * invDet
-            return [u, v]
-          }
+          // Get the frame point that should be under the cursor now
+          const targetFramePoint = frame.parentFrameId
+            ? screenToNestedFrame([currentPoint.x, currentPoint.y], frame, frames, viewport, canvasWidth, canvasHeight)
+            : screenToFrame([currentPoint.x, currentPoint.y], frame, viewport, canvasWidth, canvasHeight)
           
-          const lastFrame = parentToFrame(lastWorld, frame)
-          const currentFrame = parentToFrame(currentWorld, frame)
+          // Calculate how much we need to adjust the frame viewport to make startFramePoint appear at targetFramePoint
+          // The frame viewport pan (x, y) represents the offset in frame coordinates
+          // We want: startFramePoint - viewport.x = targetFramePoint - newViewport.x
+          // So: newViewport.x = targetFramePoint - (startFramePoint - viewport.x)
+          // Which simplifies to: newViewport.x = viewport.x + (targetFramePoint - startFramePoint)
+          const deltaX = targetFramePoint[0] - startFramePoint[0]
+          const deltaY = targetFramePoint[1] - startFramePoint[1]
           
-          // Calculate pan delta in frame coordinates
-          // The delta is in "unscaled" frame coordinates (as if zoom was 1.0)
-          // But we need to account for frame zoom: when zoomed in, a pixel movement
-          // should correspond to less movement in frame coordinates
-          const frameZoom = frame.viewport.zoom
-          let deltaX = (lastFrame[0] - currentFrame[0]) / frameZoom
-          let deltaY = (lastFrame[1] - currentFrame[1]) / frameZoom
-          
-          // Apply speed multiplier for velocity-aware panning
-          deltaX *= speedFactor
-          deltaY *= speedFactor
-          
-          // Update frame viewport
+          // Update frame viewport to keep the point under the cursor
           onFrameViewportChange(frame.id, {
             ...frame.viewport,
             x: frame.viewport.x + deltaX,
@@ -518,32 +461,33 @@ function Canvas({
           })
         }
       } else if (onViewportChange) {
-        // Panning background
-        // Convert screen points to world coordinates
-        const lastWorld = screenToWorld(
+        // Panning background - make the world point under the cursor follow the cursor
+        // Get the world point that was under the cursor when panning started
+        const startWorld = screenToWorld(
           lastPanPointRef.current.x,
           lastPanPointRef.current.y,
           viewport,
           canvasWidth,
           canvasHeight
         )
-        const currentWorld = screenToWorld(
+        
+        // Get the world point that should be under the cursor now
+        const targetWorld = screenToWorld(
           currentPoint.x,
           currentPoint.y,
           viewport,
           canvasWidth,
           canvasHeight
         )
+        
+        // Calculate how much we need to adjust the viewport to make startWorld appear at targetWorld
+        // The viewport pan (x, y) represents the world coordinate at the center
+        // We want: startWorld to appear at the current cursor position
+        // The difference tells us how much to adjust the viewport
+        const deltaX = targetWorld[0] - startWorld[0]
+        const deltaY = targetWorld[1] - startWorld[1]
 
-        // Calculate pan delta in world coordinates
-        let deltaX = lastWorld[0] - currentWorld[0]
-        let deltaY = lastWorld[1] - currentWorld[1]
-
-        // Apply speed multiplier for velocity-aware panning
-        deltaX *= speedFactor
-        deltaY *= speedFactor
-
-        // Update viewport
+        // Update viewport to keep the point under the cursor
         onViewportChange({
           ...viewport,
           x: viewport.x + deltaX,
@@ -552,7 +496,6 @@ function Canvas({
       }
 
       lastPanPointRef.current = currentPoint
-      lastPanTimeRef.current = currentTime
     }
     e.preventDefault()
   }, [isDrawing, drawingRect, viewport, onViewportChange, onFrameViewportChange, frames, width, height])
@@ -577,8 +520,6 @@ function Canvas({
     isPanningRef.current = false
     lastPanPointRef.current = null
     panningFrameRef.current = null
-    lastPanTimeRef.current = null
-    panVelocityRef.current = null
   }, [isDrawing, onDrawingModeChange, width, height, handleDrawingMouseUp])
 
   const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -603,8 +544,6 @@ function Canvas({
     isPanningRef.current = false
     lastPanPointRef.current = null
     panningFrameRef.current = null
-    lastPanTimeRef.current = null
-    panVelocityRef.current = null
   }, [isDrawing, drawingRect, width, height, handleDrawingMouseUp, onDrawingModeChange])
 
 
