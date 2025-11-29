@@ -1625,7 +1625,7 @@ For each step:
 
 **Note**: This phase adds an extended/wider mode for the code editor to provide more space for writing and viewing code.
 
-### [ ] Step 13.1: Design Extended Mode UI
+### [x] Step 13.1: Design Extended Mode UI
 **Task**: Design the UI for toggling extended code editor mode.
 
 **Implementation**:
@@ -1645,7 +1645,7 @@ For each step:
 
 ---
 
-### [ ] Step 13.2: Implement Extended Mode State Management
+### [x] Step 13.2: Implement Extended Mode State Management
 **Task**: Add state management for extended code editor mode.
 
 **Implementation**:
@@ -1664,7 +1664,7 @@ For each step:
 
 ---
 
-### [ ] Step 13.3: Implement Extended Mode Layout
+### [x] Step 13.3: Implement Extended Mode Layout
 **Task**: Adjust layout when extended mode is active.
 
 **Implementation**:
@@ -1687,7 +1687,7 @@ For each step:
 
 ---
 
-### [ ] Step 13.4: Enhance Code Editor in Extended Mode
+### [x] Step 13.4: Enhance Code Editor in Extended Mode
 **Task**: Optimize code editor display for extended mode.
 
 **Implementation**:
@@ -1709,7 +1709,7 @@ For each step:
 
 ---
 
-### [ ] Step 13.5: Add Keyboard Shortcut (Optional)
+### [x] Step 13.5: Add Keyboard Shortcut (Optional)
 **Task**: Add keyboard shortcut to toggle extended mode.
 
 **Implementation**:
