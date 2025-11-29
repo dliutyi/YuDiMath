@@ -312,13 +312,40 @@ function drawParametricFromExpressions(
     // Combined error in pixels
     const combinedError = screenLinearError + screenCurvatureError
 
-    // Adaptive threshold: subdivide if screen-space error exceeds 2 pixels
-    // This ensures smooth curves regardless of coordinate scale
-    const errorThreshold = 2.0
-    if (combinedError > errorThreshold) {
+    // Also check screen-space distance between endpoints to catch large gaps
+    const point1Screen = transformToScreen([x1_val, y1_val])
+    const point2Screen = transformToScreen([x2, y2])
+    const screenDistance = Math.sqrt(
+      (point2Screen[0] - point1Screen[0]) ** 2 + 
+      (point2Screen[1] - point1Screen[1]) ** 2
+    )
+    
+    // Adaptive threshold: subdivide if screen-space error exceeds 1 pixel OR screen distance > 5 pixels
+    // Lower threshold and check screen distance to catch more cases
+    const errorThreshold = 1.0  // More sensitive threshold
+    const maxScreenGap = 5.0  // Maximum allowed gap in screen space
+    
+    if (combinedError > errorThreshold || screenDistance > maxScreenGap) {
+      // Need to subdivide - add midpoint and quarter points if valid, then recurse
+      if (isFinite(xMid) && isFinite(yMid)) {
+        const point: Point2D = [xMid, yMid]
+        const pointScreen = transformToScreen(point)
+        validPoints.push({ point, screen: pointScreen })
+      }
+      if (xQ1 !== null && yQ1 !== null && isFinite(xQ1) && isFinite(yQ1)) {
+        const point: Point2D = [xQ1, yQ1]
+        const pointScreen = transformToScreen(point)
+        validPoints.push({ point, screen: pointScreen })
+      }
+      if (xQ3 !== null && yQ3 !== null && isFinite(xQ3) && isFinite(yQ3)) {
+        const point: Point2D = [xQ3, yQ3]
+        const pointScreen = transformToScreen(point)
+        validPoints.push({ point, screen: pointScreen })
+      }
+      
       const tMid = (t1 + t2) / 2
       sampleAdaptive(t1, tMid, x1_val, y1_val, depth + 1)
-      sampleAdaptive(tMid, t2, null, null, depth + 1)
+      sampleAdaptive(tMid, t2, xMid, yMid, depth + 1)  // Pass midpoint to avoid re-evaluation
     } else {
       // Function is smooth - add midpoint if valid
       if (isFinite(xMid) && isFinite(yMid)) {
