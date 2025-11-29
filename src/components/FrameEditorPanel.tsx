@@ -97,12 +97,36 @@ function FrameEditorPanel({
     }
   }, [activeTab, selectedFrame, toggleExtendedMode])
 
+  // Track window width for extended mode calculation
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1920)
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth)
+    }
+    
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   // Calculate panel width based on tab and extended mode
-  const panelWidth = activeTab === 'properties' 
-    ? 'w-80' 
-    : isExtendedMode 
-      ? 'w-[70vw] max-w-[900px]' 
-      : 'w-[500px]'
+  // Always use explicit pixel values for code tab to ensure smooth transitions
+  const getPanelWidth = () => {
+    if (activeTab === 'properties') {
+      return 320 // w-80 = 20rem = 320px
+    }
+    if (isExtendedMode) {
+      // Use viewport width but clamp to max 900px
+      const vwWidth = windowWidth * 0.7
+      return Math.min(vwWidth, 900)
+    }
+    return 500 // w-[500px]
+  }
+
+  const panelWidthPx = getPanelWidth()
+  // For code tab, always use inline style for width to ensure smooth transitions
+  // For properties tab, use Tailwind class
+  const panelWidthClass = activeTab === 'properties' ? 'w-80' : ''
   const panelHeight = activeTab === 'code' ? 'h-[calc(100vh-2rem)] max-h-[calc(100dvh-2rem)]' : 'h-[calc(100vh-2rem)] max-h-[calc(100dvh-2rem)]'
 
   // Animation classes based on selection state
@@ -111,15 +135,32 @@ function FrameEditorPanel({
     ? 'opacity-100 translate-x-0 pointer-events-auto'
     : 'opacity-0 translate-x-full pointer-events-none'
 
+  // Use separate transitions: width transitions separately from opacity/transform
+  // This prevents the jump when transitioning between extended and normal mode
+  const widthTransitionClass = 'transition-[width] duration-300 ease-out'
+  const otherTransitionClasses = 'transition-[opacity,transform] duration-300 ease-out'
+
   if (!selectedFrame) {
     return (
-      <div className={`${panelWidth} ${panelHeight} bg-panel-bg border border-border rounded-lg shadow-lg flex flex-col transition-all duration-300 ease-out ${panelClasses}`} style={{ visibility: 'hidden' }}>
+      <div 
+        className={`${panelWidthClass} ${panelHeight} bg-panel-bg border border-border rounded-lg shadow-lg flex flex-col ${otherTransitionClasses} ${panelClasses}`} 
+        style={{ 
+          visibility: 'hidden',
+          width: activeTab === 'code' ? `${panelWidthPx}px` : undefined,
+        }}
+      >
       </div>
     )
   }
 
   return (
-    <div className={`${panelWidth} ${panelHeight} bg-panel-bg border border-border rounded-lg shadow-lg flex flex-col transition-all duration-300 ease-out ${panelClasses}`} style={{ visibility: selectedFrame ? 'visible' : 'hidden' }}>
+    <div 
+      className={`${panelWidthClass} ${panelHeight} bg-panel-bg border border-border rounded-lg shadow-lg flex flex-col ${widthTransitionClass} ${otherTransitionClasses} ${panelClasses}`} 
+      style={{ 
+        visibility: selectedFrame ? 'visible' : 'hidden',
+        width: activeTab === 'code' ? `${panelWidthPx}px` : undefined,
+      }}
+    >
       {/* Tab Navigation */}
       <div className="flex border-b border-border flex-shrink-0">
         <button
