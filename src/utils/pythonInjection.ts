@@ -612,11 +612,14 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
         import numpy as np
         t_range = t_max - t_min
         
-        # First, estimate coordinate range by sampling a few points
+        # First, estimate coordinate range by sampling multiple points across the range
         # This helps determine if we need more points for large coordinate values
+        # Sample more points to better catch the maximum coordinate value
         estimated_max_coord = 1.0
         try:
-            sample_t = [t_min, (t_min + t_max) / 2, t_max]
+            # Sample 20 points across the range for better estimation
+            num_samples = 20
+            sample_t = np.linspace(t_min, t_max, num_samples)
             for t_val in sample_t:
                 try:
                     if x_is_callable and original_x_func is not None:
@@ -634,8 +637,14 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
         except:
             pass  # If sampling fails, use default
         
-        # Scale factor for coordinates > 10
-        coordinate_scale = max(1.0, estimated_max_coord / 10.0)
+        # More aggressive scaling: use square root to avoid excessive points but still scale up
+        # For coordinates around 100, this gives ~3x scaling instead of 10x
+        # This balances quality and performance better
+        if estimated_max_coord > 10:
+            coordinate_scale = 1.0 + (estimated_max_coord - 10.0) / 30.0  # Linear scaling above 10
+            coordinate_scale = min(coordinate_scale, 10.0)  # Cap at 10x to avoid excessive points
+        else:
+            coordinate_scale = 1.0
         
         # Calculate optimal number of points based on range, zoom, AND coordinate scale
         pixels_covered = t_range * _pixels_per_unit
@@ -1819,11 +1828,14 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
         import numpy as np
         t_range = t_max - t_min
         
-        # First, estimate coordinate range by sampling a few points
+        # First, estimate coordinate range by sampling multiple points across the range
         # This helps determine if we need more points for large coordinate values
+        # Sample more points to better catch the maximum coordinate value
         estimated_max_coord = 1.0
         try:
-            sample_t = [t_min, (t_min + t_max) / 2, t_max]
+            # Sample 20 points across the range for better estimation
+            num_samples = 20
+            sample_t = np.linspace(t_min, t_max, num_samples)
             for t_val in sample_t:
                 try:
                     if x_is_callable and original_x_func is not None:
@@ -1841,8 +1853,14 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
         except:
             pass  # If sampling fails, use default
         
-        # Scale factor for coordinates > 10
-        coordinate_scale = max(1.0, estimated_max_coord / 10.0)
+        # More aggressive scaling: use square root to avoid excessive points but still scale up
+        # For coordinates around 100, this gives ~3x scaling instead of 10x
+        # This balances quality and performance better
+        if estimated_max_coord > 10:
+            coordinate_scale = 1.0 + (estimated_max_coord - 10.0) / 30.0  # Linear scaling above 10
+            coordinate_scale = min(coordinate_scale, 10.0)  # Cap at 10x to avoid excessive points
+        else:
+            coordinate_scale = 1.0
         
         # Calculate optimal number of points based on range, zoom, AND coordinate scale
         pixels_covered = t_range * _pixels_per_unit
