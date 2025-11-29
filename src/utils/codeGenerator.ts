@@ -143,11 +143,11 @@ export function extractUserCode(code: string): string[] {
     
     // Only process lines after the marker (or if marker not found, process all)
     if (foundMarker || !code.includes(generatorMarker)) {
-      // Check if line contains draw() or plot() calls (not commented out)
+      // Check if line contains draw(), plot(), or plot_parametric() calls (not commented out)
       // Also exclude parameter variable assignments (t1 = ..., t2 = ..., etc.)
       if (trimmed && !trimmed.startsWith('#') && 
           !trimmed.match(/^\s*t\d+\s*=\s*-?\d+\.?\d*\s*(?:#.*)?$/i) &&
-          (trimmed.includes('draw(') || trimmed.includes('plot('))) {
+          (trimmed.includes('draw(') || trimmed.includes('plot(') || trimmed.includes('plot_parametric('))) {
         userCode.push(line)
       }
     }
