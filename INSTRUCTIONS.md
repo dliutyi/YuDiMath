@@ -1021,43 +1021,619 @@ For each step:
 
 ---
 
-## Phase 9: Documentation and Finalization
+## Phase 9: Project Refactoring and Code Cleanup
 
-### [ ] Step 9.1: Create README Documentation
-**Task**: Write comprehensive README with setup and usage instructions.
+**Note**: This phase focuses on improving code maintainability, modularity, and flexibility for future extensions. Files have grown large and need to be broken down into smaller, focused modules.
+
+### [ ] Step 9.1: Analyze and Document Current File Sizes
+**Task**: Identify files that exceed size limits and need refactoring.
 
 **Implementation**:
-- Document project setup
-- Document Docker usage
-- Document development workflow
-- Document feature usage
-- Add screenshots/examples
+- Run analysis to identify files exceeding 500 lines (hard limit)
+- Identify files exceeding 300 lines (soft limit - consider refactoring)
+- Document dependencies and relationships between large files
+- Create refactoring plan prioritizing most critical files
+- Focus on: `src/utils/frameDrawing.ts`, `src/utils/pythonFunctions.ts`, `src/App.tsx`, `src/components/CoordinateFrame.tsx`
 
 **Tests**:
-- Verify README is complete
-- Verify setup instructions work
-- Verify usage examples are correct
+- Verify file size analysis is accurate
+- Verify refactoring plan covers all large files
+- Verify dependencies are correctly identified
 
-**Commit**: `docs: add comprehensive README documentation`
+**Commit**: `refactor: analyze file sizes and create refactoring plan`
 
 ---
 
-### [ ] Step 9.2: Code Documentation
-**Task**: Add JSDoc comments to all functions and components.
+### [ ] Step 9.2: Refactor Frame Drawing Utilities
+**Task**: Break down `src/utils/frameDrawing.ts` into smaller, focused modules.
 
 **Implementation**:
-- Add JSDoc to all utility functions
-- Add JSDoc to all components
-- Add JSDoc to all hooks
-- Document complex algorithms
-- Document coordinate transformation logic
+- Extract grid drawing logic to `src/utils/gridDrawing.ts`
+- Extract axes drawing logic to `src/utils/axesDrawing.ts`
+- Extract function plotting logic to `src/utils/functionDrawing.ts`
+- Extract vector drawing logic to `src/utils/vectorDrawing.ts`
+- Extract discontinuity detection to `src/utils/discontinuityDetection.ts`
+- Keep only coordination logic in `frameDrawing.ts`
+- Ensure all extracted modules follow single responsibility principle
+- Each module should be <300 lines
 
 **Tests**:
-- Verify all public functions have documentation
-- Verify documentation is accurate
-- Verify examples in documentation work
+- Verify all existing tests still pass
+- Add tests for extracted modules
+- Verify no functionality is lost
+- Verify modules are properly imported and used
 
-**Commit**: `docs: add JSDoc documentation to all code`
+**Commit**: `refactor: break down frameDrawing.ts into focused modules`
+
+---
+
+### [ ] Step 9.3: Refactor Python Functions System
+**Task**: Break down `src/utils/pythonFunctions.ts` into smaller, focused modules.
+
+**Implementation**:
+- Extract function registry to `src/utils/pythonFunctionRegistry.ts`
+- Extract plot implementation to `src/utils/pythonPlot.ts`
+- Extract draw implementation to `src/utils/pythonDraw.ts`
+- Extract point caching logic to `src/utils/pointCache.ts`
+- Extract progressive rendering logic to `src/utils/progressiveRendering.ts`
+- Keep only core setup and context management in `pythonFunctions.ts`
+- Each module should be <300 lines
+
+**Tests**:
+- Verify all existing tests still pass
+- Add tests for extracted modules
+- Verify function registration still works
+- Verify plot and draw functions still work correctly
+
+**Commit**: `refactor: break down pythonFunctions.ts into focused modules`
+
+---
+
+### [ ] Step 9.4: Refactor Main App Component
+**Task**: Break down `src/App.tsx` into smaller, focused components.
+
+**Implementation**:
+- Extract viewport management to `src/hooks/useViewport.ts` (if not already separate)
+- Extract frame management logic to `src/hooks/useFrameManagement.ts`
+- Extract canvas rendering coordination to `src/components/CanvasRenderer.tsx`
+- Extract UI layout to `src/components/AppLayout.tsx`
+- Keep only high-level coordination in `App.tsx`
+- Each component/hook should be <300 lines
+
+**Tests**:
+- Verify all existing tests still pass
+- Add tests for extracted hooks and components
+- Verify app functionality is unchanged
+- Verify component composition works correctly
+
+**Commit**: `refactor: break down App.tsx into focused components and hooks`
+
+---
+
+### [ ] Step 9.5: Refactor Coordinate Frame Component
+**Task**: Break down `src/components/CoordinateFrame.tsx` into smaller sub-components.
+
+**Implementation**:
+- Extract frame grid rendering to `src/components/FrameGrid.tsx`
+- Extract frame axes rendering to `src/components/FrameAxes.tsx`
+- Extract base vector visualization to `src/components/BaseVectors.tsx`
+- Extract nested frame rendering to `src/components/NestedFrames.tsx`
+- Keep only frame coordination and selection logic in `CoordinateFrame.tsx`
+- Each component should be <300 lines
+
+**Tests**:
+- Verify all existing tests still pass
+- Add tests for extracted components
+- Verify frame rendering is unchanged
+- Verify nested frames still work correctly
+
+**Commit**: `refactor: break down CoordinateFrame.tsx into focused sub-components`
+
+---
+
+### [ ] Step 9.6: Extract Common Utilities and Types
+**Task**: Consolidate and organize utility functions and types for better reusability.
+
+**Implementation**:
+- Review all utility functions in `src/utils/` for duplication
+- Consolidate similar functions into shared utilities
+- Extract common types to `src/types/common.ts`
+- Extract common constants to `src/constants/index.ts`
+- Ensure all utilities follow single responsibility principle
+- Document utility functions with JSDoc
+
+**Tests**:
+- Verify all existing tests still pass
+- Verify no functionality is lost
+- Verify utilities are properly exported
+- Verify types are correctly used throughout codebase
+
+**Commit**: `refactor: consolidate and organize common utilities and types`
+
+---
+
+### [ ] Step 9.7: Improve Code Organization and Naming
+**Task**: Ensure consistent naming conventions and logical file organization.
+
+**Implementation**:
+- Review all file names for consistency
+- Ensure component files use PascalCase
+- Ensure utility files use camelCase
+- Ensure type files are clearly named
+- Organize imports consistently (external, internal, types)
+- Remove unused imports and code
+- Ensure consistent code formatting
+
+**Tests**:
+- Verify code compiles without errors
+- Verify no unused imports remain
+- Verify naming conventions are consistent
+- Run linter and fix all issues
+
+**Commit**: `refactor: improve code organization and naming conventions`
+
+---
+
+## Phase 10: Parametric Function Plotting
+
+**Note**: This phase adds support for parametric functions where x and y are both functions of a parameter t (e.g., x = sin(t), y = cos(t) creates a circle).
+
+### [ ] Step 10.1: Design Parametric Plot Function API
+**Task**: Design the API for parametric plot function in Python.
+
+**Implementation**:
+- Design function signature: `plot_parametric(x_func, y_func, t_min, t_max, color?)`
+  - `x_func`: function of t (string expression or callable) - e.g., `'sin(t)'` or `lambda t: np.sin(t)`
+  - `y_func`: function of t (string expression or callable) - e.g., `'cos(t)'` or `lambda t: np.cos(t)`
+  - `t_min`: minimum parameter value
+  - `t_min`: maximum parameter value
+  - `color`: optional color string
+- Design adaptive sampling strategy for parametric curves
+- Consider how to handle discontinuities in parametric curves
+- Document expected behavior and examples
+
+**Tests**:
+- Verify API design is clear and intuitive
+- Verify examples work conceptually
+- Verify adaptive sampling strategy is sound
+
+**Commit**: `feat: design parametric plot function API`
+
+---
+
+### [ ] Step 10.2: Implement Parametric Plot Function Registration
+**Task**: Register `plot_parametric` function in the Python function registry.
+
+**Implementation**:
+- Add `plotParametricImplementation` to `src/utils/pythonFunctions.ts` (or extracted module)
+- Register function as `'plot_parametric'` in function registry
+- Validate parameters (x_func, y_func, t_min, t_max, color)
+- Support both string expressions and callable functions for x_func and y_func
+- Store parametric plot data in frame state
+- Add `ParametricPlot` type to `src/types/index.ts`:
+  ```typescript
+  interface ParametricPlot {
+    id: string
+    xFunc: string  // or callable marker
+    yFunc: string  // or callable marker
+    tMin: number
+    tMax: number
+    color?: string
+    points?: PointStorage  // evaluated points
+    isProgressive?: boolean
+    cacheKey?: string
+  }
+  ```
+
+**Tests**:
+- Test function registration
+- Test parameter validation
+- Test string expression handling
+- Test callable function handling
+- Test function call storage
+
+**Commit**: `feat: implement parametric plot function registration`
+
+---
+
+### [ ] Step 10.3: Implement Parametric Function Evaluation
+**Task**: Evaluate parametric functions over t range and generate points.
+
+**Implementation**:
+- Create `evaluateParametricFunction` utility
+- Evaluate x_func(t) and y_func(t) over t range
+- Use adaptive sampling similar to regular plot function
+- Handle discontinuities in parametric curves (when x or y becomes infinite/NaN)
+- Generate points array: `[[x1, y1], [x2, y2], ...]`
+- Support progressive rendering for parametric plots
+- Implement point caching for parametric functions
+
+**Tests**:
+- Test parametric evaluation with simple functions (circle: x=sin(t), y=cos(t))
+- Test parametric evaluation with complex functions
+- Test adaptive sampling works correctly
+- Test discontinuity detection
+- Test progressive rendering
+- Test point caching
+
+**Commit**: `feat: implement parametric function evaluation with adaptive sampling`
+
+---
+
+### [ ] Step 10.4: Implement Parametric Plot Rendering
+**Task**: Render parametric plots in frames.
+
+**Implementation**:
+- Add parametric plot rendering to frame drawing logic
+- Transform parametric points to frame coordinate system
+- Draw parametric curve as continuous line/curve
+- Handle parametric curves that extend outside frame bounds
+- Apply parametric plot colors
+- Support multiple parametric plots per frame
+- Handle discontinuities in parametric curves (break curve at discontinuities)
+
+**Tests**:
+- Test parametric plot rendering (circle, ellipse, etc.)
+- Test parametric plot transformation to frame coordinates
+- Test multiple parametric plots rendering
+- Test parametric plots with different t ranges
+- Test parametric plots outside bounds handling
+- Test discontinuity handling in parametric curves
+
+**Commit**: `feat: implement parametric plot rendering in frames`
+
+---
+
+### [ ] Step 10.5: Add Parametric Plot Examples and Documentation
+**Task**: Add examples and update documentation for parametric plots.
+
+**Implementation**:
+- Add example parametric plots to default code templates:
+  - Circle: `plot_parametric('cos(t)', 'sin(t)', 0, 2*np.pi)`
+  - Ellipse: `plot_parametric('2*cos(t)', 'sin(t)', 0, 2*np.pi)`
+  - Spiral: `plot_parametric('t*cos(t)', 't*sin(t)', 0, 4*np.pi)`
+  - Lissajous curve: `plot_parametric('sin(3*t)', 'cos(2*t)', 0, 2*np.pi)`
+- Update code generator to include parametric plot examples
+- Document parametric plot function in code comments
+- Add parametric plot examples to README (when created)
+
+**Tests**:
+- Test example parametric plots render correctly
+- Test code generation includes examples
+- Verify examples are mathematically correct
+
+**Commit**: `docs: add parametric plot examples and documentation`
+
+---
+
+## Phase 11: Implicit Function Plotting
+
+**Note**: This phase adds support for implicit functions where f(x, y) = 0 (e.g., x² + y² = 16 creates a circle, x² + y² - 16 = 0).
+
+### [ ] Step 11.1: Design Implicit Plot Function API
+**Task**: Design the API for implicit plot function in Python.
+
+**Implementation**:
+- Design function signature: `plot_implicit(equation, x_min, x_max, y_min, y_max, color?)`
+  - `equation`: function of x and y (string expression or callable) - e.g., `'x**2 + y**2 - 16'` or `lambda x, y: x**2 + y**2 - 16`
+  - `x_min`, `x_max`: x range for search
+  - `y_min`, `y_max`: y range for search
+  - `color`: optional color string
+- Design contour finding algorithm (marching squares or similar)
+- Consider performance implications of 2D search
+- Document expected behavior and examples
+
+**Tests**:
+- Verify API design is clear and intuitive
+- Verify examples work conceptually
+- Verify contour finding strategy is sound
+
+**Commit**: `feat: design implicit plot function API`
+
+---
+
+### [ ] Step 11.2: Implement Implicit Plot Function Registration
+**Task**: Register `plot_implicit` function in the Python function registry.
+
+**Implementation**:
+- Add `plotImplicitImplementation` to `src/utils/pythonFunctions.ts` (or extracted module)
+- Register function as `'plot_implicit'` in function registry
+- Validate parameters (equation, x_min, x_max, y_min, y_max, color)
+- Support both string expressions and callable functions for equation
+- Store implicit plot data in frame state
+- Add `ImplicitPlot` type to `src/types/index.ts`:
+  ```typescript
+  interface ImplicitPlot {
+    id: string
+    equation: string  // or callable marker
+    xMin: number
+    xMax: number
+    yMin: number
+    yMax: number
+    color?: string
+    points?: PointStorage  // contour points
+    isProgressive?: boolean
+    cacheKey?: string
+  }
+  ```
+
+**Tests**:
+- Test function registration
+- Test parameter validation
+- Test string expression handling
+- Test callable function handling
+- Test function call storage
+
+**Commit**: `feat: implement implicit plot function registration`
+
+---
+
+### [ ] Step 11.3: Implement Contour Finding Algorithm
+**Task**: Implement algorithm to find contour points where f(x, y) = 0.
+
+**Implementation**:
+- Create `findContourPoints` utility function
+- Implement marching squares algorithm (or similar contour finding method)
+- Evaluate equation over 2D grid in specified range
+- Find points where equation crosses zero (sign changes)
+- Generate contour points array
+- Optimize for performance (adaptive grid resolution, early termination)
+- Handle multiple disconnected contours
+- Support progressive rendering for implicit plots
+
+**Tests**:
+- Test contour finding for circle (x² + y² - 16 = 0)
+- Test contour finding for ellipse
+- Test contour finding for multiple disconnected curves
+- Test contour finding for complex equations
+- Test performance with various grid resolutions
+- Test progressive rendering
+
+**Commit**: `feat: implement contour finding algorithm for implicit functions`
+
+---
+
+### [ ] Step 11.4: Implement Implicit Plot Rendering
+**Task**: Render implicit plots in frames.
+
+**Implementation**:
+- Add implicit plot rendering to frame drawing logic
+- Transform implicit contour points to frame coordinate system
+- Draw implicit curves as continuous lines
+- Handle implicit curves that extend outside frame bounds
+- Apply implicit plot colors
+- Support multiple implicit plots per frame
+- Handle multiple disconnected contours correctly
+
+**Tests**:
+- Test implicit plot rendering (circle, ellipse, etc.)
+- Test implicit plot transformation to frame coordinates
+- Test multiple implicit plots rendering
+- Test implicit plots with different ranges
+- Test implicit plots outside bounds handling
+- Test multiple disconnected contours rendering
+
+**Commit**: `feat: implement implicit plot rendering in frames`
+
+---
+
+### [ ] Step 11.5: Optimize Implicit Plot Performance
+**Task**: Optimize implicit plot evaluation and rendering for performance.
+
+**Implementation**:
+- Implement adaptive grid resolution (finer near contours, coarser elsewhere)
+- Cache equation evaluations where possible
+- Optimize contour finding algorithm
+- Use progressive rendering for large implicit plots
+- Consider Web Workers for heavy computation (optional)
+- Add performance monitoring for implicit plots
+
+**Tests**:
+- Test performance with simple implicit equations
+- Test performance with complex implicit equations
+- Test adaptive grid resolution works correctly
+- Test progressive rendering improves perceived performance
+- Verify no visual quality degradation from optimizations
+
+**Commit**: `perf: optimize implicit plot evaluation and rendering`
+
+---
+
+### [ ] Step 11.6: Add Implicit Plot Examples and Documentation
+**Task**: Add examples and update documentation for implicit plots.
+
+**Implementation**:
+- Add example implicit plots to default code templates:
+  - Circle: `plot_implicit('x**2 + y**2 - 16', -10, 10, -10, 10)`
+  - Ellipse: `plot_implicit('x**2/4 + y**2 - 1', -5, 5, -5, 5)`
+  - Hyperbola: `plot_implicit('x**2 - y**2 - 1', -5, 5, -5, 5)`
+  - Rose curve: `plot_implicit('x**2 + y**2 - 4*x*y', -5, 5, -5, 5)`
+- Update code generator to include implicit plot examples
+- Document implicit plot function in code comments
+- Add implicit plot examples to README (when created)
+
+**Tests**:
+- Test example implicit plots render correctly
+- Test code generation includes examples
+- Verify examples are mathematically correct
+
+**Commit**: `docs: add implicit plot examples and documentation`
+
+---
+
+## Phase 12: Determinant Visualization (Matrix Area Fill)
+
+**Note**: This phase adds a function to visualize the geometric interpretation of a 2x2 matrix determinant by filling the parallelogram/rectangle formed by two vectors. The filled area represents the absolute value of the determinant.
+
+### [ ] Step 12.1: Design Determinant Fill Function API
+**Task**: Design the API for filling the parallelogram formed by two vectors.
+
+**Implementation**:
+- Design function signature: `fill_determinant(vector1, vector2, color?)`
+  - `vector1`: first column vector (numpy array) - e.g., `np.array([2, 0])`
+  - `vector2`: second column vector (numpy array) - e.g., `np.array([0, 3])`
+  - `color`: optional color string (default: semi-transparent blue)
+- The parallelogram is formed by:
+  - Origin (0, 0) in frame coordinates
+  - `vector1` endpoint
+  - `vector1 + vector2` endpoint
+  - `vector2` endpoint
+- The filled area represents the absolute value of det([vector1 | vector2])
+- Document expected behavior and geometric interpretation
+- Consider adding opacity/transparency for better visualization
+
+**Tests**:
+- Verify API design is clear and intuitive
+- Verify geometric interpretation is correct
+- Verify examples work conceptually
+
+**Commit**: `feat: design determinant fill function API`
+
+---
+
+### [ ] Step 12.2: Implement Determinant Fill Function Registration
+**Task**: Register `fill_determinant` function in the Python function registry.
+
+**Implementation**:
+- Add `fillDeterminantImplementation` to `src/utils/pythonFunctions.ts` (or extracted module)
+- Register function as `'fill_determinant'` in function registry
+- Validate parameters (vector1, vector2, color)
+- Ensure vectors are 2D arrays
+- Store determinant fill data in frame state
+- Add `DeterminantFill` type to `src/types/index.ts`:
+  ```typescript
+  interface DeterminantFill {
+    id: string
+    vector1: [number, number]  // first column vector
+    vector2: [number, number]  // second column vector
+    color?: string
+    determinant?: number  // calculated determinant value
+  }
+  ```
+
+**Tests**:
+- Test function registration
+- Test parameter validation
+- Test vector validation (must be 2D)
+- Test function call storage
+- Test determinant calculation
+
+**Commit**: `feat: implement determinant fill function registration`
+
+---
+
+### [ ] Step 12.3: Calculate Parallelogram Vertices
+**Task**: Calculate the four vertices of the parallelogram formed by two vectors.
+
+**Implementation**:
+- Create `calculateParallelogramVertices` utility function
+- Calculate vertices:
+  - `v0 = [0, 0]` (origin)
+  - `v1 = vector1`
+  - `v2 = vector1 + vector2`
+  - `v3 = vector2`
+- Transform vertices to frame coordinate system
+- Calculate determinant: `det = vector1[0] * vector2[1] - vector1[1] * vector2[0]`
+- Store determinant value for display/annotation (optional)
+
+**Tests**:
+- Test vertex calculation with perpendicular vectors (rectangle)
+- Test vertex calculation with non-perpendicular vectors (parallelogram)
+- Test vertex calculation with negative components
+- Test determinant calculation accuracy
+- Test coordinate transformation
+
+**Commit**: `feat: implement parallelogram vertex calculation`
+
+---
+
+### [ ] Step 12.4: Implement Determinant Fill Rendering
+**Task**: Render filled parallelogram in frames.
+
+**Implementation**:
+- Add determinant fill rendering to frame drawing logic
+- Use canvas `fillRect` or `fill` with polygon path
+- Fill parallelogram with specified color (or default)
+- Apply transparency/opacity for better visualization (overlap visibility)
+- Render parallelogram outline (optional, for clarity)
+- Support multiple determinant fills per frame
+- Handle determinant fills that extend outside frame bounds
+- Consider rendering order (fills behind vectors/plots)
+
+**Tests**:
+- Test determinant fill rendering (rectangle case)
+- Test determinant fill rendering (parallelogram case)
+- Test determinant fill with different colors
+- Test multiple determinant fills rendering
+- Test determinant fill transformation to frame coordinates
+- Test determinant fill outside bounds handling
+- Test rendering order (fills don't obscure vectors)
+
+**Commit**: `feat: implement determinant fill rendering in frames`
+
+---
+
+### [ ] Step 12.5: Add Determinant Visualization Features
+**Task**: Add optional features to enhance determinant visualization.
+
+**Implementation**:
+- Add optional outline/stroke to parallelogram (configurable)
+- Add optional determinant value label/annotation
+- Add optional grid overlay showing unit squares
+- Consider adding animation for determinant changes (when vectors change)
+- Add visual feedback for positive vs negative determinant (optional: different colors or patterns)
+- Ensure fills are semi-transparent so overlapping areas are visible
+
+**Tests**:
+- Test outline rendering (if implemented)
+- Test determinant value display (if implemented)
+- Test grid overlay (if implemented)
+- Test visual feedback for determinant sign (if implemented)
+- Test transparency allows seeing overlapping fills
+
+**Commit**: `feat: add enhanced determinant visualization features`
+
+---
+
+### [ ] Step 12.6: Add Determinant Fill Examples and Documentation
+**Task**: Add examples and update documentation for determinant fills.
+
+**Implementation**:
+- Add example determinant fills to default code templates:
+  - Unit square: `fill_determinant(np.array([1, 0]), np.array([0, 1]))`
+  - Rectangle: `fill_determinant(np.array([3, 0]), np.array([0, 2]))`
+  - Parallelogram: `fill_determinant(np.array([2, 1]), np.array([1, 2]))`
+  - Negative determinant: `fill_determinant(np.array([1, 0]), np.array([0, -1]))`
+- Update code generator to include determinant fill examples
+- Document determinant fill function in code comments
+- Explain geometric interpretation (area = |det|)
+- Add determinant fill examples to README (when created)
+
+**Tests**:
+- Test example determinant fills render correctly
+- Test code generation includes examples
+- Verify examples are mathematically correct
+- Verify geometric interpretation is clear
+
+**Commit**: `docs: add determinant fill examples and documentation`
+
+---
+
+## Phase 13: Documentation and Finalization (Deferred)
+
+**Note**: Phase 9 documentation tasks are deferred. This phase will be completed after core functionality is fully implemented and tested.
+
+### [ ] Step 12.1: Create README Documentation
+**Task**: Write comprehensive README with setup and usage instructions.
+
+**Status**: Deferred until after core features are complete
+
+---
+
+### [ ] Step 12.2: Code Documentation
+**Task**: Add JSDoc comments to all functions and components.
+
+**Status**: Deferred until after refactoring is complete
 
 ---
 
@@ -1077,9 +1653,13 @@ Before considering the project complete, verify:
 - [ ] Python code execution works
 - [ ] draw() function renders vectors
 - [ ] plot() function renders functions
+- [ ] plot_parametric() function renders parametric curves
+- [ ] plot_implicit() function renders implicit equations
+- [ ] fill_determinant() function fills parallelogram formed by two vectors
 - [ ] Workspace export/import works
 - [ ] All UI controls function correctly
 - [ ] Application is responsive and performant
+- [ ] Code is modular and maintainable (files <500 lines)
 - [ ] Code is well-documented
 - [ ] README is complete
 
@@ -1092,6 +1672,14 @@ Before considering the project complete, verify:
 - **Error Handling**: Always handle errors gracefully and provide user feedback.
 - **Accessibility**: Consider keyboard navigation and screen reader support for future enhancements.
 - **3D Mode**: Architecture supports 3D, but implementation is deferred. Focus on perfecting 2D mode first.
+- **Code Modularity**: Maintain files under 500 lines (hard limit) and ideally under 300 lines. Break down large files proactively to ensure maintainability and flexibility for future extensions.
+- **Plotting Capabilities**: The application supports multiple plotting types:
+  - **Explicit functions**: `plot(formula, x_min, x_max)` - y = f(x)
+  - **Parametric curves**: `plot_parametric(x_func, y_func, t_min, t_max)` - x = f(t), y = g(t)
+  - **Implicit equations**: `plot_implicit(equation, x_min, x_max, y_min, y_max)` - f(x, y) = 0
+- **Matrix Visualization**: The application supports geometric matrix interpretations:
+  - **Determinant visualization**: `fill_determinant(vector1, vector2, color?)` - fills parallelogram formed by two vectors, area = |det([vector1 | vector2])|
+- **Competitive Goal**: This application aims to match and exceed Desmos functionality, providing a powerful, flexible mathematical visualization tool.
 
 ---
 
