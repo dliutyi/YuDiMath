@@ -81,8 +81,9 @@ function drawParametricFromPoints(
 
   const pixelsPerUnit = calculatePixelsPerUnit(transformToScreen)
   const validPoints: Array<{ point: Point2D; screen: Point2D }> = []
+  const maxScreenGap = 5.0  // Maximum allowed gap in screen space before interpolating
 
-  // Transform points to screen coordinates and check for discontinuities
+  // First pass: collect valid points and detect large gaps
   for (let i = 0; i < plot.points.length; i++) {
     const [x, y] = plot.points[i]
     
@@ -98,6 +99,38 @@ function drawParametricFromPoints(
 
     const point: Point2D = [x, y]
     const screen = transformToScreen(point)
+    
+    // Check for large gaps with previous point and interpolate if needed
+    if (validPoints.length > 0) {
+      const prevPoint = validPoints[validPoints.length - 1]
+      const screenDistance = Math.sqrt(
+        (screen[0] - prevPoint.screen[0]) ** 2 + 
+        (screen[1] - prevPoint.screen[1]) ** 2
+      )
+      
+      // If gap is too large, add interpolated points to fill it
+      if (screenDistance > maxScreenGap) {
+        // Estimate parameter values (assume uniform distribution in t)
+        // We don't have exact t values, so estimate based on index
+        const tRange = plot.tMax - plot.tMin
+        const t1 = plot.tMin + (i - 1) / (plot.points.length - 1) * tRange
+        const t2 = plot.tMin + i / (plot.points.length - 1) * tRange
+        
+        // Add interpolated points to fill the gap
+        const numInterpolated = Math.ceil(screenDistance / maxScreenGap)
+        for (let j = 1; j < numInterpolated; j++) {
+          const t = t1 + (j / numInterpolated) * (t2 - t1)
+          const alpha = j / numInterpolated
+          // Linear interpolation in coordinate space
+          const interpX = prevPoint.point[0] + alpha * (point[0] - prevPoint.point[0])
+          const interpY = prevPoint.point[1] + alpha * (point[1] - prevPoint.point[1])
+          const interpPoint: Point2D = [interpX, interpY]
+          const interpScreen = transformToScreen(interpPoint)
+          validPoints.push({ point: interpPoint, screen: interpScreen })
+        }
+      }
+    }
+    
     validPoints.push({ point, screen })
 
     // Check for discontinuity with previous point

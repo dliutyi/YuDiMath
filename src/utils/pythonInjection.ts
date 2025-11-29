@@ -638,12 +638,13 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
             pass  # If sampling fails, use default
         
         # Conservative scaling: only apply for coordinates > 10
-        # Use linear scaling to avoid breaking small values
+        # Use more aggressive scaling for large values to ensure quality
         # For coordinates ≤ 10: no scaling (coordinate_scale = 1.0)
-        # For coordinates > 10: linear scaling, capped at 10x
+        # For coordinates > 10: more aggressive linear scaling
         if estimated_max_coord > 10:
-            coordinate_scale = 1.0 + (estimated_max_coord - 10.0) / 30.0  # Linear scaling above 10
-            coordinate_scale = min(coordinate_scale, 10.0)  # Cap at 10x to avoid excessive points
+            # More aggressive: divide by 20 instead of 30 for better quality
+            coordinate_scale = 1.0 + (estimated_max_coord - 10.0) / 20.0  # More aggressive linear scaling
+            coordinate_scale = min(coordinate_scale, 15.0)  # Cap at 15x (increased from 10x)
         else:
             coordinate_scale = 1.0  # No scaling for small values - preserve existing behavior
         
@@ -1855,12 +1856,13 @@ def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
             pass  # If sampling fails, use default
         
         # Conservative scaling: only apply for coordinates > 10
-        # Use linear scaling to avoid breaking small values
+        # Use more aggressive scaling for large values to ensure quality
         # For coordinates ≤ 10: no scaling (coordinate_scale = 1.0)
-        # For coordinates > 10: linear scaling, capped at 10x
+        # For coordinates > 10: more aggressive linear scaling
         if estimated_max_coord > 10:
-            coordinate_scale = 1.0 + (estimated_max_coord - 10.0) / 30.0  # Linear scaling above 10
-            coordinate_scale = min(coordinate_scale, 10.0)  # Cap at 10x to avoid excessive points
+            # More aggressive: divide by 20 instead of 30 for better quality
+            coordinate_scale = 1.0 + (estimated_max_coord - 10.0) / 20.0  # More aggressive linear scaling
+            coordinate_scale = min(coordinate_scale, 15.0)  # Cap at 15x (increased from 10x)
         else:
             coordinate_scale = 1.0  # No scaling for small values - preserve existing behavior
         
