@@ -1260,7 +1260,7 @@ For each step:
 
 ---
 
-### [ ] Step 10.4: Implement Parametric Plot Rendering
+### [x] Step 10.4: Implement Parametric Plot Rendering
 **Task**: Render parametric plots in frames.
 
 **Implementation**:
