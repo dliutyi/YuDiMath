@@ -118,7 +118,15 @@ function drawImplicitFromExpression(
   const gridResolution = plot.numPoints ?? Math.max(50, Math.min(500, Math.round((xMax - xMin + yMax - yMin) / 2 * 50)))
   
   // Find contour points using marching squares
-  const contours = findContourPoints(equation, xMin, xMax, yMin, yMax, gridResolution, 3)
+  console.log('[drawImplicitFromExpression] Finding contours for equation:', equation, 'range:', xMin, xMax, yMin, yMax, 'resolution:', gridResolution)
+  let contours: Point2D[][]
+  try {
+    contours = findContourPoints(equation, xMin, xMax, yMin, yMax, gridResolution, 3)
+    console.log('[drawImplicitFromExpression] Found', contours.length, 'contour segments with', contours.reduce((sum, c) => sum + c.length, 0), 'total points')
+  } catch (error) {
+    console.error('[drawImplicitFromExpression] Error finding contours:', error)
+    return
+  }
   
   // Draw each contour segment
   for (const contour of contours) {

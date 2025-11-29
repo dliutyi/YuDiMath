@@ -32,6 +32,8 @@ export function findContourPoints(
   
   // Evaluate equation at grid points
   const grid: number[][] = []
+  let evaluationErrors = 0
+  let validValues = 0
   for (let i = 0; i <= resolution; i++) {
     grid[i] = []
     const y = yMin + i * dy
@@ -39,11 +41,24 @@ export function findContourPoints(
       const x = xMin + j * dx
       try {
         const value = evaluateImplicitExpression(equation, x, y)
-        grid[i][j] = isFinite(value) ? value : Number.NaN
+        if (isFinite(value)) {
+          grid[i][j] = value
+          validValues++
+        } else {
+          grid[i][j] = Number.NaN
+        }
       } catch (e) {
         grid[i][j] = Number.NaN
+        evaluationErrors++
+        // Log first few errors for debugging
+        if (evaluationErrors <= 3) {
+          console.warn(`[findContourPoints] Error evaluating equation "${equation}" at (${x}, ${y}):`, e)
+        }
       }
     }
+  }
+  if (evaluationErrors > 0) {
+    console.warn(`[findContourPoints] Total evaluation errors: ${evaluationErrors} out of ${(resolution + 1) ** 2} points, valid: ${validValues}`)
   }
   
   // Find zero-crossings using marching squares

@@ -97,6 +97,16 @@ export const plotImplicitImplementation: FunctionImplementation = (
     numPoints: optimalPoints,
   }
 
+  console.log('[plotImplicitImplementation] Storing implicit plot:', {
+    equation: equationString,
+    xMin,
+    xMax,
+    yMin,
+    yMax,
+    color,
+    numPoints: optimalPoints,
+  })
+
   storeImplicitPlot(implicitPlot)
 }
 
