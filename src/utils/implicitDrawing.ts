@@ -167,9 +167,12 @@ function sortPointsByProximity(points: Array<[number, number]>): Array<[number, 
     } else {
       // No nearby point found, start a new segment
       if (remaining.size > 0) {
-        currentIdx = remaining.values().next().value
-        remaining.delete(currentIdx)
-        sorted.push(points[currentIdx])
+        const nextValue = remaining.values().next().value
+        if (nextValue !== undefined) {
+          currentIdx = nextValue
+          remaining.delete(currentIdx)
+          sorted.push(points[currentIdx])
+        }
       }
     }
   }
