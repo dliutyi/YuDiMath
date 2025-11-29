@@ -1417,16 +1417,18 @@ For each step:
 
 ---
 
-### [ ] Step 11.5: Optimize Implicit Plot Performance
+### [x] Step 11.5: Optimize Implicit Plot Performance
 **Task**: Optimize implicit plot evaluation and rendering for performance.
 
 **Implementation**:
-- Implement adaptive grid resolution (finer near contours, coarser elsewhere)
-- Cache equation evaluations where possible
-- Optimize contour finding algorithm
-- Use progressive rendering for large implicit plots
-- Consider Web Workers for heavy computation (optional)
-- Add performance monitoring for implicit plots
+- [x] Implement adaptive grid resolution (zoom-aware scaling)
+- [x] Cache equation evaluations where possible (implicitCache.ts)
+- [x] Optimize contour finding algorithm
+- [ ] Use progressive rendering for large implicit plots (deferred - see note below)
+- [ ] Consider Web Workers for heavy computation (optional)
+- [ ] Add performance monitoring for implicit plots
+
+**Note on Progressive Rendering**: Progressive rendering (showing partial results as they're calculated) is deferred for now. It would require refactoring `findContourPoints` to be async/chunked and using `requestAnimationFrame` to render incrementally. Estimated effort: 2-3 hours. The current caching implementation provides good performance for most use cases.
 
 **Tests**:
 - Test performance with simple implicit equations

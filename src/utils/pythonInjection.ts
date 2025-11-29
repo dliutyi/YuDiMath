@@ -795,16 +795,24 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
                 contour_points = []
                 
                 # Helper function to interpolate zero-crossing on an edge
+                # Uses improved interpolation for better accuracy near zero
                 def interpolate_zero(p1, p2, v1, v2):
                     """Linear interpolation to find zero-crossing between two points"""
-                    if v1 == 0:
+                    if abs(v1) < 1e-10:  # Very close to zero
                         return p1
-                    if v2 == 0:
+                    if abs(v2) < 1e-10:  # Very close to zero
                         return p2
                     if np.sign(v1) == np.sign(v2):
                         return None  # No zero-crossing
                     # Linear interpolation: t = -v1 / (v2 - v1)
-                    t = -v1 / (v2 - v1)
+                    # Use more stable calculation for better accuracy
+                    denominator = v2 - v1
+                    if abs(denominator) < 1e-10:
+                        # Values are very close, use midpoint
+                        return (p1 + p2) / 2.0
+                    t = -v1 / denominator
+                    # Clamp t to [0, 1] to ensure we stay on the edge
+                    t = max(0.0, min(1.0, t))
                     return p1 + t * (p2 - p1)
                 
                 # Evaluate function at all grid points
@@ -2149,16 +2157,24 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
                 contour_points = []
                 
                 # Helper function to interpolate zero-crossing on an edge
+                # Uses improved interpolation for better accuracy near zero
                 def interpolate_zero(p1, p2, v1, v2):
                     """Linear interpolation to find zero-crossing between two points"""
-                    if v1 == 0:
+                    if abs(v1) < 1e-10:  # Very close to zero
                         return p1
-                    if v2 == 0:
+                    if abs(v2) < 1e-10:  # Very close to zero
                         return p2
                     if np.sign(v1) == np.sign(v2):
                         return None  # No zero-crossing
                     # Linear interpolation: t = -v1 / (v2 - v1)
-                    t = -v1 / (v2 - v1)
+                    # Use more stable calculation for better accuracy
+                    denominator = v2 - v1
+                    if abs(denominator) < 1e-10:
+                        # Values are very close, use midpoint
+                        return (p1 + p2) / 2.0
+                    t = -v1 / denominator
+                    # Clamp t to [0, 1] to ensure we stay on the edge
+                    t = max(0.0, min(1.0, t))
                     return p1 + t * (p2 - p1)
                 
                 # Evaluate function at all grid points

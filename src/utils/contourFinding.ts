@@ -101,7 +101,9 @@ export function findContourPoints(
       const numSignChanges = signChanges.filter(Boolean).length
       
       // If there are zero-crossings, find contour points
+      // Use higher depth near origin for better quality
       if (numSignChanges > 0) {
+        const adaptiveDepth = isNearOrigin ? maxDepth + 1 : maxDepth
         const cellContours = findContourInCell(
           equation,
           xMin + j * dx,
@@ -112,7 +114,7 @@ export function findContourPoints(
           v10,
           v01,
           v11,
-          maxDepth
+          adaptiveDepth
         )
         
         // Merge cell contours into main contours
@@ -169,36 +171,44 @@ function findContourInCell(
   
   // Base case: cell is too small or depth limit reached
   if (depth <= 0 || Math.min(dx, dy) < minCellSize) {
-    // Use linear interpolation to find zero-crossing points
+    // Use improved linear interpolation to find zero-crossing points
+    // Better handling near origin and zero values
     const points: Point2D[] = []
+    
+    // Helper function for stable interpolation
+    const interpolate = (p1: number, p2: number, v1: number, v2: number): number | null => {
+      if (Math.abs(v1) < 1e-10) return p1
+      if (Math.abs(v2) < 1e-10) return p2
+      if (Math.sign(v1) === Math.sign(v2)) return null
+      const denominator = v2 - v1
+      if (Math.abs(denominator) < 1e-10) return (p1 + p2) / 2
+      const t = Math.max(0, Math.min(1, -v1 / denominator))
+      return p1 + t * (p2 - p1)
+    }
     
     // Check each edge for zero-crossings
     // Left edge (v00 to v10)
     if (Math.sign(v00) !== Math.sign(v10)) {
-      const t = -v00 / (v10 - v00)
-      const y = y0 + t * dy
-      points.push([x0, y])
+      const y = interpolate(y0, y0 + dy, v00, v10)
+      if (y !== null) points.push([x0, y])
     }
     
     // Bottom edge (v10 to v11)
     if (Math.sign(v10) !== Math.sign(v11)) {
-      const t = -v10 / (v11 - v10)
-      const x = x0 + t * dx
-      points.push([x, y0 + dy])
+      const x = interpolate(x0, x0 + dx, v10, v11)
+      if (x !== null) points.push([x, y0 + dy])
     }
     
     // Right edge (v01 to v11)
     if (Math.sign(v01) !== Math.sign(v11)) {
-      const t = -v01 / (v11 - v01)
-      const y = y0 + t * dy
-      points.push([x0 + dx, y])
+      const y = interpolate(y0, y0 + dy, v01, v11)
+      if (y !== null) points.push([x0 + dx, y])
     }
     
     // Top edge (v00 to v01)
     if (Math.sign(v00) !== Math.sign(v01)) {
-      const t = -v00 / (v01 - v00)
-      const x = x0 + t * dx
-      points.push([x, y0])
+      const x = interpolate(x0, x0 + dx, v00, v01)
+      if (x !== null) points.push([x, y0])
     }
     
     return points.length > 0 ? [points] : []
