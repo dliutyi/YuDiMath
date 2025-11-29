@@ -1284,7 +1284,7 @@ For each step:
 
 ---
 
-### [ ] Step 10.5: Add Parametric Plot Examples and Documentation
+### [x] Step 10.5: Add Parametric Plot Examples and Documentation
 **Task**: Add examples and update documentation for parametric plots.
 
 **Implementation**:
