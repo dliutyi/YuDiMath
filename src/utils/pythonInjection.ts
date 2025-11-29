@@ -757,7 +757,7 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
     # If equation is callable, try to extract expression or evaluate at grid points
     if callable(equation):
         import numpy as np
-        # Try to extract expression from lambda
+        # Try to extract expression from lambda (supports both lambda x: and lambda x, y:)
         original_callable = equation
         extracted_expression = None
         
@@ -767,16 +767,22 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
             if 'lambda' in source:
                 lambda_part = source.split('lambda', 1)[1]
                 if ':' in lambda_part:
+                    # Extract the expression part (after the colon)
+                    # This works for both lambda x: and lambda x, y:
                     expr = lambda_part.split(':', 1)[1].strip()
+                    # Remove trailing commas, parentheses, whitespace, newlines
                     expr = expr.rstrip(',').rstrip(')').rstrip().strip()
+                    # Remove any leading/trailing quotes
                     while (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
                         expr = expr[1:-1].strip()
+                    # Remove newlines and extra whitespace
                     expr = ' '.join(expr.split())
                     extracted_expression = expr
                     equation = extracted_expression
+                    print(f"[plot_implicit wrapper] Extracted expression from lambda: {repr(extracted_expression)}")
         except Exception as e:
             print(f"[plot_implicit wrapper] Could not extract expression from callable: {e}")
-            # For callables, we need to evaluate at grid points
+            # For callables that can't be extracted, we need to evaluate at grid points
             # This is more complex for 2D, so for now we'll just pass the string representation
             # The JavaScript side will handle evaluation
             equation = str(equation)
