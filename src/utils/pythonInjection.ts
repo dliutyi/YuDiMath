@@ -815,11 +815,13 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
                             pass
                 
                 if len(contour_points) > 0:
+                    # Convert to JavaScript-compatible format (list of lists)
+                    points_list = [[float(p[0]), float(p[1])] for p in contour_points]
                     # Pass contour points to JavaScript
                     if color is not None:
-                        return _yudimath.plot_implicit_points(contour_points, x_min, x_max, y_min, y_max, color)
+                        return _yudimath.plot_implicit_points(points_list, x_min, x_max, y_min, y_max, color)
                     else:
-                        return _yudimath.plot_implicit_points(contour_points, x_min, x_max, y_min, y_max)
+                        return _yudimath.plot_implicit_points(points_list, x_min, x_max, y_min, y_max)
                 else:
                     raise ValueError("plot_implicit() could not find any zero-crossings in the specified range")
             except Exception as e2:
