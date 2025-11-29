@@ -12,6 +12,7 @@ import { drawFrameAxes } from './axesDrawing'
 import { drawFrameVectors } from './vectorDrawing'
 import { drawFrameFunctions } from './functionDrawing'
 import { drawFrameParametricPlots } from './parametricDrawing'
+import { drawFrameImplicitPlots } from './implicitDrawing'
 
 /**
  * Draw a coordinate frame on the canvas
@@ -280,6 +281,7 @@ export function drawCoordinateFrame(
   // Draw function plots within clipped region
   drawFrameFunctions(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
   drawFrameParametricPlots(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
+  drawFrameImplicitPlots(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
   
   // Recursively draw child frames
   frame.childFrameIds.forEach(childId => {
