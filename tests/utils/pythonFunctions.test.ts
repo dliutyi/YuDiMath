@@ -612,6 +612,25 @@ describe('pythonFunctions', () => {
       
       expect(() => plotImplicitWrapper(123, -10, 10, -10, 10)).toThrow('equation must be a string expression or callable function')
     })
+
+    it('should handle lambda x, y functions', () => {
+      const mockStoreVector = vi.fn()
+      const mockStoreFunction = vi.fn()
+      const mockStoreImplicitPlot = vi.fn()
+      
+      setupFunctionContext('test-frame-1', mockStoreVector, mockStoreFunction, undefined, mockStoreImplicitPlot)
+      
+      const plotImplicitWrapper = createPythonFunctionWrapper('plot_implicit')
+      
+      // Test with JavaScript function simulating lambda x, y: x**2 + y**2 - 16
+      const mockLambda = function(x: number, y: number) { return x * x + y * y - 16 }
+      // Note: In real Python, this would be lambda x, y: x**2 + y**2 - 16
+      // The wrapper should extract the expression from the lambda source
+      
+      // For now, test that it accepts callable (the actual extraction happens in Python)
+      // The JavaScript side just validates it's callable or string
+      expect(() => plotImplicitWrapper(mockLambda, -10, 10, -10, 10)).not.toThrow('equation must be a string expression or callable function')
+    })
   })
 })
 
