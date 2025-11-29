@@ -123,7 +123,6 @@ export const plotParametricPointsImplementation: FunctionImplementation = (
     numPoints: points.length, // Use actual number of points
   }
 
-  console.log('[plotParametricPointsImplementation] Storing parametric plot with', points.length, 'points')
   storeParametricPlot(parametricPlot)
 }
 

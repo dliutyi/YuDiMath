@@ -32,7 +32,6 @@ export const plotParametricImplementation: FunctionImplementation = (
   let xFuncString: string
   if (typeof xFuncArg === 'string') {
     xFuncString = xFuncArg
-    console.log('[plotParametricImplementation] Using string x_func:', xFuncString)
   } else if (isCallable(xFuncArg)) {
     // If we still receive a callable, the Python wrapper didn't convert it
     // This shouldn't happen, but handle it gracefully
@@ -41,7 +40,6 @@ export const plotParametricImplementation: FunctionImplementation = (
     if (obj.toString && typeof obj.toString === 'function') {
       try {
         xFuncString = obj.toString()
-        console.log('[plotParametricImplementation] x_func callable toString():', xFuncString)
         // If it's just a generic function representation, we can't use it
         if (xFuncString.includes('<function') || xFuncString.includes('<lambda')) {
           throw new Error(
@@ -64,7 +62,6 @@ export const plotParametricImplementation: FunctionImplementation = (
   let yFuncString: string
   if (typeof yFuncArg === 'string') {
     yFuncString = yFuncArg
-    console.log('[plotParametricImplementation] Using string y_func:', yFuncString)
   } else if (isCallable(yFuncArg)) {
     // If we still receive a callable, the Python wrapper didn't convert it
     // This shouldn't happen, but handle it gracefully
@@ -73,7 +70,6 @@ export const plotParametricImplementation: FunctionImplementation = (
     if (obj.toString && typeof obj.toString === 'function') {
       try {
         yFuncString = obj.toString()
-        console.log('[plotParametricImplementation] y_func callable toString():', yFuncString)
         // If it's just a generic function representation, we can't use it
         if (yFuncString.includes('<function') || yFuncString.includes('<lambda')) {
           throw new Error(
@@ -95,8 +91,6 @@ export const plotParametricImplementation: FunctionImplementation = (
   // Validate t_min and t_max
   const tMin = typeof tMinArg === 'number' ? tMinArg : parseFloat(String(tMinArg))
   const tMax = typeof tMaxArg === 'number' ? tMaxArg : parseFloat(String(tMaxArg))
-
-  console.log('[plotParametricImplementation] tMin:', tMin, 'tMax:', tMax, 'color:', colorArg)
 
   if (isNaN(tMin) || isNaN(tMax)) {
     throw new Error('plot_parametric() t_min and t_max must be numbers')
@@ -122,7 +116,6 @@ export const plotParametricImplementation: FunctionImplementation = (
     numPoints: optimalPoints,
   }
 
-  console.log('[plotParametricImplementation] Storing parametric plot:', parametricPlot)
   storeParametricPlot(parametricPlot)
 }
 
