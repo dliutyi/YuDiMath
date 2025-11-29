@@ -538,6 +538,179 @@ def plot(formula, x_min=None, x_max=None, color=None):
         return _yudimath.plot(formula_to_use, x_min, x_max, color)
     else:
         return _yudimath.plot(formula_to_use, x_min, x_max)
+
+# Wrapper for plot_parametric() that handles keyword arguments and callables
+def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
+    # Handle both positional and keyword arguments
+    if t_min is None or t_max is None:
+        raise ValueError("plot_parametric() requires t_min and t_max arguments")
+    
+    # Check if x_func or y_func are callables
+    x_is_callable = callable(x_func)
+    y_is_callable = callable(y_func)
+    
+    # If both are strings, pass through to JavaScript
+    if not x_is_callable and not y_is_callable:
+        if color is not None:
+            return _yudimath.plot_parametric(x_func, y_func, t_min, t_max, color)
+        else:
+            return _yudimath.plot_parametric(x_func, y_func, t_min, t_max)
+    
+    # If either is callable, we need to evaluate in Python
+    # Save original callables
+    original_x_func = x_func if x_is_callable else None
+    original_y_func = y_func if y_is_callable else None
+    
+    # Try to extract expressions from callables (similar to plot())
+    x_func_string = None
+    y_func_string = None
+    
+    if x_is_callable:
+        try:
+            import inspect
+            source = inspect.getsource(x_func)
+            if 'lambda' in source:
+                lambda_part = source.split('lambda', 1)[1]
+                if ':' in lambda_part:
+                    expr = lambda_part.split(':', 1)[1].strip()
+                    expr = expr.rstrip(',').rstrip(')').rstrip().strip()
+                    while (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
+                        expr = expr[1:-1].strip()
+                    expr = ' '.join(expr.split())
+                    x_func_string = expr
+                    x_func = expr  # Use extracted expression
+        except:
+            pass  # Will evaluate at points
+    
+    if y_is_callable:
+        try:
+            import inspect
+            source = inspect.getsource(y_func)
+            if 'lambda' in source:
+                lambda_part = source.split('lambda', 1)[1]
+                if ':' in lambda_part:
+                    expr = lambda_part.split(':', 1)[1].strip()
+                    expr = expr.rstrip(',').rstrip(')').rstrip().strip()
+                    while (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
+                        expr = expr[1:-1].strip()
+                    expr = ' '.join(expr.split())
+                    y_func_string = expr
+                    y_func = expr  # Use extracted expression
+        except:
+            pass  # Will evaluate at points
+    
+    # If we successfully extracted both expressions, use them
+    if x_func_string is not None and y_func_string is not None:
+        if color is not None:
+            return _yudimath.plot_parametric(x_func_string, y_func_string, t_min, t_max, color)
+        else:
+            return _yudimath.plot_parametric(x_func_string, y_func_string, t_min, t_max)
+    
+    # Otherwise, evaluate callables at points
+    # Use adaptive sampling similar to plot()
+    try:
+        import numpy as np
+        t_range = t_max - t_min
+        
+        # Calculate optimal number of points based on range and zoom
+        pixels_covered = t_range * _pixels_per_unit
+        
+        # Initial sampling: adapt to zoom level
+        if _is_slider_change:
+            # Slider change - use minimal sampling
+            points_per_pixel = 0.15
+            initial_n = max(50, int(pixels_covered * points_per_pixel))
+            initial_n = min(initial_n, 150)
+        elif _pixels_per_unit > 200:
+            points_per_pixel = 8.0
+            initial_n = max(5000, int(pixels_covered * points_per_pixel))
+            initial_n = min(initial_n, 30000)
+        elif _pixels_per_unit > 100:
+            points_per_pixel = 6.0
+            initial_n = max(3000, int(pixels_covered * points_per_pixel))
+            initial_n = min(initial_n, 25000)
+        elif _pixels_per_unit > 50:
+            points_per_pixel = 5.0
+            initial_n = max(2000, int(pixels_covered * points_per_pixel))
+            initial_n = min(initial_n, 15000)
+        else:
+            points_per_pixel = 4.0
+            initial_n = max(1000, int(pixels_covered * points_per_pixel))
+            initial_n = min(initial_n, 6000)
+        
+        # Evaluate functions at t values
+        points = []
+        t_samples = np.linspace(t_min, t_max, initial_n)
+        
+        # Memoization cache for function evaluations
+        eval_cache_x = {}
+        eval_cache_y = {}
+        
+        def evaluate_x_with_cache(t):
+            t_key = round(t, 12)
+            if t_key in eval_cache_x:
+                return eval_cache_x[t_key]
+            try:
+                if x_is_callable and original_x_func is not None:
+                    val = float(original_x_func(t))
+                else:
+                    # String expression - evaluate using eval (with t in namespace)
+                    val = float(eval(x_func, {'t': t, 'np': np, 'math': __import__('math'), 'sin': np.sin, 'cos': np.cos, 'tan': np.tan, 'exp': np.exp, 'log': np.log, 'sqrt': np.sqrt, 'abs': abs}))
+                if np.isfinite(val):
+                    eval_cache_x[t_key] = val
+                    return val
+                else:
+                    eval_cache_x[t_key] = None
+                    return None
+            except:
+                eval_cache_x[t_key] = None
+                return None
+        
+        def evaluate_y_with_cache(t):
+            t_key = round(t, 12)
+            if t_key in eval_cache_y:
+                return eval_cache_y[t_key]
+            try:
+                if y_is_callable and original_y_func is not None:
+                    val = float(original_y_func(t))
+                else:
+                    # String expression - evaluate using eval (with t in namespace)
+                    val = float(eval(y_func, {'t': t, 'np': np, 'math': __import__('math'), 'sin': np.sin, 'cos': np.cos, 'tan': np.tan, 'exp': np.exp, 'log': np.log, 'sqrt': np.sqrt, 'abs': abs}))
+                if np.isfinite(val):
+                    eval_cache_y[t_key] = val
+                    return val
+                else:
+                    eval_cache_y[t_key] = None
+                    return None
+            except:
+                eval_cache_y[t_key] = None
+                return None
+        
+        # Evaluate at all t samples
+        for t in t_samples:
+            x_val = evaluate_x_with_cache(t)
+            y_val = evaluate_y_with_cache(t)
+            if x_val is not None and y_val is not None:
+                points.append([float(x_val), float(y_val)])
+        
+        if len(points) == 0:
+            raise ValueError(f"plot_parametric() could not evaluate functions at any points in range [{t_min}, {t_max}]")
+        
+        # Sort points by t (they should already be sorted, but ensure it)
+        # Note: For parametric plots, we don't sort by x or y - we keep t order
+        
+        # Convert to JavaScript-compatible format
+        points_list = [[float(p[0]), float(p[1])] for p in points]
+        
+        # Pass points to JavaScript
+        if color is not None:
+            return _yudimath.plot_parametric_points(points_list, t_min, t_max, color)
+        else:
+            return _yudimath.plot_parametric_points(points_list, t_min, t_max)
+            
+    except Exception as e:
+        print(f"[plot_parametric wrapper] Evaluation failed: {e}")
+        raise ValueError(f"plot_parametric() could not evaluate functions. Error: {str(e)}")
 `
       pyodide.runPython(pythonCode)
       console.log('[pythonFunctions] Functions injected via registerJsModule with keyword argument support:', functionNames)
@@ -1547,6 +1720,176 @@ def plot(formula, x_min=None, x_max=None, color=None, num_points=None):
         return __yudimath_plot(formula_to_use, x_min, x_max, None, num_points)
     else:
         return __yudimath_plot(formula_to_use, x_min, x_max)
+
+# Wrapper for plot_parametric() that handles keyword arguments and callables
+def plot_parametric(x_func, y_func, t_min=None, t_max=None, color=None):
+    # Handle both positional and keyword arguments
+    if t_min is None or t_max is None:
+        raise ValueError("plot_parametric() requires t_min and t_max arguments")
+    
+    # Check if x_func or y_func are callables
+    x_is_callable = callable(x_func)
+    y_is_callable = callable(y_func)
+    
+    # If both are strings, pass through to JavaScript
+    if not x_is_callable and not y_is_callable:
+        if color is not None:
+            return __yudimath_plot_parametric(x_func, y_func, t_min, t_max, color)
+        else:
+            return __yudimath_plot_parametric(x_func, y_func, t_min, t_max)
+    
+    # If either is callable, we need to evaluate in Python
+    # Save original callables
+    original_x_func = x_func if x_is_callable else None
+    original_y_func = y_func if y_is_callable else None
+    
+    # Try to extract expressions from callables (similar to plot())
+    x_func_string = None
+    y_func_string = None
+    
+    if x_is_callable:
+        try:
+            import inspect
+            source = inspect.getsource(x_func)
+            if 'lambda' in source:
+                lambda_part = source.split('lambda', 1)[1]
+                if ':' in lambda_part:
+                    expr = lambda_part.split(':', 1)[1].strip()
+                    expr = expr.rstrip(',').rstrip(')').rstrip().strip()
+                    while (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
+                        expr = expr[1:-1].strip()
+                    expr = ' '.join(expr.split())
+                    x_func_string = expr
+                    x_func = expr  # Use extracted expression
+        except:
+            pass  # Will evaluate at points
+    
+    if y_is_callable:
+        try:
+            import inspect
+            source = inspect.getsource(y_func)
+            if 'lambda' in source:
+                lambda_part = source.split('lambda', 1)[1]
+                if ':' in lambda_part:
+                    expr = lambda_part.split(':', 1)[1].strip()
+                    expr = expr.rstrip(',').rstrip(')').rstrip().strip()
+                    while (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
+                        expr = expr[1:-1].strip()
+                    expr = ' '.join(expr.split())
+                    y_func_string = expr
+                    y_func = expr  # Use extracted expression
+        except:
+            pass  # Will evaluate at points
+    
+    # If we successfully extracted both expressions, use them
+    if x_func_string is not None and y_func_string is not None:
+        if color is not None:
+            return __yudimath_plot_parametric(x_func_string, y_func_string, t_min, t_max, color)
+        else:
+            return __yudimath_plot_parametric(x_func_string, y_func_string, t_min, t_max)
+    
+    # Otherwise, evaluate callables at points
+    # Use adaptive sampling similar to plot()
+    try:
+        import numpy as np
+        t_range = t_max - t_min
+        
+        # Calculate optimal number of points based on range and zoom
+        pixels_covered = t_range * _pixels_per_unit
+        
+        # Initial sampling: adapt to zoom level
+        if _is_slider_change:
+            # Slider change - use minimal sampling
+            points_per_pixel = 0.15
+            initial_n = max(50, int(pixels_covered * points_per_pixel))
+            initial_n = min(initial_n, 150)
+        elif _pixels_per_unit > 200:
+            points_per_pixel = 8.0
+            initial_n = max(5000, int(pixels_covered * points_per_pixel))
+            initial_n = min(initial_n, 30000)
+        elif _pixels_per_unit > 100:
+            points_per_pixel = 6.0
+            initial_n = max(3000, int(pixels_covered * points_per_pixel))
+            initial_n = min(initial_n, 25000)
+        elif _pixels_per_unit > 50:
+            points_per_pixel = 5.0
+            initial_n = max(2000, int(pixels_covered * points_per_pixel))
+            initial_n = min(initial_n, 15000)
+        else:
+            points_per_pixel = 4.0
+            initial_n = max(1000, int(pixels_covered * points_per_pixel))
+            initial_n = min(initial_n, 6000)
+        
+        # Evaluate functions at t values
+        points = []
+        t_samples = np.linspace(t_min, t_max, initial_n)
+        
+        # Memoization cache for function evaluations
+        eval_cache_x = {}
+        eval_cache_y = {}
+        
+        def evaluate_x_with_cache(t):
+            t_key = round(t, 12)
+            if t_key in eval_cache_x:
+                return eval_cache_x[t_key]
+            try:
+                if x_is_callable and original_x_func is not None:
+                    val = float(original_x_func(t))
+                else:
+                    # String expression - evaluate using eval (with t in namespace)
+                    val = float(eval(x_func, {'t': t, 'np': np, 'math': __import__('math'), 'sin': np.sin, 'cos': np.cos, 'tan': np.tan, 'exp': np.exp, 'log': np.log, 'sqrt': np.sqrt, 'abs': abs}))
+                if np.isfinite(val):
+                    eval_cache_x[t_key] = val
+                    return val
+                else:
+                    eval_cache_x[t_key] = None
+                    return None
+            except:
+                eval_cache_x[t_key] = None
+                return None
+        
+        def evaluate_y_with_cache(t):
+            t_key = round(t, 12)
+            if t_key in eval_cache_y:
+                return eval_cache_y[t_key]
+            try:
+                if y_is_callable and original_y_func is not None:
+                    val = float(original_y_func(t))
+                else:
+                    # String expression - evaluate using eval (with t in namespace)
+                    val = float(eval(y_func, {'t': t, 'np': np, 'math': __import__('math'), 'sin': np.sin, 'cos': np.cos, 'tan': np.tan, 'exp': np.exp, 'log': np.log, 'sqrt': np.sqrt, 'abs': abs}))
+                if np.isfinite(val):
+                    eval_cache_y[t_key] = val
+                    return val
+                else:
+                    eval_cache_y[t_key] = None
+                    return None
+            except:
+                eval_cache_y[t_key] = None
+                return None
+        
+        # Evaluate at all t samples
+        for t in t_samples:
+            x_val = evaluate_x_with_cache(t)
+            y_val = evaluate_y_with_cache(t)
+            if x_val is not None and y_val is not None:
+                points.append([float(x_val), float(y_val)])
+        
+        if len(points) == 0:
+            raise ValueError(f"plot_parametric() could not evaluate functions at any points in range [{t_min}, {t_max}]")
+        
+        # Convert to JavaScript-compatible format
+        points_list = [[float(p[0]), float(p[1])] for p in points]
+        
+        # Pass points to JavaScript
+        if color is not None:
+            return __yudimath_plot_parametric_points(points_list, t_min, t_max, color)
+        else:
+            return __yudimath_plot_parametric_points(points_list, t_min, t_max)
+            
+    except Exception as e:
+        print(f"[plot_parametric wrapper] Evaluation failed: {e}")
+        raise ValueError(f"plot_parametric() could not evaluate functions. Error: {str(e)}")
 `
       for (const name of functionNames) {
         pyodide.globals.set(`__yudimath_${name}`, jsFunctions[name])
