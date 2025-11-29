@@ -5,6 +5,7 @@ import {
 } from './frameTransforms'
 import { drawSmoothCurve } from './curveDrawing'
 import { findContourPoints } from './contourFinding'
+import { getCachedImplicitPoints, cacheImplicitPoints } from './implicitCache'
 
 /**
  * Draw implicit plots defined in a frame
@@ -43,8 +44,19 @@ export function drawFrameImplicitPlots(
       ctx.globalAlpha = 0.9
       ctx.beginPath()
       
-      // If points are provided, use them directly (for pre-computed contours)
-      if (plot.points && plot.points.length > 0) {
+      // Check cache first if we have a cache key
+      let pointsToUse = plot.points
+      if (!pointsToUse && plot.cacheKey) {
+        const cached = getCachedImplicitPoints(plot.cacheKey)
+        if (cached) {
+          pointsToUse = cached
+          // Update plot with cached points (but don't mutate the original)
+          plot = { ...plot, points: cached }
+        }
+      }
+
+      // If points are provided (from cache or pre-computed), use them directly
+      if (pointsToUse && pointsToUse.length > 0) {
         drawImplicitFromPoints(ctx, plot, transformToScreen, effectiveZoom)
       } else if (plot.equation && plot.equation.length > 0) {
         // Find contours using marching squares algorithm
@@ -210,15 +222,46 @@ function drawImplicitFromExpression(
   // Scale resolution with zoom: at zoom 1.0 use base, at zoom 10.0 use ~3x base
   const gridResolution = Math.min(1000, Math.round(baseResolution * Math.max(1.0, Math.sqrt(effectiveZoom))))
   
-  // Find contour points using marching squares
-  console.log('[drawImplicitFromExpression] Finding contours for equation:', equation, 'range:', xMin, xMax, yMin, yMax, 'resolution:', gridResolution)
+  // Check cache first if we have a cache key
   let contours: Point2D[][]
-  try {
-    contours = findContourPoints(equation, xMin, xMax, yMin, yMax, gridResolution, 3)
-    console.log('[drawImplicitFromExpression] Found', contours.length, 'contour segments with', contours.reduce((sum, c) => sum + c.length, 0), 'total points')
-  } catch (error) {
-    console.error('[drawImplicitFromExpression] Error finding contours:', error)
-    return
+  const cacheKey = plot.cacheKey
+  
+  if (cacheKey) {
+    const cached = getCachedImplicitPoints(cacheKey)
+    if (cached) {
+      // Use cached points - convert flat array back to contours
+      // For simplicity, treat all cached points as a single contour
+      contours = [cached]
+      console.log('[drawImplicitFromExpression] Using cached points:', cached.length, 'points')
+    } else {
+      // Find contours using marching squares
+      console.log('[drawImplicitFromExpression] Finding contours for equation:', equation, 'range:', xMin, xMax, yMin, yMax, 'resolution:', gridResolution)
+      try {
+        contours = findContourPoints(equation, xMin, xMax, yMin, yMax, gridResolution, 3)
+        const totalPoints = contours.reduce((sum, c) => sum + c.length, 0)
+        console.log('[drawImplicitFromExpression] Found', contours.length, 'contour segments with', totalPoints, 'total points')
+        
+        // Cache the flattened points
+        const flatPoints: Array<[number, number]> = []
+        for (const contour of contours) {
+          flatPoints.push(...contour)
+        }
+        cacheImplicitPoints(cacheKey, flatPoints)
+      } catch (error) {
+        console.error('[drawImplicitFromExpression] Error finding contours:', error)
+        return
+      }
+    }
+  } else {
+    // No cache key - find contours normally
+    console.log('[drawImplicitFromExpression] Finding contours for equation:', equation, 'range:', xMin, xMax, yMin, yMax, 'resolution:', gridResolution)
+    try {
+      contours = findContourPoints(equation, xMin, xMax, yMin, yMax, gridResolution, 3)
+      console.log('[drawImplicitFromExpression] Found', contours.length, 'contour segments with', contours.reduce((sum, c) => sum + c.length, 0), 'total points')
+    } catch (error) {
+      console.error('[drawImplicitFromExpression] Error finding contours:', error)
+      return
+    }
   }
   
   // Make gap threshold zoom-aware for string expressions too

@@ -786,7 +786,8 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
             # and find zero-crossings, then pass contour points to JavaScript
             try:
                 # Create a grid and evaluate the function
-                grid_resolution = 200  # Increased resolution for better quality
+                # Increased resolution to 300 for better quality while maintaining performance
+                grid_resolution = 300
                 dx = (x_max - x_min) / grid_resolution
                 dy = (y_max - y_min) / grid_resolution
                 
@@ -2139,7 +2140,8 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
             # and find zero-crossings, then pass contour points to JavaScript
             try:
                 # Create a grid and evaluate the function
-                grid_resolution = 200  # Increased resolution for better quality
+                # Increased resolution to 300 for better quality while maintaining performance
+                grid_resolution = 300
                 dx = (x_max - x_min) / grid_resolution
                 dy = (y_max - y_min) / grid_resolution
                 

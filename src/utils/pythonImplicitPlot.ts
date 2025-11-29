@@ -87,6 +87,9 @@ export const plotImplicitImplementation: FunctionImplementation = (
   const avgRange = (xRange + yRange) / 2
   const optimalPoints = Math.max(50, Math.min(500, Math.round(avgRange * 50)))
 
+  // Generate cache key from equation, range, and resolution
+  const cacheKey = `implicit_${equationString}_${xMin}_${xMax}_${yMin}_${yMax}_${optimalPoints}`
+
   const implicitPlot: Omit<ImplicitPlot, 'id'> = {
     equation: equationString,
     xMin,
@@ -95,6 +98,7 @@ export const plotImplicitImplementation: FunctionImplementation = (
     yMax,
     color,
     numPoints: optimalPoints,
+    cacheKey,
   }
 
   console.log('[plotImplicitImplementation] Storing implicit plot:', {
@@ -105,6 +109,7 @@ export const plotImplicitImplementation: FunctionImplementation = (
     yMax,
     color,
     numPoints: optimalPoints,
+    cacheKey,
   })
 
   storeImplicitPlot(implicitPlot)

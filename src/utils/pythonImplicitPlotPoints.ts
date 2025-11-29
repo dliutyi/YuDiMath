@@ -129,6 +129,9 @@ export const plotImplicitPointsImplementation: FunctionImplementation = (
     yMax,
     color,
     points, // Store points directly
+    numPoints: points.length,
+    // Generate cache key from range and point count
+    cacheKey: `implicit_points_${xMin}_${xMax}_${yMin}_${yMax}_${points.length}`,
   }
 
   storeImplicitPlot(implicitPlot)
