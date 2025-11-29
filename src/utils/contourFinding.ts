@@ -82,6 +82,16 @@ export function findContourPoints(
         continue
       }
       
+      // Check if cell is near origin for adaptive refinement
+      const x0 = xMin + j * dx
+      const y0 = yMin + i * dy
+      const x1 = x0 + dx
+      const y1 = y0 + dy
+      const cellCenterX = (x0 + x1) / 2
+      const cellCenterY = (y0 + y1) / 2
+      const distFromOrigin = Math.sqrt(cellCenterX ** 2 + cellCenterY ** 2)
+      const isNearOrigin = distFromOrigin < nearOriginThreshold
+      
       // Check for zero-crossings
       const signs = [
         Math.sign(v00),
