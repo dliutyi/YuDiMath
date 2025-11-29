@@ -6,7 +6,7 @@ import { frameToScreen, screenToFrame, screenToNestedFrame } from '../utils/fram
 import { drawGrid, drawAxes } from '../utils/canvasDrawing'
 import { useCanvasZoom } from '../hooks/useCanvasZoom'
 import { useCanvasDrawing } from '../hooks/useCanvasDrawing'
-import { MIN_ZOOM, MAX_ZOOM, FRAME_MIN_ZOOM, FRAME_MAX_ZOOM } from '../utils/constants'
+import { MIN_ZOOM, MAX_ZOOM, FRAME_MIN_ZOOM, FRAME_MAX_ZOOM, PAN_SPEED_MULTIPLIER } from '../utils/constants'
 
 interface CanvasProps {
   viewport: ViewportState
@@ -42,6 +42,8 @@ function Canvas({
   const isPanningRef = useRef(false)
   const lastPanPointRef = useRef<{ x: number; y: number } | null>(null)
   const panningFrameRef = useRef<string | null>(null)
+  const lastPanTimeRef = useRef<number | null>(null)  // Track time for velocity calculation
+  const panVelocityRef = useRef<{ vx: number; vy: number } | null>(null)  // Track pan velocity
 
   // Use hooks for zoom and drawing
   useCanvasZoom({
@@ -406,6 +408,8 @@ function Canvas({
       }
       isPanningRef.current = true
       lastPanPointRef.current = { x: screenX, y: screenY }
+      lastPanTimeRef.current = Date.now()
+      panVelocityRef.current = { vx: 0, vy: 0 }  // Initialize velocity
     }
     e.preventDefault()
   }, [isDrawing, viewport, width, height, frames, onFrameSelected, onFrameViewportChange])
@@ -427,9 +431,32 @@ function Canvas({
       return
     }
 
-    if (isPanningRef.current && lastPanPointRef.current) {
+    if (isPanningRef.current && lastPanPointRef.current && lastPanTimeRef.current) {
       // Panning - check if inside a frame
       const currentPoint = { x: screenX, y: screenY }
+      const currentTime = Date.now()
+      const deltaTime = Math.max(1, currentTime - lastPanTimeRef.current)  // Avoid division by zero
+      
+      // Calculate mouse velocity (pixels per millisecond)
+      const screenDeltaX = currentPoint.x - lastPanPointRef.current.x
+      const screenDeltaY = currentPoint.y - lastPanPointRef.current.y
+      const velocityX = screenDeltaX / deltaTime
+      const velocityY = screenDeltaY / deltaTime
+      
+      // Update velocity with exponential smoothing for stability
+      if (panVelocityRef.current) {
+        const smoothing = 0.3  // Smoothing factor (0-1, lower = more smoothing)
+        panVelocityRef.current.vx = panVelocityRef.current.vx * (1 - smoothing) + velocityX * smoothing
+        panVelocityRef.current.vy = panVelocityRef.current.vy * (1 - smoothing) + velocityY * smoothing
+      } else {
+        panVelocityRef.current = { vx: velocityX, vy: velocityY }
+      }
+      
+      // Calculate velocity magnitude for speed-based multiplier
+      const velocityMagnitude = Math.sqrt(velocityX * velocityX + velocityY * velocityY)
+      // Apply speed multiplier: faster movement = more responsive panning
+      // Use a curve: 1.0 at low speed, up to PAN_SPEED_MULTIPLIER at high speed
+      const speedFactor = 1.0 + (PAN_SPEED_MULTIPLIER - 1.0) * Math.min(1.0, velocityMagnitude / 2.0)  // Normalize to ~2 px/ms max
       
       if (panningFrameRef.current && onFrameViewportChange) {
         // Panning inside a frame - update frame viewport
@@ -476,8 +503,12 @@ function Canvas({
           // But we need to account for frame zoom: when zoomed in, a pixel movement
           // should correspond to less movement in frame coordinates
           const frameZoom = frame.viewport.zoom
-          const deltaX = (lastFrame[0] - currentFrame[0]) / frameZoom
-          const deltaY = (lastFrame[1] - currentFrame[1]) / frameZoom
+          let deltaX = (lastFrame[0] - currentFrame[0]) / frameZoom
+          let deltaY = (lastFrame[1] - currentFrame[1]) / frameZoom
+          
+          // Apply speed multiplier for velocity-aware panning
+          deltaX *= speedFactor
+          deltaY *= speedFactor
           
           // Update frame viewport
           onFrameViewportChange(frame.id, {
@@ -505,8 +536,12 @@ function Canvas({
         )
 
         // Calculate pan delta in world coordinates
-        const deltaX = lastWorld[0] - currentWorld[0]
-        const deltaY = lastWorld[1] - currentWorld[1]
+        let deltaX = lastWorld[0] - currentWorld[0]
+        let deltaY = lastWorld[1] - currentWorld[1]
+
+        // Apply speed multiplier for velocity-aware panning
+        deltaX *= speedFactor
+        deltaY *= speedFactor
 
         // Update viewport
         onViewportChange({
@@ -517,6 +552,7 @@ function Canvas({
       }
 
       lastPanPointRef.current = currentPoint
+      lastPanTimeRef.current = currentTime
     }
     e.preventDefault()
   }, [isDrawing, drawingRect, viewport, onViewportChange, onFrameViewportChange, frames, width, height])
@@ -541,6 +577,8 @@ function Canvas({
     isPanningRef.current = false
     lastPanPointRef.current = null
     panningFrameRef.current = null
+    lastPanTimeRef.current = null
+    panVelocityRef.current = null
   }, [isDrawing, onDrawingModeChange, width, height, handleDrawingMouseUp])
 
   const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -565,6 +603,8 @@ function Canvas({
     isPanningRef.current = false
     lastPanPointRef.current = null
     panningFrameRef.current = null
+    lastPanTimeRef.current = null
+    panVelocityRef.current = null
   }, [isDrawing, drawingRect, width, height, handleDrawingMouseUp, onDrawingModeChange])
 
 
