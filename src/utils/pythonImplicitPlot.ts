@@ -4,8 +4,25 @@ import { validateColor, isCallable } from './pythonValidation'
 
 /**
  * Implementation of plot_implicit(equation, x_min, x_max, y_min, y_max, color?) function
- * Supports both string expressions and callable functions (lambdas) for equation
- * For callables, we store a special marker and the callable will be evaluated in Python
+ * 
+ * Plots an implicit curve where f(x, y) = 0 (e.g., x² + y² = 16 creates a circle).
+ * 
+ * @param equation - Function of x and y (string expression or callable)
+ *   - String: e.g., 'x**2 + y**2 - 16' (circle)
+ *   - Lambda: e.g., lambda x, y: x**2 + y**2 - 16
+ * @param x_min - Minimum x value for search range
+ * @param x_max - Maximum x value for search range
+ * @param y_min - Minimum y value for search range
+ * @param y_max - Maximum y value for search range
+ * @param color - Optional color string (hex format, e.g., '#ff0000')
+ * 
+ * Examples:
+ *   plot_implicit('x**2 + y**2 - 16', -10, 10, -10, 10)  # Circle
+ *   plot_implicit('x**2/4 + y**2 - 1', -5, 5, -5, 5, color='#ff0000')  # Ellipse
+ *   plot_implicit(lambda x, y: x**2 + y**2 - 16, -10, 10, -10, 10)  # Circle with lambda
+ * 
+ * For callables, the Python wrapper will attempt to extract the expression or evaluate
+ * the function on a grid to find zero-crossings.
  */
 export const plotImplicitImplementation: FunctionImplementation = (
   args,

@@ -56,12 +56,19 @@ basis_matrix = np.column_stack([base_i, base_j])${parameterCode}
 #   Example: plot_parametric('sin(3*t)', 'cos(2*t)', 0, 2*np.pi)  # Lissajous curve
 #   Example: plot_parametric(lambda t: np.cos(t), lambda t: np.sin(t), 0, 2*np.pi)  # Circle (lambdas)
 #   Example: plot_parametric(lambda t: t*np.cos(t), lambda t: t*np.sin(t), 0, 4*np.pi)  # Spiral (lambdas)
+# - plot_implicit(equation, x_min, x_max, y_min, y_max, color?) - Plot an implicit curve f(x, y) = 0
+#   Example: plot_implicit('x**2 + y**2 - 16', -10, 10, -10, 10)  # Circle
+#   Example: plot_implicit('x**2/4 + y**2 - 1', -5, 5, -5, 5, color='#ff0000')  # Ellipse
+#   Example: plot_implicit('x**2 - y**2 - 1', -5, 5, -5, 5)  # Hyperbola
+#   Example: plot_implicit(lambda x, y: x**2 + y**2 - 16, -10, 10, -10, 10)  # Circle (lambda)
 
 # Example usage:
 # draw(np.array([2, 3]), color='#00ff00')
 # plot('x**2', x_min=-5, x_max=5, color='#ff00ff')
 # plot_parametric('cos(t)', 'sin(t)', 0, 2*np.pi, color='#0000ff')  # Circle
 # plot_parametric(lambda t: np.cos(t), lambda t: np.sin(t), 0, 2*np.pi)  # Circle with lambdas
+# plot_implicit('x**2 + y**2 - 16', -10, 10, -10, 10, color='#00ff00')  # Circle
+# plot_implicit(lambda x, y: x**2 + y**2 - 16, -10, 10, -10, 10)  # Circle with lambda
 `
 }
 
@@ -146,11 +153,11 @@ export function extractUserCode(code: string): string[] {
     
     // Only process lines after the marker (or if marker not found, process all)
     if (foundMarker || !code.includes(generatorMarker)) {
-      // Check if line contains draw(), plot(), or plot_parametric() calls (not commented out)
+      // Check if line contains draw(), plot(), plot_parametric(), or plot_implicit() calls (not commented out)
       // Also exclude parameter variable assignments (t1 = ..., t2 = ..., etc.)
       if (trimmed && !trimmed.startsWith('#') && 
           !trimmed.match(/^\s*t\d+\s*=\s*-?\d+\.?\d*\s*(?:#.*)?$/i) &&
-          (trimmed.includes('draw(') || trimmed.includes('plot(') || trimmed.includes('plot_parametric('))) {
+          (trimmed.includes('draw(') || trimmed.includes('plot(') || trimmed.includes('plot_parametric(') || trimmed.includes('plot_implicit('))) {
         userCode.push(line)
       }
     }
