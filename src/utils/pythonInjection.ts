@@ -2081,10 +2081,49 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
                     print(f"[plot_implicit wrapper] Extracted expression from lambda: {repr(extracted_expression)}")
         except Exception as e:
             print(f"[plot_implicit wrapper] Could not extract expression from callable: {e}")
-            # For callables that can't be extracted, we need to evaluate at grid points
-            # This is more complex for 2D, so for now we'll just pass the string representation
-            # The JavaScript side will handle evaluation
-            equation = str(equation)
+            # For callables that can't be extracted, evaluate at grid points in Python
+            # and find zero-crossings, then pass contour points to JavaScript
+            try:
+                # Create a grid and evaluate the function
+                grid_resolution = 100  # Start with moderate resolution
+                dx = (x_max - x_min) / grid_resolution
+                dy = (y_max - y_min) / grid_resolution
+                
+                # Evaluate at grid points and find zero-crossings
+                contour_points = []
+                for i in range(grid_resolution):
+                    y = y_min + i * dy
+                    for j in range(grid_resolution):
+                        x = x_min + j * dx
+                        try:
+                            # Evaluate at four corners of cell
+                            v00 = float(original_callable(x, y))
+                            v10 = float(original_callable(x + dx, y))
+                            v01 = float(original_callable(x, y + dy))
+                            v11 = float(original_callable(x + dx, y + dy))
+                            
+                            # Check for zero-crossings
+                            if np.isfinite(v00) and np.isfinite(v10) and np.isfinite(v01) and np.isfinite(v11):
+                                signs = [np.sign(v00), np.sign(v10), np.sign(v01), np.sign(v11)]
+                                # If signs differ, there's a zero-crossing
+                                if len(set(signs)) > 1:
+                                    # Approximate zero-crossing as cell center (simple approach)
+                                    # For better quality, could use linear interpolation
+                                    contour_points.append([float(x + dx/2), float(y + dy/2)])
+                        except:
+                            pass
+                
+                if len(contour_points) > 0:
+                    # Pass contour points to JavaScript
+                    if color is not None:
+                        return __yudimath_plot_implicit_points(contour_points, x_min, x_max, y_min, y_max, color)
+                    else:
+                        return __yudimath_plot_implicit_points(contour_points, x_min, x_max, y_min, y_max)
+                else:
+                    raise ValueError("plot_implicit() could not find any zero-crossings in the specified range")
+            except Exception as e2:
+                print(f"[plot_implicit wrapper] Grid evaluation failed: {e2}")
+                raise ValueError(f"plot_implicit() could not evaluate callable function. Please use a string expression like 'x**2 + y**2 - 16' instead of lambda x, y: x**2 + y**2 - 16. Error: {str(e2)}")
     
     # Pass to JavaScript implementation
     if color is not None:
