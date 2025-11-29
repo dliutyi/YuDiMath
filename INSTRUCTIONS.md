@@ -1441,7 +1441,7 @@ For each step:
 
 ---
 
-### [ ] Step 11.6: Add Implicit Plot Examples and Documentation
+### [x] Step 11.6: Add Implicit Plot Examples and Documentation
 **Task**: Add examples and update documentation for implicit plots.
 
 **Implementation**:
