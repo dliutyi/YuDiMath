@@ -147,18 +147,43 @@ function drawParametricFromExpressions(
   _canvasHeight: number
 ): void {
   const tRange = plot.tMax - plot.tMin
-  const baseNumPoints = plot.numPoints ?? Math.max(200, Math.min(2000, Math.round(tRange * 75)))
   const tMin = plot.tMin
   const tMax = plot.tMax
   const xFunc = plot.xFunc!
   const yFunc = plot.yFunc!
 
+  // Calculate pixelsPerUnit first to make baseNumPoints screen-space aware
+  const pixelsPerUnit = calculatePixelsPerUnit(transformToScreen)
+  
+  // Estimate coordinate range by sampling a few points
+  // This helps determine if we need more points for large coordinate values
+  let estimatedMaxCoord = 1
+  try {
+    const sampleT = [tMin, (tMin + tMax) / 2, tMax]
+    for (const t of sampleT) {
+      const x = evaluateParametricExpression(xFunc, t)
+      const y = evaluateParametricExpression(yFunc, t)
+      if (isFinite(x) && isFinite(y)) {
+        estimatedMaxCoord = Math.max(estimatedMaxCoord, Math.abs(x), Math.abs(y))
+      }
+    }
+  } catch (e) {
+    // If sampling fails, use default
+  }
+  
+  // Base number of points: scale with parameter range AND coordinate scale
+  // For large coordinate values, we need more points to maintain quality
+  // pixelsPerUnit already accounts for zoom, so we scale by coordinate magnitude
+  const coordinateScale = Math.max(1, estimatedMaxCoord / 10) // Scale factor for coordinates > 10
+  const baseNumPoints = plot.numPoints ?? Math.max(
+    200, 
+    Math.min(3000, Math.round(tRange * 75 * coordinateScale))
+  )
+  
   // Use adaptive sampling: collect points with adaptive density
   const validPoints: Array<{ point: Point2D; screen: Point2D }> = []
-  const maxDepth = 8 // Maximum recursion depth for adaptive sampling
-  const minStep = (tMax - tMin) / 10000 // Minimum step size to prevent infinite recursion
-
-  const pixelsPerUnit = calculatePixelsPerUnit(transformToScreen)
+  const maxDepth = 10 // Increased max depth for better quality on large values
+  const minStep = (tMax - tMin) / 20000 // Smaller min step for better precision
 
   // Adaptive sampling function
   const sampleAdaptive = (t1: number, t2: number, x1: number | null, y1: number | null, depth: number) => {
