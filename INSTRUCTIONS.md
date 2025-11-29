@@ -1186,7 +1186,7 @@ For each step:
   - `x_func`: function of t (string expression or callable) - e.g., `'sin(t)'` or `lambda t: np.sin(t)`
   - `y_func`: function of t (string expression or callable) - e.g., `'cos(t)'` or `lambda t: np.cos(t)`
   - `t_min`: minimum parameter value
-  - `t_min`: maximum parameter value
+  - `t_max`: maximum parameter value
   - `color`: optional color string
 - Design adaptive sampling strategy for parametric curves
 - Consider how to handle discontinuities in parametric curves
