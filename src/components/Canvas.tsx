@@ -465,19 +465,36 @@ function Canvas({
         }
       } else if (onViewportChange) {
         // Panning background - make the world point under the cursor follow the cursor
-        // Calculate how much the cursor moved in screen space
-        const screenDeltaX = currentPoint.x - lastPanPointRef.current.x
-        const screenDeltaY = currentPoint.y - lastPanPointRef.current.y
+        // Get the world point that was under the cursor when panning started
+        const startWorld = screenToWorld(
+          lastPanPointRef.current.x,
+          lastPanPointRef.current.y,
+          viewport,
+          canvasWidth,
+          canvasHeight
+        )
         
-        // Convert screen movement to world movement
-        // When cursor moves right (screenDeltaX > 0), we want the world to move left
-        // so the point under the cursor stays under the cursor
-        // screenToWorld: worldX = viewport.x + (screenX - centerX) / zoom
-        // So if screenX changes by deltaX, worldX changes by deltaX / zoom
-        // But we want the OLD world point to appear at the NEW screen position
-        // So we need to adjust viewport.x by -deltaX / zoom
-        const deltaX = -screenDeltaX / viewport.zoom
-        const deltaY = screenDeltaY / viewport.zoom  // Y is inverted in screen space
+        // Get the world point that is currently under the cursor (with current viewport)
+        const currentWorld = screenToWorld(
+          currentPoint.x,
+          currentPoint.y,
+          viewport,
+          canvasWidth,
+          canvasHeight
+        )
+        
+        // To make startWorld appear at the current cursor position, we need to adjust
+        // the viewport. The world point startWorld should appear at currentPoint.
+        // After adjusting viewport by deltaX, startWorld should appear at currentPoint:
+        // currentPoint = centerX + (startWorld - (viewport.x + deltaX)) * zoom
+        // Solving for deltaX:
+        // currentPoint - centerX = (startWorld - viewport.x - deltaX) * zoom
+        // (currentPoint - centerX) / zoom = startWorld - viewport.x - deltaX
+        // deltaX = startWorld - viewport.x - (currentPoint - centerX) / zoom
+        // But currentWorld = viewport.x + (currentPoint - centerX) / zoom
+        // So: deltaX = startWorld - currentWorld
+        const deltaX = startWorld[0] - currentWorld[0]
+        const deltaY = startWorld[1] - currentWorld[1]
 
         // Update viewport to keep the point under the cursor
         onViewportChange({
@@ -721,15 +738,27 @@ function Canvas({
         }
       } else if (onViewportChange) {
         // Panning background
-        // Calculate how much the touch moved in screen space
-        const screenDeltaX = currentPoint.x - lastPanPointRef.current.x
-        const screenDeltaY = currentPoint.y - lastPanPointRef.current.y
+        // Get the world point that was under the touch when panning started
+        const startWorld = screenToWorld(
+          lastPanPointRef.current.x,
+          lastPanPointRef.current.y,
+          viewport,
+          canvasWidth,
+          canvasHeight
+        )
         
-        // Convert screen movement to world movement
-        // When touch moves right (screenDeltaX > 0), we want the world to move left
-        // so the point under the touch stays under the touch
-        const deltaX = -screenDeltaX / viewport.zoom
-        const deltaY = screenDeltaY / viewport.zoom  // Y is inverted in screen space
+        // Get the world point that is currently under the touch (with current viewport)
+        const currentWorld = screenToWorld(
+          currentPoint.x,
+          currentPoint.y,
+          viewport,
+          canvasWidth,
+          canvasHeight
+        )
+        
+        // To make startWorld appear at the current touch position, adjust viewport
+        const deltaX = startWorld[0] - currentWorld[0]
+        const deltaY = startWorld[1] - currentWorld[1]
 
         onViewportChange({
           ...viewport,
