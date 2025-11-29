@@ -65,6 +65,9 @@ export function findContourPoints(
   const contours: Point2D[][] = []
   const visited = new Set<string>()
   
+  // Use adaptive refinement near origin for better quality
+  const nearOriginThreshold = Math.max(xRange, yRange) * 0.1
+  
   // Process each cell in the grid
   for (let i = 0; i < resolution; i++) {
     for (let j = 0; j < resolution; j++) {
