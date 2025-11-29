@@ -1310,7 +1310,7 @@ For each step:
 
 **Note**: This phase adds support for implicit functions where f(x, y) = 0 (e.g., x² + y² = 16 creates a circle, x² + y² - 16 = 0).
 
-### [ ] Step 11.1: Design Implicit Plot Function API
+### [x] Step 11.1: Design Implicit Plot Function API
 **Task**: Design the API for implicit plot function in Python.
 
 **Implementation**:
@@ -1332,7 +1332,7 @@ For each step:
 
 ---
 
-### [ ] Step 11.2: Implement Implicit Plot Function Registration
+### [x] Step 11.2: Implement Implicit Plot Function Registration
 **Task**: Register `plot_implicit` function in the Python function registry.
 
 **Implementation**:
