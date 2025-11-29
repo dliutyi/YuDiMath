@@ -26,6 +26,10 @@ export function drawFrameImplicitPlots(
   const transformToScreen = frame.parentFrameId
     ? (point: Point2D): Point2D => nestedFrameToScreen(point, frame, allFrames, viewport, canvasWidth, canvasHeight)
     : (point: Point2D): Point2D => frameToScreen(point, frame, viewport, canvasWidth, canvasHeight)
+  
+  // Calculate effective zoom level for adaptive gap detection
+  // Higher zoom = more detail = allow larger gaps (points are closer in world space)
+  const effectiveZoom = viewport.zoom * frame.viewport.zoom
 
   // Draw each implicit plot
   frame.implicitPlots.forEach((plot: ImplicitPlot) => {
@@ -41,10 +45,10 @@ export function drawFrameImplicitPlots(
       
       // If points are provided, use them directly (for pre-computed contours)
       if (plot.points && plot.points.length > 0) {
-        drawImplicitFromPoints(ctx, plot, transformToScreen)
+        drawImplicitFromPoints(ctx, plot, transformToScreen, effectiveZoom)
       } else if (plot.equation && plot.equation.length > 0) {
         // Find contours using marching squares algorithm
-        drawImplicitFromExpression(ctx, plot, transformToScreen)
+        drawImplicitFromExpression(ctx, plot, transformToScreen, effectiveZoom)
       } else {
         // Skip if no valid data
         console.warn('[drawFrameImplicitPlots] Skipping implicit plot with no points or equation:', plot)
@@ -68,7 +72,8 @@ export function drawFrameImplicitPlots(
 function drawImplicitFromPoints(
   ctx: CanvasRenderingContext2D,
   plot: ImplicitPlot,
-  transformToScreen: (point: Point2D) => Point2D
+  transformToScreen: (point: Point2D) => Point2D,
+  effectiveZoom: number = 1.0
 ): void {
   if (!plot.points || plot.points.length === 0) {
     return
@@ -82,7 +87,10 @@ function drawImplicitFromPoints(
   // Note: For implicit plots, points may represent multiple disconnected contours
   // We'll draw them as separate segments, breaking at NaN points or large gaps
   const screenPoints: Point2D[] = []
-  const maxScreenGap = 30 // pixels - break curve if gap is larger than this
+  // Make gap threshold zoom-aware: higher zoom = more detail = allow larger gaps
+  // At zoom 1.0, use 30 pixels. At zoom 10.0, use 60 pixels (2x more tolerant)
+  const baseGapThreshold = 30
+  const maxScreenGap = baseGapThreshold * Math.max(1.0, Math.sqrt(effectiveZoom))
   
   for (let i = 0; i < sortedPoints.length; i++) {
     const point = sortedPoints[i]
