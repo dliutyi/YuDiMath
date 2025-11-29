@@ -865,8 +865,58 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
                                         contour_points.append([float(x_interp), float(py1)])
                 
                 if len(contour_points) > 0:
+                    # Sort and connect points into continuous contours
+                    # Group nearby points together to form continuous curves
+                    sorted_contours = []
+                    remaining_points = contour_points.copy()
+                    
+                    while len(remaining_points) > 0:
+                        # Start a new contour with the first remaining point
+                        current_contour = [remaining_points.pop(0)]
+                        
+                        # Try to extend the contour by finding nearby points
+                        max_distance = max(dx, dy) * 2.0  # Connect points within 2 cell sizes
+                        changed = True
+                        while changed and len(remaining_points) > 0:
+                            changed = False
+                            best_idx = None
+                            best_dist = max_distance
+                            
+                            # Find the closest point to either end of the current contour
+                            for idx, point in enumerate(remaining_points):
+                                # Distance to start of contour
+                                dist_start = np.sqrt((point[0] - current_contour[0][0])**2 + (point[1] - current_contour[0][1])**2)
+                                # Distance to end of contour
+                                dist_end = np.sqrt((point[0] - current_contour[-1][0])**2 + (point[1] - current_contour[-1][1])**2)
+                                
+                                min_dist = min(dist_start, dist_end)
+                                if min_dist < best_dist:
+                                    best_dist = min_dist
+                                    best_idx = idx
+                            
+                            if best_idx is not None:
+                                point = remaining_points.pop(best_idx)
+                                # Add to the closer end
+                                dist_start = np.sqrt((point[0] - current_contour[0][0])**2 + (point[1] - current_contour[0][1])**2)
+                                dist_end = np.sqrt((point[0] - current_contour[-1][0])**2 + (point[1] - current_contour[-1][1])**2)
+                                
+                                if dist_start < dist_end:
+                                    current_contour.insert(0, point)  # Add to start
+                                else:
+                                    current_contour.append(point)  # Add to end
+                                changed = True
+                        
+                        if len(current_contour) >= 2:
+                            sorted_contours.append(current_contour)
+                    
+                    # Flatten all contours into a single list for JavaScript
+                    # JavaScript will handle drawing them as separate segments
+                    all_points = []
+                    for contour in sorted_contours:
+                        all_points.extend(contour)
+                    
                     # Convert to JavaScript-compatible format (list of lists)
-                    points_list = [[float(p[0]), float(p[1])] for p in contour_points]
+                    points_list = [[float(p[0]), float(p[1])] for p in all_points]
                     # Pass contour points to JavaScript
                     if color is not None:
                         return _yudimath.plot_implicit_points(points_list, x_min, x_max, y_min, y_max, color)
