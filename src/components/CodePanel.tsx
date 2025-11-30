@@ -5,7 +5,7 @@ import { highlight, languages } from 'prismjs'
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
 import { usePyScript } from '../hooks/usePyScript'
-import type { CoordinateFrame, Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill } from '../types'
+import type { CoordinateFrame, Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill, FormulaLabel } from '../types'
 
 interface CodePanelProps {
   selectedFrame: CoordinateFrame | null
@@ -16,11 +16,13 @@ interface CodePanelProps {
   onParametricPlotsUpdate?: (frameId: string, parametricPlots: ParametricPlot[], replace?: boolean) => void
   onImplicitPlotsUpdate?: (frameId: string, implicitPlots: ImplicitPlot[], replace?: boolean) => void
   onDeterminantFillsUpdate?: (frameId: string, determinantFills: DeterminantFill[], replace?: boolean) => void
+  onFormulasUpdate?: (frameId: string, formulas: FormulaLabel[], replace?: boolean) => void
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
   onParametricPlotsClear?: (frameId: string) => void
   onImplicitPlotsClear?: (frameId: string) => void
   onDeterminantFillsClear?: (frameId: string) => void
+  onFormulasClear?: (frameId: string) => void
   externalExecutionResult?: { success: boolean; error?: string } | null // Execution result from external (auto-execution)
   onExecutionErrorChange?: (hasError: boolean) => void // Callback to notify parent of error state changes
 }
@@ -45,11 +47,13 @@ function CodePanel({
   onParametricPlotsUpdate,
   onImplicitPlotsUpdate,
   onDeterminantFillsUpdate,
+  onFormulasUpdate,
   onVectorsClear,
   onFunctionsClear,
   onParametricPlotsClear,
   onImplicitPlotsClear,
   onDeterminantFillsClear,
+  onFormulasClear,
   externalExecutionResult,
   onExecutionErrorChange,
 }: CodePanelProps) {
@@ -377,6 +381,7 @@ function CodePanel({
       const newParametricPlots: ParametricPlot[] = []
       const newImplicitPlots: ImplicitPlot[] = []
       const newDeterminantFills: DeterminantFill[] = []
+      const newFormulas: FormulaLabel[] = []
       const result = await executeCode(
         codeToExecute,
         selectedFrame.id,
@@ -415,6 +420,14 @@ function CodePanel({
             id: generateId('det'),
           } as DeterminantFill)
         },
+              // onFormulaCreated callback
+              (formula) => {
+                const formulaWithId = {
+                  ...formula,
+                  id: generateId('formula'),
+                } as FormulaLabel
+                newFormulas.push(formulaWithId)
+              },
         estimatedCanvasWidth,
         estimatedCanvasHeight,
         pixelsPerUnit
@@ -440,6 +453,9 @@ function CodePanel({
           if (onDeterminantFillsClear) {
             onDeterminantFillsClear(selectedFrame.id)
           }
+          if (onFormulasClear) {
+            onFormulasClear(selectedFrame.id)
+          }
         })
         
         // Then atomically replace with new ones
@@ -459,6 +475,9 @@ function CodePanel({
           }
           if (onDeterminantFillsUpdate) {
             onDeterminantFillsUpdate(selectedFrame.id, newDeterminantFills, true)
+          }
+          if (onFormulasUpdate) {
+            onFormulasUpdate(selectedFrame.id, newFormulas, true)
           }
         })
         

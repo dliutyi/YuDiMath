@@ -4,19 +4,19 @@
 
 ---
 
-### [ ] Step 15.1: Design LaTeX Formula Rendering API
+### [x] Step 15.1: Design LaTeX Formula Rendering API
 **Task**: Design the API for rendering LaTeX formatted formulas at specific coordinates.
 
 **Implementation**:
 - Design function signature: `show_formula(formula, x, y, color?, size?)`
   - `formula`: LaTeX string expression - e.g., `r'\frac{a}{b}'`, `r'x^2 + y^2 = r^2'`
-  - `x`, `y`: coordinates in frame coordinate system where formula should be displayed
-  - `color`: optional color string (default: text primary color)
-  - `size`: optional font size (default: 16px)
-- Research LaTeX rendering libraries for browser (e.g., KaTeX, MathJax)
-- Consider rendering approach (canvas text vs HTML overlay)
+  - `x`, `y`: coordinates in frame coordinate system where formula should be displayed (position relative to frame)
+  - `color`: optional color string (default: text primary color '#1f2937')
+  - `size`: optional base font size in pixels (default: 16px, will be adjusted by zoom levels)
+- Research LaTeX rendering libraries for browser (e.g., KaTeX, MathJax) - **Selected KaTeX for performance**
+- Consider rendering approach (canvas text vs HTML overlay) - **Using html2canvas to render KaTeX to canvas**
 - Document expected behavior and LaTeX syntax support
-- Consider coordinate system (formula position relative to frame or background)
+- Consider coordinate system (formula position relative to frame or background) - **Position is relative to frame**
 
 **Tests**:
 - Verify API design is clear and intuitive
@@ -27,16 +27,16 @@
 
 ---
 
-### [ ] Step 15.2: Implement LaTeX Rendering Library Integration
+### [x] Step 15.2: Implement LaTeX Rendering Library Integration
 **Task**: Integrate LaTeX rendering library (KaTeX or MathJax) into the application.
 
 **Implementation**:
-- Install and configure LaTeX rendering library (prefer KaTeX for performance)
-- Add library to `public/index.html` or bundle with application
-- Create LaTeX rendering utility function
-- Support common LaTeX syntax (fractions, superscripts, subscripts, Greek letters, etc.)
-- Handle rendering errors gracefully (invalid LaTeX syntax)
-- Consider caching rendered formulas for performance
+- Install and configure LaTeX rendering library (prefer KaTeX for performance) - **Installed KaTeX and html2canvas via npm**
+- Add library to `public/index.html` or bundle with application - **Bundled with application via imports**
+- Create LaTeX rendering utility function - **Created `formulaDrawing.ts` with caching support**
+- Support common LaTeX syntax (fractions, superscripts, subscripts, Greek letters, etc.) - **KaTeX supports all common syntax**
+- Handle rendering errors gracefully (invalid LaTeX syntax) - **Errors are caught and logged, formulas skipped on failure**
+- Consider caching rendered formulas for performance - **Implemented formula cache with expiration**
 
 **Tests**:
 - Test library loads correctly
@@ -49,25 +49,15 @@
 
 ---
 
-### [ ] Step 15.3: Implement show_formula Function Registration
+### [x] Step 15.3: Implement show_formula Function Registration
 **Task**: Register `show_formula` function in the Python function registry.
 
 **Implementation**:
-- Add `showFormulaImplementation` to appropriate module (e.g., `src/utils/pythonFormula.ts`)
-- Register function as `'show_formula'` in function registry
-- Validate parameters (formula, x, y, color, size)
-- Store formula data in frame state
-- Add `FormulaLabel` type to `src/types/index.ts`:
-  ```typescript
-  interface FormulaLabel {
-    id: string
-    formula: string  // LaTeX string
-    x: number
-    y: number
-    color?: string
-    size?: number
-  }
-  ```
+- Add `showFormulaImplementation` to appropriate module (e.g., `src/utils/pythonFormula.ts`) - **Created `pythonFormula.ts`**
+- Register function as `'show_formula'` in function registry - **Registered in `pythonFunctions.ts`**
+- Validate parameters (formula, x, y, color, size) - **All parameters validated**
+- Store formula data in frame state - **Added `formulas` array to `CoordinateFrame`**
+- Add `FormulaLabel` type to `src/types/index.ts` - **Added with all required fields**
 
 **Tests**:
 - Test function registration
@@ -79,20 +69,19 @@
 
 ---
 
-### [ ] Step 15.4: Implement Formula Rendering in Frames
+### [x] Step 15.4: Implement Formula Rendering in Frames
 **Task**: Render LaTeX formulas at specified coordinates in frames.
 
 **Implementation**:
-- Add formula rendering to frame drawing logic
-- Transform formula coordinates to frame coordinate system
-- Render LaTeX formulas at specified positions
-- Apply formula colors and sizes
-- Support multiple formulas per frame
-- Handle formulas that extend outside frame bounds
+- Add formula rendering to frame drawing logic - **Integrated `drawFrameFormulas` into `frameDrawing.ts`**
+- Transform formula coordinates to frame coordinate system - **Uses `frameToScreen` and `nestedFrameToScreen` for positioning relative to frame**
+- Render LaTeX formulas at specified positions - **Rendered using KaTeX + html2canvas, cached for performance**
+- Apply formula colors and sizes - **Colors and sizes applied, font size adjusts based on zoom**
+- Support multiple formulas per frame - **All formulas in frame.formulas array are rendered**
+- Handle formulas that extend outside frame bounds - **Formulas are clipped by frame bounds**
 - Consider rendering approach:
-  - Option 1: Render to canvas using library's canvas API
-  - Option 2: Use HTML overlay with positioned elements (may require z-index management)
-- Ensure formulas scale correctly with frame zoom
+  - **Selected: html2canvas approach** - KaTeX renders to HTML, html2canvas converts to image, cached and drawn on canvas
+- Ensure formulas scale correctly with frame zoom - **Font size adjusts based on both main grid zoom (`viewport.zoom`) and frame zoom (`frame.viewport.zoom`)**
 
 **Tests**:
 - Test formula rendering at various coordinates

@@ -7,6 +7,7 @@ import { drawGrid, drawAxes } from '../utils/canvasDrawing'
 import { useCanvasZoom } from '../hooks/useCanvasZoom'
 import { useCanvasDrawing } from '../hooks/useCanvasDrawing'
 import { MIN_ZOOM, MAX_ZOOM, FRAME_MIN_ZOOM, FRAME_MAX_ZOOM } from '../utils/constants'
+import { setFormulaRedrawCallback } from '../utils/formulaDrawing'
 
 interface CanvasProps {
   viewport: ViewportState
@@ -264,6 +265,16 @@ function Canvas({
       }
     }
   }, [scheduleRedraw, viewport, width, height, topLevelFrames, frames, selectedFrameId, drawingRect])
+
+  // Set up formula redraw callback
+  useEffect(() => {
+    setFormulaRedrawCallback(() => {
+      scheduleRedraw()
+    })
+    return () => {
+      setFormulaRedrawCallback(null)
+    }
+  }, [scheduleRedraw])
 
   // Also redraw on window resize
   useEffect(() => {

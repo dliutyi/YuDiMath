@@ -6,7 +6,7 @@ import {
   injectFunctionsIntoPyodide,
   updateCanvasInfoInPyodide,
 } from '../utils/pythonFunctions'
-import type { Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill } from '../types'
+import type { Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill, FormulaLabel } from '../types'
 
 interface PyScriptError {
   message: string
@@ -24,6 +24,7 @@ interface UsePyScriptReturn {
     onParametricPlotCreated?: (plot: Omit<ParametricPlot, 'id'>) => void,
     onImplicitPlotCreated?: (plot: Omit<ImplicitPlot, 'id'>) => void,
     onDeterminantFillCreated?: (fill: Omit<DeterminantFill, 'id'>) => void,
+    onFormulaCreated?: (formula: Omit<FormulaLabel, 'id'>) => void,
     canvasWidth?: number,
     canvasHeight?: number,
     pixelsPerUnit?: number,
@@ -49,6 +50,7 @@ let executionQueue: Array<{
   onParametricPlotCreated?: (plot: Omit<ParametricPlot, 'id'>) => void
   onImplicitPlotCreated?: (plot: Omit<ImplicitPlot, 'id'>) => void
   onDeterminantFillCreated?: (fill: Omit<DeterminantFill, 'id'>) => void
+  onFormulaCreated?: (formula: Omit<FormulaLabel, 'id'>) => void
   canvasWidth?: number
   canvasHeight?: number
   pixelsPerUnit?: number
@@ -250,6 +252,7 @@ export function usePyScript(): UsePyScriptReturn {
             item.onParametricPlotCreated,
             item.onImplicitPlotCreated,
             item.onDeterminantFillCreated,
+            item.onFormulaCreated,
             item.canvasWidth,
             item.canvasHeight,
             item.pixelsPerUnit
@@ -263,6 +266,7 @@ export function usePyScript(): UsePyScriptReturn {
             item.onParametricPlotCreated,
             item.onImplicitPlotCreated,
             item.onDeterminantFillCreated,
+            item.onFormulaCreated,
             item.canvasWidth,
             item.canvasHeight,
             item.pixelsPerUnit
@@ -392,6 +396,7 @@ export function usePyScript(): UsePyScriptReturn {
       onParametricPlotCreated?: (plot: Omit<ParametricPlot, 'id'>) => void,
       onImplicitPlotCreated?: (plot: Omit<ImplicitPlot, 'id'>) => void,
       onDeterminantFillCreated?: (fill: Omit<DeterminantFill, 'id'>) => void,
+      onFormulaCreated?: (formula: Omit<FormulaLabel, 'id'>) => void,
       canvasWidth?: number,
       canvasHeight?: number,
       pixelsPerUnit?: number,
@@ -420,6 +425,7 @@ export function usePyScript(): UsePyScriptReturn {
             onParametricPlotCreated,
             onImplicitPlotCreated,
             onDeterminantFillCreated,
+            onFormulaCreated,
             canvasWidth,
             canvasHeight,
             pixelsPerUnit,

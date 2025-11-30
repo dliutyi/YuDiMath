@@ -1,7 +1,7 @@
 import { useState, useEffect, memo, useCallback } from 'react'
 import PropertiesPanel from './PropertiesPanel'
 import CodePanel from './CodePanel'
-import type { CoordinateFrame, ViewportState, Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill } from '../types'
+import type { CoordinateFrame, ViewportState, Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill, FormulaLabel } from '../types'
 
 interface FrameEditorPanelProps {
   selectedFrame: CoordinateFrame | null
@@ -14,11 +14,13 @@ interface FrameEditorPanelProps {
   onParametricPlotsUpdate?: (frameId: string, parametricPlots: ParametricPlot[], replace?: boolean) => void
   onImplicitPlotsUpdate?: (frameId: string, implicitPlots: ImplicitPlot[], replace?: boolean) => void
   onDeterminantFillsUpdate?: (frameId: string, determinantFills: DeterminantFill[], replace?: boolean) => void
+  onFormulasUpdate?: (frameId: string, formulas: FormulaLabel[], replace?: boolean) => void
   onVectorsClear?: (frameId: string) => void
   onFunctionsClear?: (frameId: string) => void
   onParametricPlotsClear?: (frameId: string) => void
   onImplicitPlotsClear?: (frameId: string) => void
   onDeterminantFillsClear?: (frameId: string) => void
+  onFormulasClear?: (frameId: string) => void
   externalExecutionResult?: { success: boolean; error?: string } | null
   onFrameDelete?: (frameId: string) => void
 }
@@ -36,11 +38,13 @@ function FrameEditorPanel({
   onParametricPlotsUpdate,
   onImplicitPlotsUpdate,
   onDeterminantFillsUpdate,
+  onFormulasUpdate,
   onVectorsClear,
   onFunctionsClear,
   onParametricPlotsClear,
   onImplicitPlotsClear,
   onDeterminantFillsClear,
+  onFormulasClear,
   externalExecutionResult,
   onFrameDelete,
 }: FrameEditorPanelProps) {
@@ -250,11 +254,13 @@ function FrameEditorPanel({
             onParametricPlotsUpdate={onParametricPlotsUpdate}
             onImplicitPlotsUpdate={onImplicitPlotsUpdate}
             onDeterminantFillsUpdate={onDeterminantFillsUpdate}
+            onFormulasUpdate={onFormulasUpdate}
             onVectorsClear={onVectorsClear}
             onFunctionsClear={onFunctionsClear}
             onParametricPlotsClear={onParametricPlotsClear}
             onImplicitPlotsClear={onImplicitPlotsClear}
             onDeterminantFillsClear={onDeterminantFillsClear}
+            onFormulasClear={onFormulasClear}
             externalExecutionResult={externalExecutionResult}
             onExecutionErrorChange={setHasExecutionError}
           />

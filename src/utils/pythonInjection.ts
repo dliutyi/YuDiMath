@@ -786,6 +786,17 @@ def fill_determinant(vector1, vector2, color=None):
     else:
         return _yudimath.fill_determinant(vector1, vector2)
 
+# Wrapper for show_formula() that handles keyword arguments
+def show_formula(formula, x, y, color=None, size=None):
+    if color is not None and size is not None:
+        return _yudimath.show_formula(formula, x, y, color, size)
+    elif color is not None:
+        return _yudimath.show_formula(formula, x, y, color)
+    elif size is not None:
+        return _yudimath.show_formula(formula, x, y, None, size)
+    else:
+        return _yudimath.show_formula(formula, x, y)
+
 # Wrapper for plot_implicit() that handles keyword arguments and callables
 def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, color=None):
     # Handle both positional and keyword arguments
@@ -2186,6 +2197,17 @@ def fill_determinant(vector1, vector2, color=None):
     else:
         return _yudimath.fill_determinant(vector1, vector2)
 
+# Wrapper for show_formula() that handles keyword arguments
+def show_formula(formula, x, y, color=None, size=None):
+    if color is not None and size is not None:
+        return _yudimath.show_formula(formula, x, y, color, size)
+    elif color is not None:
+        return _yudimath.show_formula(formula, x, y, color)
+    elif size is not None:
+        return _yudimath.show_formula(formula, x, y, None, size)
+    else:
+        return _yudimath.show_formula(formula, x, y)
+
 # Wrapper for plot_implicit() that handles keyword arguments and callables
 def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, color=None):
     # Handle both positional and keyword arguments
@@ -2328,6 +2350,17 @@ def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, colo
         return __yudimath_plot_implicit(equation, x_min, x_max, y_min, y_max, color)
     else:
         return __yudimath_plot_implicit(equation, x_min, x_max, y_min, y_max)
+
+# Wrapper for show_formula() that handles keyword arguments
+def show_formula(formula, x, y, color=None, size=None):
+    if color is not None and size is not None:
+        return __yudimath_show_formula(formula, x, y, color, size)
+    elif color is not None:
+        return __yudimath_show_formula(formula, x, y, color)
+    elif size is not None:
+        return __yudimath_show_formula(formula, x, y, None, size)
+    else:
+        return __yudimath_show_formula(formula, x, y)
 `
       for (const name of functionNames) {
         pyodide.globals.set(`__yudimath_${name}`, jsFunctions[name])

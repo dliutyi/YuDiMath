@@ -1,4 +1,4 @@
-import type { Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill } from '../types'
+import type { Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill, FormulaLabel } from '../types'
 import type { PythonFunctionCallback } from './pythonFunctions'
 import { getFunctionImplementation } from './pythonFunctionRegistry'
 import { parsePythonArgs } from './pythonArgParsing'
@@ -29,6 +29,7 @@ let storeFunctionFn: ((func: Omit<FunctionPlot, 'id'>) => void) | null = null
 let storeParametricPlotFn: ((plot: Omit<ParametricPlot, 'id'>) => void) | null = null
 let storeImplicitPlotFn: ((plot: Omit<ImplicitPlot, 'id'>) => void) | null = null
 let storeDeterminantFillFn: ((fill: Omit<DeterminantFill, 'id'>) => void) | null = null
+let storeFormulaFn: ((formula: Omit<FormulaLabel, 'id'>) => void) | null = null
 
 /**
  * Canvas and viewport information for screen-resolution-aware sampling
@@ -47,6 +48,7 @@ let canvasInfo: {
  * @param onParametricPlotCreated Optional callback to store a parametric plot
  * @param onImplicitPlotCreated Optional callback to store an implicit plot
  * @param onDeterminantFillCreated Optional callback to store a determinant fill
+ * @param onFormulaCreated Optional callback to store a formula label
  * @param canvasWidth Optional canvas width for screen-resolution-aware sampling
  * @param canvasHeight Optional canvas height for screen-resolution-aware sampling
  * @param pixelsPerUnit Optional pixels per unit in frame coordinates for optimal sampling
@@ -58,6 +60,7 @@ export function setupFunctionContext(
   onParametricPlotCreated?: (plot: Omit<ParametricPlot, 'id'>) => void,
   onImplicitPlotCreated?: (plot: Omit<ImplicitPlot, 'id'>) => void,
   onDeterminantFillCreated?: (fill: Omit<DeterminantFill, 'id'>) => void,
+  onFormulaCreated?: (formula: Omit<FormulaLabel, 'id'>) => void,
   canvasWidth?: number,
   canvasHeight?: number,
   pixelsPerUnit?: number
@@ -68,6 +71,7 @@ export function setupFunctionContext(
   storeParametricPlotFn = onParametricPlotCreated || null
   storeImplicitPlotFn = onImplicitPlotCreated || null
   storeDeterminantFillFn = onDeterminantFillCreated || null
+  storeFormulaFn = onFormulaCreated || null
   capturedCalls = []
   
   // Store canvas info for screen-resolution-aware sampling
@@ -88,6 +92,7 @@ export function clearFunctionContext(): void {
   storeParametricPlotFn = null
   storeImplicitPlotFn = null
   storeDeterminantFillFn = null
+  storeFormulaFn = null
   capturedCalls = []
   canvasInfo = null
 }
@@ -179,8 +184,11 @@ export function createPythonFunctionWrapper(name: string): PythonFunctionCallbac
         storeFunctionFn,
         storeParametricPlotFn || undefined,
         storeImplicitPlotFn || undefined,
-        storeDeterminantFillFn || undefined
+        storeDeterminantFillFn || undefined,
+        storeFormulaFn || undefined
       )
+      if (name === 'show_formula') {
+      }
     } catch (error: any) {
       throw new Error(`Error in ${name}(): ${error.message}`)
     }

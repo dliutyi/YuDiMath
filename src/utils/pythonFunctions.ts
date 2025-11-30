@@ -35,6 +35,7 @@ export { plotParametricPointsImplementation } from './pythonParametricPlotPoints
 export { plotImplicitImplementation } from './pythonImplicitPlot'
 export { plotImplicitPointsImplementation } from './pythonImplicitPlotPoints'
 export { fillDeterminantImplementation } from './pythonDeterminantFill'
+export { showFormulaImplementation } from './pythonFormula'
 
 // Import and re-export injection (will be created separately)
 import { injectFunctionsIntoPyodide } from './pythonInjection'
@@ -49,10 +50,11 @@ import { plotParametricPointsImplementation } from './pythonParametricPlotPoints
 import { plotImplicitImplementation } from './pythonImplicitPlot'
 import { plotImplicitPointsImplementation } from './pythonImplicitPlotPoints'
 import { fillDeterminantImplementation } from './pythonDeterminantFill'
+import { showFormulaImplementation } from './pythonFormula'
 
 /**
  * Initialize the predefined functions system
- * Registers default functions (draw, plot, plot_parametric, plot_implicit, fill_determinant)
+ * Registers default functions (draw, plot, plot_parametric, plot_implicit, fill_determinant, show_formula)
  */
 export function initializeFunctions(): void {
   // Register default functions
@@ -64,6 +66,7 @@ export function initializeFunctions(): void {
   registerFunction('plot_implicit', plotImplicitImplementation)
   registerFunction('plot_implicit_points', plotImplicitPointsImplementation)
   registerFunction('fill_determinant', fillDeterminantImplementation)
+  registerFunction('show_formula', showFormulaImplementation)
 }
 
 // Initialize default functions on module load

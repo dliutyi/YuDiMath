@@ -11,7 +11,7 @@ import { usePyScript, clearQueuedExecutionsForFrame } from './hooks/usePyScript'
 import { useWorkspace } from './hooks/useWorkspace'
 import { downloadWorkspace, importWorkspaceFromFile } from './utils/exportImport'
 import { debounce } from './utils/debounce'
-import type { ViewportState, CoordinateFrame, Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill, WorkspaceState } from './types'
+import type { ViewportState, CoordinateFrame, Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill, FormulaLabel, WorkspaceState } from './types'
 import { MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM, ZOOM_STEP_MULTIPLIER } from './utils/constants'
 
 function App() {
@@ -230,6 +230,20 @@ function App() {
     workspace.updateFrame(frameId, { determinantFills: [] })
   }
 
+  const handleFormulasUpdate = (frameId: string, formulas: FormulaLabel[], replace: boolean = false) => {
+    const frame = workspace.frames.find(f => f.id === frameId)
+    if (frame) {
+      const newFormulas = replace ? formulas : [...(frame.formulas || []), ...formulas]
+      workspace.updateFrame(frameId, {
+        formulas: newFormulas,
+      })
+    }
+  }
+
+  const handleFormulasClear = (frameId: string) => {
+    workspace.updateFrame(frameId, { formulas: [] })
+  }
+
   const [autoExecuteCode, setAutoExecuteCode] = useState<string | null>(null)
   const [autoExecuteFrameId, setAutoExecuteFrameId] = useState<string | null>(null)
   const isSliderTriggeredRef = useRef<boolean>(false) // Track if execution is slider-triggered
@@ -347,6 +361,7 @@ function App() {
       const newParametricPlots: ParametricPlot[] = []
       const newImplicitPlots: ImplicitPlot[] = []
       const newDeterminantFills: DeterminantFill[] = []
+      const newFormulas: FormulaLabel[] = []
       executeCode(
         codeToExecute,
         frameIdToExecute,
@@ -379,6 +394,14 @@ function App() {
             id: generateId('det'),
           } as DeterminantFill)
         },
+        // onFormulaCreated callback
+        (formula) => {
+          const formulaWithId = {
+            ...formula,
+            id: generateId('formula'),
+          } as FormulaLabel
+          newFormulas.push(formulaWithId)
+        },
         estimatedCanvasWidth,
         estimatedCanvasHeight,
         pixelsPerUnit,
@@ -398,6 +421,7 @@ function App() {
             handleFunctionsClear(frameIdToExecute)
             handleParametricPlotsClear(frameIdToExecute)
             handleImplicitPlotsClear(frameIdToExecute)
+            handleFormulasClear(frameIdToExecute)
           })
           // Then atomically replace with new ones
           // This keeps old ones visible until new ones are ready, eliminating blinking
@@ -406,6 +430,7 @@ function App() {
             handleFunctionsUpdate(frameIdToExecute, newFunctions, true)
             handleParametricPlotsUpdate(frameIdToExecute, newParametricPlots, true)
             handleImplicitPlotsUpdate(frameIdToExecute, newImplicitPlots, true)
+            handleFormulasUpdate(frameIdToExecute, newFormulas, true)
           })
         } else {
           // On error, set error result (this will be displayed)
@@ -424,6 +449,7 @@ function App() {
             handleFunctionsClear(frameIdToExecute)
             handleParametricPlotsClear(frameIdToExecute)
             handleImplicitPlotsClear(frameIdToExecute)
+            handleFormulasClear(frameIdToExecute)
           })
         }
         // Clear auto-execute trigger after execution
@@ -689,6 +715,8 @@ function App() {
           onImplicitPlotsClear={handleImplicitPlotsClear}
           onDeterminantFillsUpdate={handleDeterminantFillsUpdate}
           onDeterminantFillsClear={handleDeterminantFillsClear}
+          onFormulasUpdate={handleFormulasUpdate}
+          onFormulasClear={handleFormulasClear}
           externalExecutionResult={autoExecutionResult}
           onFrameDelete={handleFrameDelete}
         />

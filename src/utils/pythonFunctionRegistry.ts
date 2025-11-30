@@ -1,4 +1,4 @@
-import type { Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill } from '../types'
+import type { Vector, FunctionPlot, ParametricPlot, ImplicitPlot, DeterminantFill, FormulaLabel } from '../types'
 
 /**
  * Function implementation that processes arguments and stores results
@@ -10,7 +10,8 @@ export type FunctionImplementation = (
   storeFunction: (func: Omit<FunctionPlot, 'id'>) => void,
   storeParametricPlot?: (plot: Omit<ParametricPlot, 'id'>) => void,
   storeImplicitPlot?: (plot: Omit<ImplicitPlot, 'id'>) => void,
-  storeDeterminantFill?: (fill: Omit<DeterminantFill, 'id'>) => void
+  storeDeterminantFill?: (fill: Omit<DeterminantFill, 'id'>) => void,
+  storeFormula?: (formula: Omit<FormulaLabel, 'id'>) => void
 ) => void
 
 /**

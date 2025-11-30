@@ -161,6 +161,24 @@ export interface DeterminantFill {
 }
 
 /**
+ * Formula label definition - represents a LaTeX formula to be rendered at a specific position
+ */
+export interface FormulaLabel {
+  /** Unique identifier for the formula */
+  id: string
+  /** LaTeX string expression */
+  formula: string
+  /** X coordinate in frame coordinate system */
+  x: number
+  /** Y coordinate in frame coordinate system */
+  y: number
+  /** Optional color string (default: text primary color) */
+  color?: string
+  /** Optional base font size in pixels (default: 16px, will be adjusted by zoom levels) */
+  size?: number
+}
+
+/**
  * Coordinate frame - represents a viewport with its own coordinate system
  * Each frame is a rectangular region snapped to the background coordinate system
  * but has its own independent coordinate grid based on base vectors
@@ -191,6 +209,8 @@ export interface CoordinateFrame {
   implicitPlots: ImplicitPlot[]
   /** Determinant fills defined in this frame (via fill_determinant() calls) */
   determinantFills: DeterminantFill[]
+  /** Formula labels defined in this frame (via show_formula() calls) */
+  formulas: FormulaLabel[]
   /** Python code for this frame */
   code: string
   /** Parameter slider values (t1, t2, t3, etc.) */

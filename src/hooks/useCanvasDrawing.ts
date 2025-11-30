@@ -300,6 +300,7 @@ export function useCanvasDrawing({
         parametricPlots: [],
         implicitPlots: [],
         determinantFills: [],
+        formulas: [],
         bounds: newBounds,
         viewport: {
           x: 0,

@@ -14,6 +14,7 @@ import { drawFrameFunctions } from './functionDrawing'
 import { drawFrameParametricPlots } from './parametricDrawing'
 import { drawFrameImplicitPlots } from './implicitDrawing'
 import { drawFrameDeterminantFills } from './determinantDrawing'
+import { drawFrameFormulas } from './formulaDrawing'
 
 /**
  * Draw a coordinate frame on the canvas
@@ -286,6 +287,9 @@ export function drawCoordinateFrame(
   drawFrameFunctions(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
   drawFrameParametricPlots(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
   drawFrameImplicitPlots(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
+  
+  // Draw formula labels within clipped region
+  drawFrameFormulas(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
   
   // Recursively draw child frames
   frame.childFrameIds.forEach(childId => {
