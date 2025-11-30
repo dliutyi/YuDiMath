@@ -42,8 +42,9 @@ export const showFormulaImplementation: FunctionImplementation = (
   const formulaArg = args[0]
   const xArg = args[1]
   const yArg = args[2]
-  const colorArg = args.length > 3 ? args[3] : undefined
-  const sizeArg = args.length > 4 ? args[4] : undefined
+  // Handle None/null from Python - treat as undefined
+  const colorArg = args.length > 3 && args[3] !== null && args[3] !== undefined ? args[3] : undefined
+  const sizeArg = args.length > 4 && args[4] !== null && args[4] !== undefined ? args[4] : undefined
 
   // Validate formula is a string
   if (typeof formulaArg !== 'string') {
@@ -93,7 +94,7 @@ export const showFormulaImplementation: FunctionImplementation = (
 
   // Default color is white (suitable for dark backgrounds)
   const defaultColor = '#ffffff'
-  const color = colorArg ? validateColor(colorArg) : defaultColor
+  const color = colorArg !== undefined && colorArg !== null ? validateColor(colorArg) : defaultColor
 
   // Default size is 2px (will be adjusted by zoom levels)
   let size: number | undefined

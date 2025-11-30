@@ -288,7 +288,7 @@ export function drawCoordinateFrame(
   drawFrameParametricPlots(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
   drawFrameImplicitPlots(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
   
-  // Draw formula labels within clipped region
+  // Draw formula labels within clipped region (includes matrices rendered via draw_matrix)
   drawFrameFormulas(ctx, frame, viewport, canvasWidth, canvasHeight, allFrames)
   
   // Recursively draw child frames

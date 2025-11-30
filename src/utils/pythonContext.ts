@@ -163,6 +163,15 @@ export function createPythonFunctionWrapper(name: string): PythonFunctionCallbac
       if ('color' in keywords) {
         args.push(keywords.color)
       }
+    } else if (name === 'show_formula' || name === 'draw_matrix') {
+      // show_formula(formula, x, y, color?, size?) and draw_matrix(matrix, x, y, color?, size?)
+      // Add color first if provided, then size
+      if ('color' in keywords) {
+        args.push(keywords.color)
+      }
+      if ('size' in keywords) {
+        args.push(keywords.size)
+      }
     } else {
       // For other functions, just append all keyword values
       Object.values(keywords).forEach(value => args.push(value))

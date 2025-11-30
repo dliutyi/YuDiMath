@@ -797,6 +797,25 @@ def show_formula(formula, x, y, color=None, size=None):
     else:
         return _yudimath.show_formula(formula, x, y)
 
+# Wrapper for draw_matrix() that handles keyword arguments and numpy arrays
+def draw_matrix(matrix, x, y, color=None, size=None):
+    # Convert numpy array to list if needed
+    import numpy as np
+    if isinstance(matrix, np.ndarray):
+        matrix = matrix.tolist()
+    elif hasattr(matrix, 'tolist'):
+        matrix = matrix.tolist()
+    
+    # Pass to JavaScript implementation
+    if color is not None and size is not None:
+        return _yudimath.draw_matrix(matrix, x, y, color, size)
+    elif color is not None:
+        return _yudimath.draw_matrix(matrix, x, y, color)
+    elif size is not None:
+        return _yudimath.draw_matrix(matrix, x, y, None, size)
+    else:
+        return _yudimath.draw_matrix(matrix, x, y)
+
 # Wrapper for plot_implicit() that handles keyword arguments and callables
 def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, color=None):
     # Handle both positional and keyword arguments
@@ -2208,6 +2227,25 @@ def show_formula(formula, x, y, color=None, size=None):
     else:
         return _yudimath.show_formula(formula, x, y)
 
+# Wrapper for draw_matrix() that handles keyword arguments and numpy arrays
+def draw_matrix(matrix, x, y, color=None, size=None):
+    # Convert numpy array to list if needed
+    import numpy as np
+    if isinstance(matrix, np.ndarray):
+        matrix = matrix.tolist()
+    elif hasattr(matrix, 'tolist'):
+        matrix = matrix.tolist()
+    
+    # Pass to JavaScript implementation
+    if color is not None and size is not None:
+        return _yudimath.draw_matrix(matrix, x, y, color, size)
+    elif color is not None:
+        return _yudimath.draw_matrix(matrix, x, y, color)
+    elif size is not None:
+        return _yudimath.draw_matrix(matrix, x, y, None, size)
+    else:
+        return _yudimath.draw_matrix(matrix, x, y)
+
 # Wrapper for plot_implicit() that handles keyword arguments and callables
 def plot_implicit(equation, x_min=None, x_max=None, y_min=None, y_max=None, color=None):
     # Handle both positional and keyword arguments
@@ -2361,6 +2399,20 @@ def show_formula(formula, x, y, color=None, size=None):
         return __yudimath_show_formula(formula, x, y, None, size)
     else:
         return __yudimath_show_formula(formula, x, y)
+
+# Wrapper for draw_matrix() that handles keyword arguments and numpy arrays
+def draw_matrix(matrix, x, y, color=None):
+    # Convert numpy array to list if needed
+    import numpy as np
+    if isinstance(matrix, np.ndarray):
+        matrix = matrix.tolist()
+    elif hasattr(matrix, 'tolist'):
+        matrix = matrix.tolist()
+    
+    if color is not None:
+        return __yudimath_draw_matrix(matrix, x, y, color)
+    else:
+        return __yudimath_draw_matrix(matrix, x, y)
 `
       for (const name of functionNames) {
         pyodide.globals.set(`__yudimath_${name}`, jsFunctions[name])

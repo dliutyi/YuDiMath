@@ -244,6 +244,7 @@ function App() {
     workspace.updateFrame(frameId, { formulas: [] })
   }
 
+
   const [autoExecuteCode, setAutoExecuteCode] = useState<string | null>(null)
   const [autoExecuteFrameId, setAutoExecuteFrameId] = useState<string | null>(null)
   const isSliderTriggeredRef = useRef<boolean>(false) // Track if execution is slider-triggered
@@ -430,7 +431,7 @@ function App() {
             handleFunctionsUpdate(frameIdToExecute, newFunctions, true)
             handleParametricPlotsUpdate(frameIdToExecute, newParametricPlots, true)
             handleImplicitPlotsUpdate(frameIdToExecute, newImplicitPlots, true)
-            handleFormulasUpdate(frameIdToExecute, newFormulas, true)
+                handleFormulasUpdate(frameIdToExecute, newFormulas, true)
           })
         } else {
           // On error, set error result (this will be displayed)
@@ -449,7 +450,7 @@ function App() {
             handleFunctionsClear(frameIdToExecute)
             handleParametricPlotsClear(frameIdToExecute)
             handleImplicitPlotsClear(frameIdToExecute)
-            handleFormulasClear(frameIdToExecute)
+                handleFormulasClear(frameIdToExecute)
           })
         }
         // Clear auto-execute trigger after execution

@@ -65,6 +65,15 @@ basis_matrix = np.column_stack([base_i, base_j])${parameterCode}
 #   Example: fill_determinant(np.array([1, 0]), np.array([0, 1]))  # Unit square
 #   Example: fill_determinant(np.array([3, 0]), np.array([0, 2]), color='#ff000080')  # Rectangle
 #   Example: fill_determinant(np.array([2, 1]), np.array([1, 2]))  # Parallelogram
+# - show_formula(formula, x, y, color?, size?) - Display a LaTeX formula at specified coordinates
+#   Example: show_formula(r'x^2 + y^2 = r^2', 0, 0)
+#   Example: show_formula(r'\\frac{a}{b}', 2, 2, color='#ff0000')
+#   Example: show_formula(r'\\alpha + \\beta = \\gamma', -2, 2, size=20)
+#   Example: show_formula(r'\\int_{0}^{1} x^2 dx = \\frac{1}{3}', 0, -2, color='#00ff00', size=18)
+# - draw_matrix(matrix, x, y, color?, size?) - Display a matrix using LaTeX (sugar syntax for show_formula)
+#   Example: draw_matrix(np.array([[1, 2], [3, 4]]), 0, 0)
+#   Example: draw_matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]], 2, 2, color='#ff0000')
+#   Example: draw_matrix(np.eye(3), -2, -2, size=20)
 
 # Example usage:
 # draw(np.array([2, 3]), color='#00ff00')
@@ -74,6 +83,13 @@ basis_matrix = np.column_stack([base_i, base_j])${parameterCode}
 # plot_implicit('x**2 + y**2 - 16', -10, 10, -10, 10, color='#00ff00')  # Circle
 # plot_implicit(lambda x, y: x**2 + y**2 - 16, -10, 10, -10, 10)  # Circle with lambda
 # fill_determinant(np.array([1, 0]), np.array([0, 1]), color='#3b82f680')  # Unit square
+# show_formula(r'x^2 + y^2 = r^2', 0, 0)  # Simple formula
+# show_formula(r'\\frac{a}{b}', 2, 2)  # Fraction
+# show_formula(r'\\alpha + \\beta = \\gamma', -2, 2, color='#ffff00')  # Greek letters
+# show_formula(r'\\int_{0}^{1} x^2 dx = \\frac{1}{3}', 0, -2, color='#00ff00', size=18)  # Complex formula
+# draw_matrix(np.array([[1, 2], [3, 4]]), 0, 0)  # 2x2 matrix
+# draw_matrix(np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]]), 2, 2)  # 3x3 identity matrix
+# draw_matrix(np.eye(3), -2, -2, color='#ff0000', size=20)  # Identity matrix with color and size
 `
 }
 

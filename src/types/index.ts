@@ -209,7 +209,7 @@ export interface CoordinateFrame {
   implicitPlots: ImplicitPlot[]
   /** Determinant fills defined in this frame (via fill_determinant() calls) */
   determinantFills: DeterminantFill[]
-  /** Formula labels defined in this frame (via show_formula() calls) */
+  /** Formula labels defined in this frame (via show_formula() and draw_matrix() calls) */
   formulas: FormulaLabel[]
   /** Python code for this frame */
   code: string
