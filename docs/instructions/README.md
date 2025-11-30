@@ -80,12 +80,18 @@ This directory contains the complete development instructions for the YuDiMath p
 **File**: [phase-14-documentation-finalization.md](phase-14-documentation-finalization.md)  
 **Steps**: 2 steps (14.1 - 14.2)
 
+### ⏳ Phase 15: LaTeX Formula Rendering and Matrix Visualization
+**Status**: ⏳ **NOT STARTED** - All steps pending  
+**File**: [phase-15-latex-and-matrix-visualization.md](phase-15-latex-and-matrix-visualization.md)  
+**Steps**: 8 steps (15.1 - 15.8)
+
 ## Summary
 
-- **Total Phases**: 14
+- **Total Phases**: 15
 - **Completed Phases**: 9 ✅
 - **Partial Phases**: 4 ⚠️
 - **Deferred Phases**: 1 ⏸️
+- **Not Started Phases**: 1 ⏳
 
 ## How to Use This Documentation
 
@@ -116,7 +122,8 @@ docs/instructions/
 ├── phase-11-implicit-function-plotting.md # Phase 11 instructions
 ├── phase-12-determinant-visualization.md # Phase 12 instructions
 ├── phase-13-extended-code-editor-mode.md # Phase 13 instructions
-└── phase-14-documentation-finalization.md # Phase 14 instructions
+├── phase-14-documentation-finalization.md # Phase 14 instructions
+└── phase-15-latex-and-matrix-visualization.md # Phase 15 instructions
 ```
 
 Each phase file is self-sufficient and includes:

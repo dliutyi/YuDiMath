@@ -17,6 +17,8 @@ Before considering the project complete, verify:
 - [ ] plot_parametric() function renders parametric curves
 - [ ] plot_implicit() function renders implicit equations
 - [ ] fill_determinant() function fills parallelogram formed by two vectors
+- [ ] show_formula() function renders LaTeX formulas at specified coordinates
+- [ ] draw_matrix() function renders matrices with brackets and elements
 - [ ] Workspace export/import works
 - [ ] All UI controls function correctly
 - [ ] Application is responsive and performant
